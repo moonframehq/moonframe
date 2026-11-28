@@ -1,0 +1,5 @@
+strict graph G {
+  a -- b -- c;
+  b -- d [style=dotted];
+  d [shape=diamond, label=<<b>Decide</b>>];
+}

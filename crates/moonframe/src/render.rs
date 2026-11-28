@@ -11,6 +11,7 @@ mod browser;
 pub(crate) mod cached;
 mod carry;
 mod divider;
+mod document;
 mod elements;
 mod ends;
 mod floating;
@@ -30,6 +31,7 @@ mod place;
 mod plot;
 mod pointer;
 mod popover;
+mod reveal;
 mod revision_timeline;
 mod stack_measure;
 mod styling;
@@ -73,11 +75,14 @@ use {
 use crate::terminal::Terminals;
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use divider::kept as dividers_kept;
+#[cfg(feature = "capture")]
+pub(crate) use viewer::forget_window;
 pub(crate) use {
     divider::{
         closed as dividers_closed, frame_drawn as dividers_drawn, keystroke as divider_keystroke,
     },
     focus_keys::{FocusKeys, closed as focus_keys_closed, drawn as focus_keys_drawn},
+    reveal::Pending,
 };
 
 static NO_RULES: LazyLock<Rules> = LazyLock::new(Rules::default);
@@ -323,6 +328,12 @@ pub(crate) struct Painter<'w, 'm> {
     /// The stacks being drawn that hear presses `outside` them: popovers
     /// and overlays drawn inside them record their boxes in each.
     outside: Vec<outside::Inside>,
+    /// The keys the scrolling stacks being drawn are to reveal, outermost
+    /// first.
+    reveal: Vec<Rc<Pending>>,
+    /// A pane or keyed child drawn so far is growing or shrinking: what
+    /// moves the rows after it, unlike a spinner or an easing color.
+    resizing: bool,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -372,6 +383,8 @@ impl<'w, 'm> Painter<'w, 'm> {
             live_again: Vec::new(),
             layering: None,
             outside: Vec::new(),
+            reveal: Vec::new(),
+            resizing: false,
         }
     }
 
@@ -596,7 +609,9 @@ impl<'w, 'm> Painter<'w, 'm> {
         if transition.is_some() {
             tracing::trace!(pane = %place.path, visible, ?shown, "pane motion");
         }
-        self.animating |= matches!(shown, Shown::Moving(_));
+        let moving = matches!(shown, Shown::Moving(_));
+        self.animating |= moving;
+        self.resizing |= moving;
         shown
     }
 
@@ -776,6 +791,7 @@ fn draw_node<'w>(
         Node::Map(map) => map.draw(painter, place, cx),
         Node::Terminal(terminal) => terminal.draw(painter, place, cx),
         Node::Browser(browser) => browser.draw(painter, place, cx),
+        Node::Document(document) => document.draw(painter, place, cx),
         Node::Video(video) => video.draw(painter, place, cx),
         Node::View(view) => view.draw(painter, place, cx),
         Node::Input(input) => input.draw(painter, place, cx),

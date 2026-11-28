@@ -472,18 +472,7 @@ impl Module {
         windows: &BTreeMap<String, ListWindow>,
         strict: bool,
     ) -> Result<(Node, Vec<Error>, Reads), Error> {
-        self.meter.reset();
-        let app = self.lens.open(&self.lua, app)?;
-        let call = if self.definition.component {
-            self.definition
-                .view
-                .call::<Value>((self.props.clone(), self.state.clone(), app))
-        } else {
-            self.definition
-                .view
-                .call::<Value>((self.state.clone(), app, self.props.clone()))
-        };
-        let tree = call.map_err(|error| Error::from(error).context("view"))?;
+        let tree = self.run_view(app)?;
         // A list's rows are built as it is read, and may read `app` too.
         let (node, problems) =
             node::read(&tree, sheet, windows, strict).map_err(|error| error.context("view"))?;
@@ -496,6 +485,30 @@ impl Module {
                 .collect(),
             self.lens.reads(),
         ))
+    }
+
+    /// Runs `view(state, app)`, or a component's `build`, and returns the
+    /// table as it built it, unread.
+    fn run_view(&self, app: &Rc<AppData>) -> Result<Value, Error> {
+        self.meter.reset();
+        let app = self.lens.open(&self.lua, app)?;
+        let call = if self.definition.component {
+            self.definition
+                .view
+                .call::<Value>((self.props.clone(), self.state.clone(), app))
+        } else {
+            self.definition
+                .view
+                .call::<Value>((self.state.clone(), app, self.props.clone()))
+        };
+        call.map_err(|error| Error::from(error).context("view"))
+    }
+
+    /// The view's table as it built it, for the conformance tests, which
+    /// compare it with what another host's view builds.
+    #[cfg(test)]
+    pub(crate) fn raw_view(&self, app: &Rc<AppData>) -> Result<Value, Error> {
+        self.run_view(app)
     }
 
     /// Notes how much of its limits the call that just ended came to use.

@@ -10,11 +10,15 @@ use {
 };
 
 // keep-sorted start
+mod agent_chat;
 mod app_icons;
 mod check_data;
 mod checks;
 mod components;
+mod composer_field;
+mod conformance;
 mod dictation;
+mod document;
 mod drawn_text;
 mod elements;
 mod entries;
@@ -26,6 +30,7 @@ mod gestures;
 mod history;
 mod input_caret;
 mod lightbox;
+mod list_scroll;
 mod maps;
 mod markdown_tooltips;
 mod menu_checks;
@@ -40,11 +45,14 @@ mod pointer;
 mod revision_timeline;
 mod scroll_end;
 mod scroll_sync;
+mod scroll_to;
 mod scrollbar;
+mod scrolled_children;
 mod shell;
 mod split_resize;
 mod stack_measure;
 mod state;
+mod style_ranges;
 mod styles;
 mod switchyard;
 mod t3_overview;

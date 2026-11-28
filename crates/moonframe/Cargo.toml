@@ -27,8 +27,8 @@ browser = ["dep:dispatch2", "dep:objc2-web-kit", "dep:wry"]
 # Developer-only export of this app's own rendered frame, without desktop capture,
 # and `render_entry`: one miniapp entry drawn headless to PNG.
 capture = ["dep:gpui-apple-capture", "dep:gpui-capture", "dep:gpui-platform-capture", "dep:image"]
-# The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
-# attached over herdr's chat protocol.
+# The `chat` native provider (`app.chat`): agent chats run by Sheprd's
+# sheprd-acp, attached over its chat protocol.
 chat = ["dep:moonframe-chat"]
 default = [
   # keep-sorted start
@@ -53,6 +53,9 @@ default = [
 # `app.crash`: a panic leaves a report in the state folder, and the next
 # launch offers it. Off by default; the starter turns it on.
 crash = []
+# `ui.diagram`: diagrams drawn, laid out and edited by moonframe-diagram.
+# Off by default; the starter turns it on.
+diagram = ["dep:moonframe-diagram", "moonframe-diagram/view"]
 # `app.displays`, and a mod's window placed with `display` and `fullscreen`.
 # Off by default; the starter turns it on.
 displays = []
@@ -132,6 +135,10 @@ sealed = ["moonframe-packages/sealed"]
 # sessions and their transcripts, read only, for Cinder. Off by default;
 # the starter turns it on.
 transcripts = ["dep:moonframe-transcripts"]
+# The `terminals` native provider (`app.terminals`): every terminal
+# herdr-core and tmux run, and the coding agents in them, for an agent
+# workspace such as Moonmux. Off by default; the starter turns it on.
+terminals = ["dep:moonframe-terminals"]
 # Socket providers (`kind = "socket"`): a program that runs on its own. Off
 # by default; the starter turns it on.
 socket = ["moonframe-providers/socket"]
@@ -205,6 +212,7 @@ markdown                      = { optional = true, workspace = true }
 moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
+moonframe-diagram             = { optional = true, workspace = true }
 moonframe-docs                = { optional = true, workspace = true }
 moonframe-documents           = { optional = true, workspace = true }
 moonframe-forge               = { optional = true, workspace = true }
@@ -222,6 +230,7 @@ moonframe-shell               = { optional = true, workspace = true }
 moonframe-speech              = { optional = true, workspace = true }
 moonframe-store.workspace     = true
 moonframe-terminal            = { optional = true, workspace = true }
+moonframe-terminals           = { optional = true, workspace = true }
 moonframe-transcripts         = { optional = true, workspace = true }
 moonframe-usage               = { optional = true, workspace = true }
 notify.workspace              = true
@@ -255,7 +264,7 @@ moonframe-frames   = { optional = true, workspace = true }
 # `ui.browser`'s keys and clipping: a key monitor and the view a page sits in.
 block2.workspace = true
 objc2.workspace  = true
-objc2-app-kit    = { features = ["NSBezierPath", "NSBitmapImageRep", "NSButton", "NSButtonCell", "NSCell", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSGraphics", "NSGraphicsContext", "NSImage", "NSImageRep", "NSImageView", "NSMenu", "NSMenuItem", "NSPanel", "NSPrintInfo", "NSPrintOperation", "NSRunningApplication", "NSSavePanel", "NSScreen", "NSSharingService", "NSSound", "NSStatusBar", "NSStatusBarButton", "NSStatusItem", "NSView", "NSWindow", "block2"], workspace = true }
+objc2-app-kit    = { features = ["NSAppearance", "NSBezierPath", "NSBitmapImageRep", "NSButton", "NSButtonCell", "NSCell", "NSColor", "NSControl", "NSDockTile", "NSEvent", "NSGraphics", "NSGraphicsContext", "NSImage", "NSImageRep", "NSImageView", "NSMenu", "NSMenuItem", "NSPanel", "NSPrintInfo", "NSPrintOperation", "NSRunningApplication", "NSSavePanel", "NSScreen", "NSSharingService", "NSSound", "NSStatusBar", "NSStatusBarButton", "NSStatusItem", "NSView", "NSWindow", "block2"], workspace = true }
 objc2-foundation = { features = ["NSArray", "NSGeometry", "NSNotification", "NSOperation", "NSURL", "NSValue"], workspace = true }
 # Finding the AppKit window a trackpad gesture happened in.
 raw-window-handle.workspace = true

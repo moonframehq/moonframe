@@ -35,9 +35,33 @@ ui.icon = element("icon", "name")
 ui.image = element("image", "src")
 ui.terminal = element("terminal", "id")
 ui.browser = element("browser", "url")
+ui.document = element("document", "html")
 ui.video = element("video", "source")
 ui.markdown = element("markdown", "text")
 ui.view = element("view", "name")
+-- `ui.diagram { id = "main", shapes = ..., links = ... }`: the built-in
+-- `diagram` view (the `diagram` feature); every key but `id`, `class` and
+-- `style` is its props.
+ui.diagram = function(props: any)
+	if type(props) ~= "table" then
+		error("ui.diagram takes a table", 2)
+	end
+	local inner = {}
+	for key, value in props do
+		if key ~= "id" and key ~= "class" and key ~= "style" then
+			inner[key] = value
+		end
+	end
+	return {
+		type = "view",
+		name = "diagram",
+		id = props.id,
+		class = props.class,
+		style = props.style,
+		props = inner,
+		__line = caller_line(),
+	}
+end
 ui.button = element("button", "label")
 ui.item = element("item", "label")
 ui.region = element("region", "name")

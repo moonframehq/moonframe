@@ -9,6 +9,7 @@ use {
 };
 
 // keep-sorted start
+mod document;
 mod embed;
 mod ends;
 mod gesture;
@@ -16,6 +17,7 @@ mod icon;
 mod input;
 mod instance;
 mod layout;
+mod list_scroll;
 mod map;
 mod pointer;
 mod read;
@@ -27,8 +29,9 @@ mod video;
 // keep-sorted end
 
 pub use {
-    embed::*, ends::*, gesture::*, icon::*, input::*, instance::*, layout::*, map::*, pointer::*,
-    revision_timeline::*, rows::*, snapshot::*, tokens::*, video::*,
+    document::*, embed::*, ends::*, gesture::*, icon::*, input::*, instance::*, layout::*,
+    list_scroll::*, map::*, pointer::*, revision_timeline::*, rows::*, snapshot::*, tokens::*,
+    video::*,
 };
 
 pub(crate) use read::{element_keys, read};
@@ -52,6 +55,8 @@ pub enum Node {
     Map(Map),
     Terminal(Terminal),
     Browser(Browser),
+    /// HTML shown sealed: no script, no network.
+    Document(Document),
     /// Frames from another process, from a ring in shared memory.
     Video(Video),
     /// A view the app writes in Rust, by name.

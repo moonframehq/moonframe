@@ -7,7 +7,10 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 // keep-sorted start
+mod agent_chat;
 mod both_backends;
+mod chat_toolbar;
+mod composer_field;
 mod divider_keys;
 mod focus_keys;
 mod host_views;
@@ -15,16 +18,21 @@ mod input_caret;
 mod inspect_context;
 mod list_range;
 mod list_rows;
+mod list_scroll;
 mod markdown_scroll;
 mod markdown_tooltips;
 mod outside;
 mod overlay_letter_keys;
+mod overlay_scroll_to;
 mod page_text;
 mod paste;
 mod regressions;
 mod revision_timeline;
 mod scroll_end;
 mod scroll_sync;
+mod scroll_to_at;
+mod scroll_to_key;
+mod scrolled_children;
 mod secret_input;
 mod spinner;
 mod split_resize;

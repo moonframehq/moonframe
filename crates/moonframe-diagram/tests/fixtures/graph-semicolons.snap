@@ -1,0 +1,7 @@
+Flow Down
+node A "A" box
+node B "B" box
+node C "C" box
+edge e0 A -> B Solid none..arrow
+edge e1 B -> C Solid none..arrow
+edge e2 C -> A Solid none..none

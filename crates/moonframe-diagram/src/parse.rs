@@ -1,0 +1,159 @@
+//! Text into the model: Mermaid ([`mermaid`]) and Graphviz DOT ([`dot`]).
+//! Our own parsers, so a diagram an agent writes needs no browser or
+//! Node.js; layout is always ours, so both look alike.
+//!
+//! What a parser does not understand it says, with the line, rather than
+//! drawing half a diagram: the caller shows the text as code instead.
+
+pub mod dot;
+pub mod mermaid;
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests;
+
+use crate::model::Diagram;
+
+/// The most nodes a parsed diagram may have: text from anywhere (an
+/// agent, a file) can't make one that takes the layout minutes.
+pub const MOST_NODES: usize = 5_000;
+/// The most edges, which `a & b --> c & d` or DOT's `{a b} -> {c d}`
+/// multiply.
+pub const MOST_EDGES: usize = 20_000;
+/// The deepest nesting of subgraphs or groups a parser follows.
+pub(crate) const MOST_DEPTH: usize = 64;
+
+/// Why a text is not a diagram this crate draws.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Unsupported {
+    /// The line it stopped at, from 1; 0 for the text as a whole.
+    pub line: usize,
+    pub reason: String,
+}
+
+impl Unsupported {
+    pub(crate) fn too_big(line: usize) -> Self {
+        Self::at(
+            line,
+            format!("more than {MOST_NODES} nodes or {MOST_EDGES} edges"),
+        )
+    }
+
+    pub(crate) fn at(line: usize, reason: impl Into<String>) -> Self {
+        Self {
+            line,
+            reason: reason.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for Unsupported {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.line == 0 {
+            write!(f, "{}", self.reason)
+        } else {
+            write!(f, "line {}: {}", self.line, self.reason)
+        }
+    }
+}
+
+impl std::error::Error for Unsupported {}
+
+/// A fenced block's text by its language: `mermaid`, `dot` or `graphviz`.
+/// `None` for another language.
+pub fn fenced(language: &str, text: &str) -> Option<Result<Diagram, Unsupported>> {
+    match language.trim().to_ascii_lowercase().as_str() {
+        "mermaid" => Some(mermaid::parse(text)),
+        "dot" | "graphviz" | "gv" => Some(dot::parse(text)),
+        _ => None,
+    }
+}
+
+/// `diagram`, unless it is bigger than a diagram may be: every parser's
+/// last word, whatever kind of diagram it read.
+pub(crate) fn within_limits(diagram: Diagram) -> Result<Diagram, Unsupported> {
+    let edges = diagram.edges.len() + diagram.messages.len() + diagram.notes.len();
+    if diagram.nodes.len() + diagram.groups.len() > MOST_NODES || edges > MOST_EDGES {
+        return Err(Unsupported::too_big(0));
+    }
+    Ok(diagram)
+}
+
+/// A label as written, made plain: quotes off, `<br>` as a space,
+/// Mermaid's markdown strings (`` "`**bold**`" ``) as their words, and its
+/// `#quot;` style entities decoded.
+pub(crate) fn label(raw: &str) -> String {
+    let mut text = raw.trim();
+    if text.len() >= 2 && text.starts_with('"') && text.ends_with('"') {
+        text = &text[1..text.len() - 1];
+    }
+    if text.len() >= 2 && text.starts_with('`') && text.ends_with('`') {
+        text = &text[1..text.len() - 1];
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('<') {
+        out.push_str(&rest[..at]);
+        let tail = &rest[at..];
+        let lower = tail.get(..6).unwrap_or(tail).to_ascii_lowercase();
+        if lower.starts_with("<br") {
+            out.push(' ');
+            rest = tail.find('>').map_or("", |end| &tail[end + 1..]);
+        } else if tail[1..].starts_with(|c: char| c == '/' || c.is_ascii_alphabetic()) {
+            // Other tags (`<b>`, `</i>`) leave their words. With no `>`
+            // left, no later `<` opens a tag either: the rest is text,
+            // and a label full of `<` is still read in one pass.
+            let Some(end) = tail.find('>') else {
+                out.push_str(tail);
+                rest = "";
+                break;
+            };
+            rest = &tail[end + 1..];
+        } else {
+            out.push('<');
+            rest = &tail[1..];
+        }
+    }
+    out.push_str(rest);
+    let out = decode(&out.replace("**", "").replace("\\n", " "));
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Mermaid's entities, named (`#quot;`, `#amp;`, `#lt;`, `#gt;`) or by
+/// number (`#35;`), decoded in one pass: what one decodes to is not read
+/// again, so `#35;lt;` is `#lt;`, not `<`.
+fn decode(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('#') {
+        out.push_str(&rest[..at]);
+        let tail = &rest[at + 1..];
+        // An entity's name is at most 7 bytes: look no further for its `;`,
+        // so a long label full of `#` is read in one pass.
+        let near = &tail.as_bytes()[..tail.len().min(8)];
+        let entity = near.iter().position(|&b| b == b';').and_then(|end| {
+            let decoded = match &tail[..end] {
+                "quot" => '"',
+                "amp" => '&',
+                "lt" => '<',
+                "gt" => '>',
+                number if !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()) => {
+                    char::from_u32(number.parse().ok()?)?
+                },
+                _ => return None,
+            };
+            Some((decoded, end))
+        });
+        match entity {
+            Some((decoded, end)) => {
+                out.push(decoded);
+                rest = &tail[end + 1..];
+            },
+            None => {
+                out.push('#');
+                rest = tail;
+            },
+        }
+    }
+    out.push_str(rest);
+    out
+}

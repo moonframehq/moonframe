@@ -1,0 +1,226 @@
+-- A run of an agent's tool calls folded to one line: a status icon, what
+-- the run did ("Read 3 files, ran 2 commands") and the lines it changed.
+-- Open, each call on a line of its own with the end of its output, the
+-- files it changed and a sub-agent's step count; thoughts between calls
+-- show as quiet lines. It draws a `ToolGroup` from `app.chat`'s view.
+
+type Props = {
+	group: any,
+	inspect: boolean?,
+	output: any,
+	open: boolean?,
+	msg: any,
+	to: string?,
+}
+
+-- Lucide icons for herdr's tool kinds.
+local KIND_ICONS: { [string]: string } = {
+	read = "file-text",
+	edit = "pencil",
+	delete = "trash-2",
+	move = "replace",
+	search = "search",
+	execute = "terminal",
+	think = "brain",
+	fetch = "globe",
+	switch_mode = "sliders-horizontal",
+	subagent = "bot",
+	other = "settings-2",
+}
+
+local function status_icon(status: string): any
+	if status == "running" or status == "pending" then
+		return ui.icon { name = "loader-circle", size = "small", spin = true, class = "tool-group-running" }
+	elseif status == "failed" then
+		return ui.icon { name = "circle-x", size = "small", class = "tool-group-failed" }
+	end
+	return ui.icon { name = "check", size = "small", class = "tool-group-done" }
+end
+
+-- "+12 −3", or nothing without counts.
+local function counts(file: any): any
+	if file.added == nil and file.removed == nil then
+		return nil
+	end
+	return ui.row {
+		gap = "small",
+		hug = true,
+		(file.added or 0) > 0 and ui.text { `+{file.added}`, size = "small", class = "tool-group-added" },
+		(file.removed or 0) > 0 and ui.text { `−{file.removed}`, size = "small", class = "tool-group-removed" },
+	}
+end
+
+-- The lines a group added and removed, over every file.
+local function totals(files: { any }): (number, number)
+	local added, removed = 0, 0
+	for _, file in files do
+		added += file.added or 0
+		removed += file.removed or 0
+	end
+	return added, removed
+end
+
+local function output_view(tool: any, props: Props): any
+	if not tool.detail then return nil end
+	local running = tool.status == "running" or tool.status == "pending"
+	local fetchable = not running and tool.output_key ~= nil
+	local key = if fetchable then tool.output_key else tool.id
+	local output = props.output
+	local expanded = output and output.key == key and (output.fetch == nil or output.fetch == fetchable)
+	local page = if output then (output.page or 0) else 0
+	local function request(target: number): any
+		return { inspect = key, page = target, fetch = fetchable }
+	end
+	return ui.column {
+		gap = "none",
+		ui.row {
+			class = "tool-group-detail",
+			align = "start",
+			msg = props.inspect and (if expanded then { close_output = true } else request(0)),
+			to = props.to,
+			tooltip = props.inspect and (if expanded then "Collapse output" else "Expand output") or nil,
+			ui.column { grow = true, ui.text {
+				if expanded and fetchable then output.text or tool.detail else tool.detail,
+				size = "small", wrap = true, lines = if expanded then nil else 3,
+			} },
+			props.inspect and ui.icon { name = if expanded then "chevron-up" else "chevron-down", size = "small" },
+		},
+		expanded and fetchable and (page > 0 or output.more) and ui.row {
+			gap = "small",
+			page > 0 and ui.button { "Previous", small = true, msg = request(page - 1), to = props.to },
+			output.more and ui.button { "Next", small = true, msg = request(page + 1), to = props.to },
+		},
+	}
+end
+
+local function call_line(tool: any, props: Props): any
+	local files: { any } = {}
+	for _, file in tool.files or {} do
+		table.insert(files, ui.row {
+			class = "tool-group-file",
+			gap = "small",
+			align = "center",
+			ui.icon { name = if file.new then "plus" else "file", size = "small" },
+			ui.text { file.path, size = "small", truncate = true },
+			counts(file),
+		})
+	end
+	return ui.column {
+		class = "tool-group-call",
+		gap = "small",
+		ui.row {
+			gap = "small",
+			align = "center",
+			ui.icon { name = (KIND_ICONS[tool.kind] or "settings-2") :: any, size = "small", class = "tool-group-kind" },
+			ui.text { tool.title, size = "small", class = "tool-group-call-title", truncate = true },
+			(tool.steps or 0) > 0 and ui.text {
+				`{tool.steps} {if tool.steps == 1 then "step" else "steps"}`,
+				size = "small",
+				tone = "muted",
+			},
+			status_icon(tool.status),
+		},
+		output_view(tool, props),
+		#files > 0 and ui.column { gap = "small", table.unpack(files) },
+	}
+end
+
+return component {
+	title = "Tool Group",
+	category = "Data",
+	icon = "workflow",
+	description = "A run of an agent's tool calls folded to one line with its status and changed lines; open, each call with its output's end and its files.",
+	when = "Inside a chat with a coding agent, for each `tools` row of `app.chat`'s view (`agent-chat` draws them). For one agent run's whole progress use `agent-run`; for a plain fold use `collapsible`.",
+	props = {
+		["group"] = "a `ToolGroup` from `app.chat`: { key, title, status (\"running\" \"done\" \"failed\"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = \"tool\", id, kind, title, status, detail?, output_key?, files, steps } or { type = \"thought\", gist, text } } }",
+		["open"] = "show its calls",
+		["inspect"] = "enable clicking a detail to send { inspect, page, fetch } or { close_output = true }",
+		["output"] = "the expanded detail { key, page, text?, more? }",
+		["msg"] = "message a click on the header sends (the mod flips `open`)",
+		["to"] = "mod to send it to, if not the drawing one",
+	},
+	styles = {
+		[".tool-group"] = { border = true, border_color = "border", radius = 10, gap = 0 },
+		[".tool-group-head"] = { padding = { 7, 10 }, gap = 8, radius = 10 },
+		[".tool-group-head:hover"] = { background = "list-hover" },
+		[".tool-group-title"] = { size = "small", weight = "medium" },
+		[".tool-group-current"] = { size = "small", color = "muted-foreground" },
+		[".tool-group-body"] = { padding = { 4, 10, 10, 10 }, gap = 8, border = "top", border_color = "border" },
+		[".tool-group-kind"] = { color = "muted-foreground" },
+		[".tool-group-call-title"] = { font = "mono" },
+		[".tool-group-detail"] = { font = "mono", color = "muted-foreground", background = "muted", radius = 6, padding = { 4, 8 } },
+		[".tool-group-file"] = { padding = { 0, 0, 0, 20 }, color = "muted-foreground" },
+		[".tool-group-thought"] = { color = "muted-foreground" },
+		[".tool-group-running"] = { color = "accent" },
+		[".tool-group-done"] = { color = "success" },
+		[".tool-group-failed"] = { color = "danger" },
+		[".tool-group-added"] = { color = "success" },
+		[".tool-group-removed"] = { color = "danger" },
+	},
+	example = {
+		open = true,
+		group = {
+			key = "e2",
+			title = "Read 2 files, edited 1 file",
+			status = "done",
+			count = 3,
+			failed = 0,
+			more = 0,
+			files = { { path = "src/lib.rs", added = 12, removed = 3, new = false } },
+			items = {
+				{ type = "thought", gist = "Looking at the parser first", text = "" },
+				{ type = "tool", id = "a", kind = "read", title = "Read src/parse.rs", status = "done", steps = 0, files = {} },
+				{ type = "tool", id = "b", kind = "execute", title = "cargo test parse", status = "done", steps = 0, files = {}, detail = "test result: ok. 14 passed" },
+				{ type = "tool", id = "c", kind = "edit", title = "Edit src/lib.rs", status = "done", steps = 0, files = { { path = "src/lib.rs", added = 12, removed = 3, new = false } } },
+			},
+		},
+	},
+
+	build = function(props: Props)
+		local group = props.group or {}
+		local items: { any } = {}
+		if props.open then
+			if (group.more or 0) > 0 then
+				table.insert(items, ui.text { `{group.more} earlier calls`, size = "small", tone = "muted" })
+			end
+			for _, item in group.items or {} do
+				if item.type == "tool" then
+					table.insert(items, call_line(item, props))
+				elseif item.gist and item.gist ~= "" then
+					table.insert(items, ui.row {
+						class = "tool-group-thought",
+						gap = "small",
+						align = "center",
+						ui.icon { name = "brain", size = "small" },
+						ui.text { item.gist, size = "small", truncate = true },
+					})
+				end
+			end
+		end
+		local added, removed = totals(group.files or {})
+		local running = group.status == "running"
+		return ui.column {
+			class = "tool-group",
+			state = group.status,
+			ui.row {
+				class = "tool-group-head",
+				align = "center",
+				msg = props.msg,
+				to = props.to,
+				ui.icon { name = if props.open then "chevron-down" else "chevron-right", size = "small", class = "tool-group-kind" },
+				status_icon(group.status or "done"),
+				ui.column {
+					grow = true,
+					gap = "none",
+					ui.text { group.title or "", class = "tool-group-title", truncate = true },
+					running and group.current and group.current ~= group.title
+						and ui.text { group.current, class = "tool-group-current", truncate = true },
+				},
+				(group.failed or 0) > 0 and ui.text { `{group.failed} failed`, size = "small", tone = "danger" },
+				(added > 0 or removed > 0) and counts({ added = added, removed = removed }),
+				(group.count or 0) > 1 and ui.text { tostring(group.count), size = "small", tone = "muted" },
+			},
+			#items > 0 and ui.column { class = "tool-group-body", table.unpack(items) },
+		}
+	end,
+}

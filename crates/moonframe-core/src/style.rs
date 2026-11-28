@@ -95,6 +95,8 @@ tokens! {
         Map = "map",
         Terminal = "terminal",
         Browser = "browser",
+        /// A `ui.document`'s box, which its page fills.
+        Document = "document",
         /// A `ui.video`'s box.
         Video = "video",
         View = "view",

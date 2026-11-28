@@ -61,6 +61,7 @@ fn run(shared: &Shared, host: &Handle, id: &str, endpoint: &EndpointId) {
         }
         if gone {
             chat.phase = Phase::Ended("the chat program ended".to_owned());
+            chat.held.clear();
             state.dirty = true;
             state.unsaved = true;
             return;
@@ -98,6 +99,13 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
                 return false;
             }
             if let Some(chat) = state.chat_mut(id) {
+                // What was sent while it started goes first.
+                let mut writer = writer;
+                for (command_id, held) in std::mem::take(&mut chat.held) {
+                    if !command(&mut writer, command_id, held) {
+                        return false;
+                    }
+                }
                 chat.writer = Some(writer);
             }
         },
@@ -122,6 +130,7 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
             ServerMessage::Snapshot { cursor, transcript } => {
                 chat.cursor = Some(cursor);
                 chat.transcript = Some(*transcript);
+                chat.output_revisions.on_snapshot();
                 chat.phase = Phase::Live;
             },
             ServerMessage::Change { change, cursor } => {
@@ -130,7 +139,10 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
                     .as_mut()
                     .map(|transcript| transcript.apply(&change));
                 match applied {
-                    Some(Ok(())) => chat.cursor = Some(cursor),
+                    Some(Ok(())) => {
+                        chat.cursor = Some(cursor);
+                        chat.output_revisions.on_change(&change);
+                    },
                     // Out of step: start over from a snapshot.
                     Some(Err(_)) | None => {
                         chat.cursor = None;
@@ -152,7 +164,7 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
                             "reply": pending.reply, "action": pending.action, "ok": true,
                         }),
                     };
-                    send(host, &pending.owner, &answer);
+                    send(host, &pending.to, &answer);
                 }
             },
             ServerMessage::Bye { .. } => return true,
@@ -169,6 +181,19 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
             if let Some(chat) = state.chat_mut(id) {
                 chat.session = Some(session);
             }
+            state.unsaved = true;
+        }
+        // Another agent took the conversation over: a resume starts it.
+        if let Some(agent) = state
+            .chat(id)
+            .and_then(|chat| chat.transcript.as_ref())
+            .and_then(|transcript| transcript.harnesses.as_ref())
+            .and_then(|harnesses| harnesses.current)
+            .map(|agent| agent.name())
+            && let Some(chat) = state.chat_mut(id)
+            && chat.agent != agent
+        {
+            agent.clone_into(&mut chat.agent);
             state.unsaved = true;
         }
         state.dirty = true;

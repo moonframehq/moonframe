@@ -19,7 +19,7 @@ pub(crate) use unsupported::*;
 #[cfg(all(feature = "browser", any(target_os = "macos", windows)))]
 mod platform {
     use {
-        super::super::{Event, Outbox, Page},
+        super::super::{Event, Outbox, Page, sealed},
         gpui_kit::{App, Bounds, Pixels, Window},
         moonframe_core::is_web_url,
         std::{
@@ -92,22 +92,59 @@ mod platform {
             })
     }
 
+    /// The builder for a `ui.document`'s page, reporting to `outbox`: its
+    /// scripts off but the host's, a session that keeps nothing, and no
+    /// navigation but the document's own load. It loads the document once
+    /// sealed ([`seal`]).
+    fn sealed_builder(outbox: Outbox) -> WebViewBuilder<'static> {
+        let (load, reports) = (outbox.clone(), outbox);
+        WebViewBuilder::new()
+            .with_visible(false)
+            .with_focused(false)
+            .with_bounds(Rect::default())
+            .with_javascript_disabled()
+            .with_incognito(true)
+            .with_initialization_script_for_main_only(sealed::SCRIPT, true)
+            .with_ipc_handler(move |request| {
+                if let Some(reported) = sealed::read(request.body()) {
+                    reports.report(Event::Document(reported));
+                }
+            })
+            .with_navigation_handler(|url| url == sealed::BLANK)
+            .with_new_window_req_handler(|_, _| NewWindowResponse::Deny)
+            .with_download_started_handler(|_, _| false)
+            .with_on_page_load_handler(move |event, url| {
+                if matches!(event, PageLoadEvent::Finished) {
+                    load.report(Event::Finished(url));
+                }
+            })
+    }
+
     /// Builds `page`'s view on a later turn, outside this frame, and hands it
-    /// to the page; the window draws again to place it.
+    /// to the page; the window draws again to place it. A `sealed` one is a
+    /// document's.
     pub(crate) fn start(
         page: Rc<Page>,
         url: String,
         outbox: Outbox,
         local: Arc<AtomicBool>,
+        sealed: bool,
         window: &mut Window,
         cx: &mut App,
     ) {
-        let builder = builder(url, outbox, local);
+        let builder = if sealed {
+            sealed_builder(outbox)
+        } else {
+            builder(url, outbox, local)
+        };
         window
             .spawn(cx, async move |cx| {
                 #[cfg(target_os = "macos")]
                 let _ = cx.update(|window, _| {
                     page.built(macos::build(builder, window));
+                    if sealed {
+                        macos::seal(page.clone());
+                    }
                     window.refresh();
                 });
                 #[cfg(windows)]
@@ -126,6 +163,11 @@ mod platform {
                     };
                     let _ = cx.update(|window, _| {
                         page.built(built);
+                        // WebView2 has no content rules: the document's
+                        // policy and the refused navigations hold it.
+                        if sealed {
+                            page.sealed();
+                        }
                         window.refresh();
                     });
                 }
@@ -150,6 +192,43 @@ mod platform {
         pub(crate) fn script(&self, script: &'static str) {
             if let Err(error) = self.view.evaluate_script(script) {
                 tracing::debug!(%error, "browser script failed");
+            }
+        }
+
+        /// Shows `html`, a sealed document, in place of what it showed.
+        pub(crate) fn load_html(&self, html: &str) {
+            if let Err(error) = self.view.load_html(html) {
+                tracing::debug!(%error, "document load failed");
+            }
+        }
+
+        /// Calls `function` of the host's document script with `argument`,
+        /// data written as JSON, which no mod's text can make code of.
+        pub(crate) fn call(&self, function: &'static str, argument: &serde_json::Value) {
+            let script = format!(
+                "window.__moonframeDocument && window.__moonframeDocument.{function}({argument})"
+            );
+            if let Err(error) = self.view.evaluate_script(&script) {
+                tracing::debug!(%error, "document call failed");
+            }
+        }
+
+        /// Looks dark or light, as the app does: what `color-scheme` and a
+        /// page's `prefers-color-scheme` follow.
+        pub(crate) fn set_dark(&self, dark: bool) {
+            #[cfg(target_os = "macos")]
+            macos::appearance(&self.view, dark);
+            #[cfg(windows)]
+            {
+                use wry::WebViewExtWindows as _;
+                let theme = if dark {
+                    wry::Theme::Dark
+                } else {
+                    wry::Theme::Light
+                };
+                if let Err(error) = self.view.set_theme(theme) {
+                    tracing::debug!(%error, "document theme failed");
+                }
             }
         }
 
@@ -332,6 +411,57 @@ mod platform {
             clip.setFrameOrigin(AWAY);
         }
 
+        /// Gives `page`'s view WebKit's content rules for a document, which
+        /// block every load but `about:` and `data:`, then lets it load. A
+        /// view the rules cannot reach shows nothing.
+        pub(super) fn seal(page: std::rc::Rc<super::super::super::Page>) {
+            let Some(main) = MainThreadMarker::new() else {
+                return;
+            };
+            crate::pdf::macos::with_rules(0, main, move |rules| {
+                let rules = match rules {
+                    Ok(rules) => rules,
+                    Err(error) => {
+                        tracing::warn!("document: {error}");
+                        return;
+                    },
+                };
+                let sealed = page.native.borrow().as_ref().is_some_and(|native| {
+                    let view: Retained<objc2_web_kit::WKWebView> =
+                        Retained::into_super(native.view.webview());
+                    // SAFETY: the view's own content controller, shared by its
+                    // configuration's copies, on the main thread.
+                    unsafe {
+                        view.configuration()
+                            .userContentController()
+                            .addContentRuleList(&rules);
+                    }
+                    true
+                });
+                if sealed {
+                    page.sealed();
+                }
+            });
+        }
+
+        /// Gives the page the dark or the light look.
+        pub(super) fn appearance(view: &wry::WebView, dark: bool) {
+            use objc2_app_kit::{
+                NSAppearance, NSAppearanceCustomization as _, NSAppearanceNameAqua,
+                NSAppearanceNameDarkAqua,
+            };
+            // SAFETY: AppKit's own appearance names.
+            let name = unsafe {
+                if dark {
+                    NSAppearanceNameDarkAqua
+                } else {
+                    NSAppearanceNameAqua
+                }
+            };
+            let page: Retained<NSView> = Retained::into_super(Retained::into_super(view.webview()));
+            page.setAppearance(NSAppearance::appearanceNamed(name).as_deref());
+        }
+
         /// Whether the page can go back, and forward.
         pub(super) fn history(view: &wry::WebView) -> (bool, bool) {
             let page = view.webview();
@@ -421,6 +551,7 @@ mod unsupported {
         _: String,
         _: Outbox,
         _: Arc<AtomicBool>,
+        _: bool,
         _: &mut Window,
         _: &mut App,
     ) {
@@ -433,6 +564,12 @@ mod unsupported {
         pub(crate) fn reload(&self) {}
 
         pub(crate) fn script(&self, _: &'static str) {}
+
+        pub(crate) fn load_html(&self, _: &str) {}
+
+        pub(crate) fn call(&self, _: &'static str, _: &serde_json::Value) {}
+
+        pub(crate) fn set_dark(&self, _: bool) {}
 
         pub(crate) fn url(&self) -> Option<String> {
             None

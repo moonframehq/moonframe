@@ -107,3 +107,14 @@ fn the_message_is_the_mods_own_with_the_reading_added() {
     assert_eq!(told.get("content_width"), Some(&Data::Number(400.)));
     assert_eq!(told.get("fit"), Some(&Data::Number(3.)));
 }
+
+#[test]
+fn a_stack_is_told_again_when_missed_a_frame_or_the_count_went_back() {
+    use super::drawn_just_before;
+    assert!(!drawn_just_before(None, 0));
+    assert!(drawn_just_before(Some(4), 4));
+    assert!(drawn_just_before(Some(4), 5));
+    assert!(!drawn_just_before(Some(4), 6));
+    // A window drawn anew under an id it had: its frames start over.
+    assert!(!drawn_just_before(Some(40), 1));
+}

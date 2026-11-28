@@ -7,6 +7,7 @@
 
 use crate::{Command, Data, Error};
 
+// keep-sorted start
 mod awake;
 mod devtools;
 mod dock;
@@ -14,12 +15,14 @@ mod edit;
 mod guard;
 mod hotkey;
 mod icon;
+mod mailto;
 mod pdf;
 mod pick;
 mod share;
 mod status_item;
 mod text;
 mod window;
+// keep-sorted end
 
 pub use {
     awake::Awake,
@@ -245,12 +248,17 @@ fn restart(msg: &Data) -> Result<String, Error> {
     }
 }
 
-/// A web address, never a file or another program's scheme.
+/// A web address or one `mailto:` address, never a file or another
+/// program's scheme.
 fn open(msg: &Data) -> Result<String, Error> {
     match msg {
-        Data::String(url) if url.len() <= MAX_URL && crate::is_remote_url(url) => Ok(url.clone()),
+        Data::String(url)
+            if url.len() <= MAX_URL && (crate::is_remote_url(url) || mailto::is_mailto(url)) =>
+        {
+            Ok(url.clone())
+        },
         _ => Err(Error::new(format!(
-            "`{APP}open` takes a web address (https:// or http://, at most {MAX_URL} bytes)"
+            "`{APP}open` takes a web address (https:// or http://, at most {MAX_URL} bytes) or one mailto: address"
         ))),
     }
 }

@@ -10,7 +10,9 @@ members = [
   "crates/moonframe-acp",
   "crates/moonframe-app",
   "crates/moonframe-chat",
+  "crates/moonframe-chat-view",
   "crates/moonframe-core",
+  "crates/moonframe-diagram",
   "crates/moonframe-docs",
   "crates/moonframe-documents",
   "crates/moonframe-forge",
@@ -30,6 +32,7 @@ members = [
   "crates/moonframe-speech",
   "crates/moonframe-store",
   "crates/moonframe-terminal",
+  "crates/moonframe-terminals",
   "crates/moonframe-transcripts",
   "crates/moonframe-usage",
   "examples/host",
@@ -81,13 +84,13 @@ tokio      = { default-features = false, version = "1.54" }
 core-graphics-types = "0.2"
 # Running a provider's page render on the main thread, where WebKit lives.
 dispatch2           = { default-features = false, features = ["block2", "objc2", "std"], version = "0.3" }
-herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-chat-protocol", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
-herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-core-client", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
-herdr-credentials   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-credentials", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
-herdr-github        = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-github", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
-herdr-i18n          = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-i18n", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
-herdr-usage         = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-usage", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
-herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-vcs", rev = "7947567ddc1ede4e6940a2a8d388ba2182249445" }
+herdr-chat-protocol = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-chat-protocol", rev = "d68e0cc74f2d54a6e6db43b9f1f5640718e70942" }
+herdr-core-client   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-core-client", rev = "d68e0cc74f2d54a6e6db43b9f1f5640718e70942" }
+herdr-credentials   = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-credentials", rev = "d68e0cc74f2d54a6e6db43b9f1f5640718e70942" }
+herdr-github        = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-github", rev = "d68e0cc74f2d54a6e6db43b9f1f5640718e70942" }
+herdr-i18n          = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-i18n", rev = "d68e0cc74f2d54a6e6db43b9f1f5640718e70942" }
+herdr-usage         = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-usage", rev = "d68e0cc74f2d54a6e6db43b9f1f5640718e70942" }
+herdr-vcs           = { git = "https://github.com/penso/herdr-gpui", package = "sheprd-vcs", rev = "d68e0cc74f2d54a6e6db43b9f1f5640718e70942" }
 # An app's translations (`locales/<language>/*.ftl`) and how `ui.t`,
 # `ui.number` and `ui.date` write numbers and dates in its language
 # (moonframe-core). fluent-langneg 0.13 is the one fluent-bundle matches with.
@@ -113,7 +116,9 @@ mlua                = { features = ["luau"], version = "0.12.2" }
 moonframe           = { path = "crates/moonframe" }
 moonframe-acp       = { path = "crates/moonframe-acp" }
 moonframe-chat      = { path = "crates/moonframe-chat" }
+moonframe-chat-view = { path = "crates/moonframe-chat-view" }
 moonframe-core      = { path = "crates/moonframe-core" }
+moonframe-diagram   = { default-features = false, path = "crates/moonframe-diagram" }
 moonframe-docs      = { path = "crates/moonframe-docs" }
 moonframe-documents = { path = "crates/moonframe-documents" }
 moonframe-forge     = { path = "crates/moonframe-forge" }
@@ -135,6 +140,7 @@ moonframe-shell          = { path = "crates/moonframe-shell" }
 moonframe-speech         = { path = "crates/moonframe-speech" }
 moonframe-store          = { path = "crates/moonframe-store" }
 moonframe-terminal       = { default-features = false, path = "crates/moonframe-terminal" }
+moonframe-terminals      = { path = "crates/moonframe-terminals" }
 moonframe-transcripts    = { path = "crates/moonframe-transcripts" }
 moonframe-usage          = { path = "crates/moonframe-usage" }
 notify                   = "8"
@@ -164,7 +170,10 @@ toml               = "1"
 tracing            = "0.1"
 tracing-subscriber = { default-features = false, features = ["ansi", "env-filter", "fmt", "std"], version = "0.3" }
 # Check for Updates: GitHub's releases API and the download (moonframe).
-ureq = "3.5"
+# Without the default `gzip`: on anywhere in a build, ureq decodes every gzip
+# answer for every crate in it and drops its Content-Encoding, with no way to
+# ask otherwise per request. A crate that wants it asks for it itself.
+ureq = { default-features = false, features = ["rustls"], version = "3.5" }
 # Links to an app's own URL schemes, read for its mods (moonframe).
 url = "2.5"
 # The ids of pi threads, which pi takes as session ids (moonframe-pi).

@@ -86,7 +86,7 @@ pub use {
     json::{MAX_ENTRIES, from_json, to_json},
     manifest::{Capability, Kind, Manifest, PREBUILT, Publish, Restart, Start},
     mods::{Mods, owner},
-    native::{Handle, Native, Natives},
+    native::{Handle, Native, Natives, Origin},
     options::{ProviderOptions, check_entry},
     portable::Portable,
 };

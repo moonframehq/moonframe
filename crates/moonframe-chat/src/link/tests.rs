@@ -20,9 +20,12 @@ fn cursor_reconnect_becomes_live_without_a_snapshot() {
         endpoint: None,
         session: None,
         phase: Phase::Reconnecting,
+        context: None,
         transcript: Some(Transcript::new("test")),
+        output_revisions: crate::output::Revisions::default(),
         cursor: Some(cursor),
         writer: None,
+        held: Vec::new(),
         closing: false,
     });
     let host = Handle::new(
@@ -78,9 +81,12 @@ fn chat(id: &str, writer: Option<UnixStream>) -> Chat {
         endpoint: None,
         session: None,
         phase: Phase::Live,
+        context: None,
         transcript: Some(Transcript::new("test")),
+        output_revisions: crate::output::Revisions::default(),
         cursor: None,
         writer,
+        held: Vec::new(),
         closing: false,
     }
 }
@@ -97,7 +103,7 @@ fn commands_a_chat_never_answered_are_answered_when_it_goes() {
     for (chat, reply) in [("a", "first"), ("b", "other")] {
         state.pending.insert(CommandId::random(), crate::Pending {
             chat: chat.into(),
-            owner: "chat".into(),
+            to: "chat".into(),
             reply: json!(reply),
             action: "prompt",
         });

@@ -431,7 +431,7 @@ return mod {
         let mut target = None;
         walk(&popover.content, &mut vec![], &mut |node, _| {
             if let Node::Stack(stack) = node
-                && let Some(index) = stack.scroll_to
+                && let Some(crate::ScrollTo::Child(index)) = stack.scroll_to
             {
                 assert_eq!(stack.frame.max_height, Some(300.));
                 assert_ne!(stack.frame.scroll, crate::Scroll::No);
@@ -475,4 +475,85 @@ return mod {
     }
     send(&mut workspace, &[("query", Data::from("Option 98"))]);
     inspect(&workspace, "down"); // filtered-out highlight falls back to the match
+}
+
+#[test]
+fn a_scrolling_table_passes_measure_and_scroll_to_to_its_rows() {
+    let source = |height: &str| {
+        format!(
+            r#"
+local table_view = use "table"
+return mod {{
+  view = function()
+    local rows = {{}}
+    for i = 1, 20 do rows[i] = {{ id = tostring(i), a = "a" }} end
+    return table_view {{ {height} columns = {{ {{ key = "a" }} }}, rows = rows,
+      measure = "seen", scroll_to = 12, to = "pages" }}
+  end,
+}}"#
+        )
+    };
+    let body = |workspace: &Workspace| {
+        let Node::Stack(table) = tree(workspace) else {
+            panic!("no table")
+        };
+        let [Node::Stack(header), Node::Stack(body)] = &table.children[..] else {
+            panic!("a header and a body: {:?}", table.children)
+        };
+        assert!(header.measure.is_none() && header.scroll_to.is_none());
+        body.clone()
+    };
+    let (_dir, workspace) = fixture(&source("height = 300,"), &["table"]);
+    let rows = body(&workspace);
+    assert_eq!(rows.children.len(), 20);
+    assert_eq!(rows.scroll_to, Some(crate::ScrollTo::Child(12)));
+    assert!(matches!(
+        &rows.measure,
+        Some(Action::Send { to: Some(to), msg }) if to == "pages" && *msg == Data::from("seen")
+    ));
+    // A table that does not scroll has no body to measure or scroll.
+    let (_dir, workspace) = fixture(&source(""), &["table"]);
+    let rows = body(&workspace);
+    assert!(rows.measure.is_none() && rows.scroll_to.is_none());
+    // Emptied, it is still measured, by a column of no rows beside the
+    // empty text.
+    let (_dir, workspace) = fixture(
+        &source("height = 300,").replace("for i = 1, 20", "for i = 1, 0"),
+        &["table"],
+    );
+    let empty = body(&workspace);
+    let [Node::Stack(text), Node::Stack(measured)] = &empty.children[..] else {
+        panic!("the empty text and a measured column: {:?}", empty.children)
+    };
+    assert!(text.measure.is_none());
+    assert!(measured.children.is_empty() && measured.measure.is_some());
+}
+
+#[test]
+fn a_long_tables_list_takes_its_scroll_to() {
+    let source = |scroll_to: &str| {
+        format!(
+            r#"
+local table_view = use "table"
+return mod {{
+  view = function()
+    local rows = {{}}
+    for i = 1, 300 do rows[i] = {{ id = tostring(i), a = "a" }} end
+    return table_view {{ id = "long", height = 300, columns = {{ {{ key = "a" }} }}, rows = rows,
+      scroll_to = {scroll_to} }}
+  end,
+}}"#
+        )
+    };
+    let asked = |scroll_to: &str| {
+        let (_dir, workspace) = fixture(&source(scroll_to), &["table"]);
+        list(&workspace).scroll_to.map(|asked| asked.to)
+    };
+    assert_eq!(
+        asked("{ y = 480, seq = 2 }"),
+        Some(crate::ListScroll::Y(480.0))
+    );
+    assert_eq!(asked("12"), Some(crate::ListScroll::Row(12)));
+    // A key names no row of a list: left out, not an error.
+    assert_eq!(asked(r#"{ key = "12", seq = 1 }"#), None);
 }

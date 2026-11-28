@@ -27,7 +27,7 @@ Text-like elements take their main value positionally: `ui.text "hi"`,
 | `ui.panel { ... }` | a titled section with header actions over a body | frame keys, `title`, `actions = { elements }` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | areas the user resizes by dragging; a clicked divider also moves with the arrow keys (16 px, 64 with Shift), Home and End take the pane before it to its `min` and `max`, and a double-click puts back the `reset` size of a pane beside it (the one before, else after), else a starting `size` the same way; children must be `ui.pane` | `id`, `divider`, `resize` (sent once the user lets go of a divider, or moves it by key or double-click, with `sizes`, each pane's whole pixels in order, 0 for a hidden one: keep them in state and pass them back as the panes' `size`, and they survive a relaunch), `to` |
 | `ui.pane { ... }` | one side of a split; slides in and out when `visible` changes; `lazy = true` starts what it mounts only once it first shows, and keeps it asleep (not run, not drawn) while hidden | `size`, `reset` (the size a double-click on its divider puts it back to, apart from `size`: the app's default when `size` passes back the user's kept one; else the starting `size`), `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` |
-| `ui.list { count = n, row_height = 24, row = function(i) ... end }` | long lists (files, logs, results, chats): only the rows that show are built and drawn, so any length costs a screenful; it scrolls itself and takes the space it is given | `id` (two lists in one mod need two), `count`, `row_height` (pixels for every row, or `function(i)` giving row `i`'s own, for up to 100,000 rows: a row with a second line can be taller than the rest), `row` (builds row `i`, from 1; called again as it scrolls, so keep it cheap), `range` (sent with `first` and `last`, the rows any part of which shows, as they change, at most every 100 ms; `to` names another mod), frame keys |
+| `ui.list { count = n, row_height = 24, row = function(i) ... end }` | long lists (files, logs, results, chats): only the rows that show are built and drawn, so any length costs a screenful; it scrolls itself and takes the space it is given | `id` (two lists in one mod need two), `count`, `row_height` (pixels for every row, or `function(i)` giving row `i`'s own, for up to 100,000 rows: a row with a second line can be taller than the rest), `row` (builds row `i`, from 1; called again as it scrolls, so keep it cheap), `range` (sent with `first` and `last`, the rows any part of which shows, and `y`, the pixels scrolled, as they change, at most every 100 ms; `to` names another mod), `scroll_to` (`n` or `{ row = n, seq }` reveals row n as far as needed; `{ y = px, seq }` goes back to a `y` `range` told), frame keys; while scrolled down it keeps the first row showing in place as rows with a `key` arrive above (`range`, `scroll_to` and keeping in place are the GPUI window's, so far) |
 | `ui.region "name"` | the slot mods fill by naming it in `region` (shell only) | `name`, `direction`, `gap`, `justify` |
 | `ui.mount "name"` | one mod's view, by name | `mod` |
 | `ui.divider()` | a line across the parent's axis | |
@@ -72,15 +72,17 @@ for the API, limits, caller identity and build policies.
 | Element | Use it for | Keys |
 | --- | --- | --- |
 | `ui.text "..."` | any text; a bare string child is plain text | `text`, `tone`, `size`, `weight` (`light` `normal` `medium` `semibold` `bold`), `truncate` (one line), `lines` (at most N lines), `wrap = false` (keep lines whole, for code that scrolls sideways), `syntax` (color it as code in this language, a line at a time), extras |
-| `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama`; the full list is `IconName` in types/moonframe.d.luau. An app built on Moonframe adds its own as `app-NAME` (lowercase words joined by hyphens): its `icons/app-NAME.svg`, or `circle-dashed`, a placeholder, where the app lacks it | `name`, `tone`, `size`, `spin`, extras |
+| `ui.icon "name"` | a bundled icon at the text's size and color; `spin = true` turns it (loaders). Lucide glyphs (git: `git-branch` `git-commit-horizontal` `git-merge` `git-pull-request` `git-pull-request-draft` `git-pull-request-closed` `git-compare` `circle-dot`), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, brands `brand-github` `brand-gitlab` `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-linkedin` `brand-x` `brand-slack` `brand-wikipedia` `brand-google-scholar`; the full list is `IconName` in types/moonframe.d.luau. An app built on Moonframe adds its own as `app-NAME` (lowercase words joined by hyphens): its `icons/app-NAME.svg`, or `circle-dashed`, a placeholder, where the app lacks it | `name`, `tone`, `size`, `spin`, extras |
 | `ui.image "avatar.png"` | a picture from a file inside the app's folders or `~/.cache/moonframe/images` (relative to the mod, `~/`, or absolute; no URLs: a provider downloads into that cache); `radius` rounds it into an avatar | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), `zoom` (screen pixels per picture pixel, 1 is 100 %: a viewer that fills its parent unless sized) panned to `center = { x, y }` (fractions of the picture), `overlay = { elements }` drawn over the picture wherever it lands (their `area` is in fractions of the picture: a crop frame, spots), `measure` (sent with the picture's `width`, `height`, `box_width`, `box_height` and the `fit` zoom when they, `measure`, or `to` change), extras |
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
+| `ui.document { html = state.html }` | HTML shown sealed in a native view that fills its space (macOS, Windows): no script runs and nothing loads but the document (pictures and fonts inline as `data:`), in the app's light or dark look, for a briefing, a shared file's preview or a note; `editable = true` edits it in place | `id`, `html` or `src` (a file, named as `ui.image` names pictures), `link` (sent with `url`, `text`: links are never followed, `#part` scrolls), `scroll` (with `y`, `height`, `content_height`), `scroll_to` (a `y`, an element `id`, or `{ y \| id, seq }`), `select` (with `text`, `x`, `y`, `width`, `height`), `editable`, `change` and `done` (with `html`, the whole document; `done` also with `edited`, typed into since the last `done` or the load) |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, `> [!NOTE]` alerts, footnotes, frontmatter, highlighted code with a copy button; LaTeX in a build with `math`), up to 1 MiB; links send `link` instead of opening, a `#heading` link scrolls there, a `[label](cite:source)` link draws a source chip, and pictures show only with `images`, never from the web (a picture titled `emoji`, `![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`, draws inline at the line's height from the image cache alone, with or without `images`, its alt text standing in until it loads or when it is missing); styled by `markdown`, `markdown-code`, `markdown-quote`, `markdown-alert`, `markdown-find` and `markdown-find-current` rules | `text`, `link` (sent with `url` added), `tooltips` (`{ [url] = text }`: a link's tooltip, over its own title; a link with a title, `[text](url "title")`, shows it while every link to that address has the same title; links in a `> [!NOTE]` alert too), `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `lines` (at most N lines, for a preview), `images`, `image` (a click on a picture on its own line, with `src` and `alt`), `outline` (sent with `headings`: `level`, `text`, `at`, `slug`), `section` (sent with `heading`, the index being read), `reveal = { at, seq }` (scrolls there when it changes), `find`, `find_index`, `found` (sent with `count`), `stream` (fade in what is added), `scrolled` (with `scroll`: sent as the reader scrolls, with `fraction`, 0 at the top to 1 at the end), `scroll_at = { fraction, seq }` (with `scroll`: scrolls there when it changes, without sending `scrolled`) |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key, nor do `vector-liberty` `vector-positron` `vector-streets` `vector-dark` `vector-graphite`, vector tiles drawn on the GPU by gpui-maps in builds with the `map-vector` feature; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` when a `via` route is found or `routed`/`to` changes), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
 | `ui.video { source = "camera", white = 4095 }` | live frames from another process, from a ring in shared memory, in a 16-bit colour-managed native view that fills its space (macOS, the `video` feature); nothing draws over it, so `guides` draws crop frames and lines in the picture. `source`, `id`, `zoom`, `center`, `filter` (`auto` `nearest` `linear`), `color` (`srgb` `display-p3` `rec709` `rec2020` `linear-srgb` `linear-p3` `none`), `extended`, `black`, `white`, `gain`, `gamma`, `guides`, `probe`, `stats`, `probed`, `width`, `height`. Most apps want `video-viewer`; see `docs/video.md` |
+| `ui.diagram { id = "flow", document = { nodes = {...}, edges = {...} } }` | a diagram drawn in Rust in the theme's colors and font: boxes, rounded boxes, pills, diamonds, circles, cylinders, notes and text, joined by orthogonal edges with heads, in groups; or a sequence diagram. Nodes without a place are laid out in layers (`direction` down, up, right or left), and a new document keeps what stayed where it was; placed ones (`x`, `y`, `w`, `h`, as an editor's) stay put. Scroll pans, a pinch or ⌘-scroll zooms. With `mode = "edit"` (the default with `shapes`) a click selects (shift adds, a drag on empty space draws a marquee), a drag moves with snapping guides, corners resize, the blue ports connect, a double click edits the label, and a `tool` draws new nodes; it never changes the document itself but tells the mod each edit (`selected`, `moved`, `resized`, `created`, `connected`, `deleted`, `edited`; `opened` on a double click in `view` mode; `zoom`, `tool`). Built with the `diagram` feature (the starter has it; `app.capabilities.diagram` says so; elsewhere, and on Rune, it marks its spot). The `diagram` component is the same canvas in Luau | `mermaid` or `dot` (Mermaid flowchart, sequence, state, class and ER diagrams, or Graphviz DOT, parsed in Rust; text that does not parse shows why), `shapes` and `links` (the `diagram` component's document) or `document` (`kind` `flow` or `sequence`, `direction`, `nodes` each `id`, `label`, `sublabel`, `kind`, `tone`, `fill`, `group`, `x`/`y`/`w`/`h`; `edges` each `from`, `to`, `label`, `kind` `solid` `dashed` `dotted` `thick` `invisible`, `start`/`end` `none` `arrow` `open` `circle` `cross` `triangle` `diamond` `hollow-diamond`, `tone`; `groups` each `id`, `label`, `parent`; a sequence's `messages` each `from`, `to`, `label`, `kind` `sync` `async` `reply`, and `notes` each `over`, `text`, `before`), `mode`, `tool`, `selected`, `highlight` (ids drawn in the accent), `camera` (`fit`, `zoom` or `zoom_by`, acted on with each new `seq`), `scroll = "focus"` (pans only after a click inside, in a page that scrolls), `id`, `class`, `style` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
@@ -108,7 +110,7 @@ and `preview` to false. Preview cards are noninteractive and stay inside the com
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `secret` (a password: drawn as bullets and never copied or cut, while `change` and `submit` still carry the text; one line), `paste` (sent with `files`, their paths, when files or a picture are pasted into it; a picture is saved to the image cache first and also comes as `image = { path, width, height }`; text pastes as usual), `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `caret` (`"start"`, `"end"` or a byte offset: where the caret goes when the field takes a new `value` or this changes, as after a recalled line), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `enter = "submit"` (multiline: Enter submits and ⇧↩ makes a new line, a chat's composer), `history` (earlier entries, oldest first: ↑ on the first line recalls the one before, ↓ on the last line the one after, then back to the draft; each recall sends `change`), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `secret` (a password: drawn as bullets and never copied or cut, while `change` and `submit` still carry the text; one line), `paste` (sent with `files`, their paths, when files or a picture are pasted into it; a picture is saved to the image cache first and also comes as `image = { path, width, height }`; text pastes as usual), `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `caret` (`"start"`, `"end"` or a byte offset: where the caret goes when the field takes a new `value` or this changes, as after a recalled line), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
 
 ### Overlays
 
@@ -130,7 +132,17 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
 - **Scroll to a child** (`row`, `column`): with `scroll` enabled,
   `scroll_to = 12` reveals direct child 12 (one-based) when the index
   changes. It scrolls only as far as needed and leaves wheel scrolling
-  free between changes. Set it to nil to reset the request.
+  free between changes, and a column that appears with it (an overlay's
+  content as it opens) shows the child once it is laid out. Set it to nil
+  to reset the request.
+  `scroll_to = "row-7"` reveals the first row or column with
+  `key = "row-7"` inside it, however deep (a row in a card in the list),
+  once it is drawn; `scroll_to = { key = "row-7", seq = n }` asks again
+  for the same key with each new `seq`. `scroll_to = { y = state.y, seq =
+  n }` (and `x`) scrolls back to how far `measure` told it was, as far as
+  the content goes: a reader reopened where it was left. With a `seq`, only
+  a new `seq` asks again, so keep `measure`'s `y` in state as it comes. All are the GPUI
+  window's, so far.
 
 - **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,
   `measure = msg` sends `msg` (to `to`, else the drawing mod) with its
@@ -160,7 +172,8 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `gap`, `padding`, `surface`, `border`, `scroll` (`true` along its axis, or `"x"`, `"y"`, `"both"`: code that scrolls sideways), `follow = true` (with `scroll`:
   while at its end, stay there as the content grows, as a chat or log
   does), `shrink = false` (keep
-  the content's size instead of being squeezed), `self_align` (`start`,
+  the content's size instead of being squeezed; the default inside a row or
+  column that scrolls along its axis), `self_align` (`start`,
   `center`, `end`, `stretch`: e.g. keep a capsule at its own width inside a
   column, which otherwise stretches it), `hug = true` (keep its own width in
   a column, and follow a row's `align`: the usual choice for pills, badges
@@ -349,11 +362,15 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
 | [`t3-composer`](#t3-composer) | Controls | Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
+| [`agent-chat`](#agent-chat) | Data | Give an app a chat with Claude, Codex, OpenCode, pi or Gemini on the `chat` provider (crates/moonframe-chat) in a few lines; the mod must be in providers/chat's `starters`. For one run of an agent the app starts itself use `agent-run`; for a static message use `chat-message`; for a send box alone use `composer`. |
 | [`audio-meter`](#audio-meter) | Data | Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
 | [`avatar-stack`](#avatar-stack) | Data | Who is in a group, in a card or a row (38 investors, 3 reviewers), when their names matter less than how many. For one person use `avatar`; for a list of people use `list` or `table`. |
 | [`bar-chart`](#bar-chart) | Data | Counts over time or per category: tokens per day, runs per hour, alerts per device, stacked by kind. For a tiny live trend in a status bar use `sparkline`; for one fraction use `meter`; for one headline number use `stat-tile`. |
 | [`chat-message`](#chat-message) | Data | Each turn of a conversation with an agent or a person, stacked in a scrolling column over a `composer`. For a comment on a pull request use `comment-card`; for a notification use `toast`. |
+| [`chat-question`](#chat-question) | Data | A permission in `app.chat`'s view that carries a `question`; `agent-chat` draws it already. For a yes/no permission use the permission's options as buttons; for a form of your own use `form-grid`. |
+| [`chat-waiting`](#chat-waiting) | Data | Between an agent conversation from `app.chat`'s view and its composer; `agent-chat` draws it already. For one run's question use `agent-run`; for a plain confirmation use `confirm`. |
+| [`chat-working`](#chat-working) | Data | Under an agent conversation drawn from `app.chat`'s view; `agent-chat` draws it already. For one run's status use `agent-run`; for a plain spinner use `loading`. |
 | [`code-view`](#code-view) | Data | Show code or a log read-only: a file at a line, a snippet in a comment, a test's output. For changes use `diff-view`; for a live shell use `terminal`. |
 | [`comment-card`](#comment-card) | Data | Comments in a pull request conversation, review threads, notes left by agents or people. Stack them in a column. For a numbered review note with a remove button use `note-card`; for events in order use `timeline`. |
 | [`contribution-graph`](#contribution-graph) | Data | Daily activity over months or a year, GitHub style: commits, agent runs, posts, workouts, a streak. Pass one count per day and the first day's date. For weekly or arbitrary buckets without dates use `heat-grid`; for counts with an axis use `bar-chart`; for picking a day use `month-grid`. |
@@ -361,6 +378,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`country-code`](#country-code) | Data | Beside a country's name in lists of locations or settings, in place of a flag (no flag images ship). For any short label use `ui.badge` or `pill`. |
 | [`course-card`](#course-card) | Data | The one course, plan or program a page puts first, with where the reader is and a button to carry on. For a grid of guides use `guide-card`; for a figure with a trend use `stat-tile`; for a titled box of anything use `card`. |
 | [`date-tile`](#date-tile) | Data | Beside dated items in a list (deadlines, calls, distributions, events) where the date leads. For a date inside a line of text use plain text; for picking a day use `day-strip` or `month-grid`. |
+| [`diagram`](#diagram) | Data | An editable diagram the user draws: flows, architecture sketches, mind maps. The parent keeps `shapes`, `links` and `selected` and applies the edits it is sent. For a fixed system diagram on a grid use `flow-diagram`; for dependency arrows between dated bars use `gantt`. |
 | [`document-card`](#document-card) | Data | A home screen or a folder of notes shown as a grid. For a list beside an editor use `document-row`; for attached files use `file-card`; for reading material with progress use `guide-card`. |
 | [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
 | [`file-card`](#file-card) | Data | Attachments on a task, a comment or a message, in a grid of tiles or a list of rows, while they upload and after. For the area files are dropped on use `dropzone`; for a file in a tree use `tree` with `file-icon`; for a picture to look at closely use `image-viewer`. |
@@ -405,6 +423,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`threshold-line`](#threshold-line) | Data | A metric against its target or limit in a dashboard card: % within SLA against 95%, latency against 2s, lag against 5 minutes. For a line without a target use `ui.line`; for tiny bars use `sparkline`; for bars against a floor use `forecast-chart`. |
 | [`tick-meter`](#tick-meter) | Data | A resource's utilization in a dense, technical dashboard (CPU, GPU, memory, a queue's depth), where a striped instrument reads better than a smooth bar. For a compact bar with its percentage use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`. |
 | [`timeline`](#timeline) | Data | Events in order: checkpoints, commits, deploys, an agent's steps. For a flat selectable list use `list`; for comments use `comment-card`; for a table of runs use `table`. |
+| [`tool-group`](#tool-group) | Data | Inside a chat with a coding agent, for each `tools` row of `app.chat`'s view (`agent-chat` draws them). For one agent run's whole progress use `agent-run`; for a plain fold use `collapsible`. |
 | [`usage-bar`](#usage-bar) | Data | A rate limit or quota with a reset (an AI plan's weekly or 5-hour window, an API budget), in a usage sheet or settings page. For a plain fraction use `meter`; for task progress use `progress`; for a single big number use `stat-tile`. |
 | [`vectorscope`](#vectorscope) | Data | Judging colour balance and saturation from points an engine measured and published (up to 480, thinned out; more are left out). For levels across the picture use `waveform`; for tones use `histogram`. |
 | [`vertical-bar`](#vertical-bar) | Data | A fraction in a row with no room for a horizontal bar: a host's CPU or memory beside its name in a sidebar, a queue's depth in a tab. For a bar with room to spread use `meter`; for a history use `sparkline`. |
@@ -1320,6 +1339,51 @@ A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 
 ### Data
 
+#### `agent-chat`
+
+**Agent Chat.** A whole conversation with a coding agent through Sheprd's sheprd-acp: transcript with folded tool runs and handoffs, what the agent is doing with its stoppable sub-agents and shells, permission questions and questions with choices, a queue to steer or send now, Stop and Resume, pull requests, pickers for the agent (switched mid-conversation), mode, model, effort and other settings, auto-accept, and a multiline composer with history, / commands and attachments.
+
+**When:** Give an app a chat with Claude, Codex, OpenCode, pi or Gemini on the `chat` provider (crates/moonframe-chat) in a few lines; the mod must be in providers/chat's `starters`. For one run of an agent the app starts itself use `agent-run`; for a static message use `chat-message`; for a send box alone use `composer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `agent` | the agent a new chat starts (default `app.chat.default`); the composer offers the others |
+| `chat` | the `app.chat` chat to draw; without it the first prompt starts one, and `started` says which |
+| `context` | text put before every prompt for the agent (what the user is looking at); never shown in the user's bubble |
+| `cwd` | the folder a new chat starts in (default the provider's) |
+| `id` | the instance's id (one per chat drawn) |
+| `link` | sent to the mod with `url` when a link in an answer is clicked |
+| `placeholder` | the composer's grey text |
+| `started` | sent to the mod with `chat` set to the id of a chat it started |
+| `suggestions` | chips on the empty chat: strings, or { label, prompt } |
+| `title` | the empty chat's heading (default "Ask the agent") |
+| `to` | where its commands go (default "provider:chat"; "parent" sends them to the mod, as a demo does) |
+| `view` | stands in for the `app.chat` chat { id, status, error?, session?, view }, for a preview or demo |
+
+**Styles:** `.agent-chat` `.agent-chat-auto-accept` `.agent-chat-bottom` `.agent-chat-composer` `.agent-chat-context` `.agent-chat-empty-icon` `.agent-chat-ended` `.agent-chat-error` `.agent-chat-field` `.agent-chat-file` `.agent-chat-guest` `.agent-chat-handoff` `.agent-chat-handoff-line` `.agent-chat-notice` `.agent-chat-notice:error` `.agent-chat-notice:warning` `.agent-chat-notice-details` `.agent-chat-transcript` `.agent-chat-turn` `.agent-chat-turn:cancelled` `.agent-chat-turn:failed` `.agent-chat-user` `.agent-chat-working`
+
+```lua
+local agent_chat = use "agent-chat"
+
+-- in view: a chat on the mod's state.chat, started by the first prompt
+agent_chat {
+	id = "assistant",
+	chat = state.chat,
+	agent = "claude",
+	context = `The user is reading: {state.subject}`,
+	placeholder = "Ask about this message…",
+	suggestions = { "Summarize it", "Draft a reply" },
+	started = "chat-started",
+}
+
+-- in update: keep the chat it started
+if msg.msg == "chat-started" then
+	state.chat = msg.chat
+end
+```
+
+A whole mod using it, with state: `app/components/demos/agent-chat.luau`.
+
 #### `audio-meter`
 
 **Audio Meter.** A vertical bar per channel in dBFS, with a held peak and colours near full scale.
@@ -1460,6 +1524,70 @@ chat_message {
 	author = "Sales agent", text = "Start with Lumen Retail: the biggest deal at risk.",
 	thinking { seconds = 4, open = state.thought, msg = "toggle-thought" },
 }
+```
+
+#### `chat-question`
+
+**Chat Question.** A question a coding agent asks with choices: each choice with its description, one click to answer (or tick several, then Send), and a field for the user's own words.
+
+**When:** A permission in `app.chat`'s view that carries a `question`; `agent-chat` draws it already. For a yes/no permission use the permission's options as buttons; for a form of your own use `form-grid`.
+
+| Prop | Meaning |
+| --- | --- |
+| `id` | the instance's id, one per question (such as `q-<permission id>`) |
+| `permission` | the view's permission: { id, title, question = { header?, text, multiple, options = { { label, description? } } } } |
+
+**Styles:** `.chat-question` `.chat-question-choice` `.chat-question-choice:picked` `.chat-question-field` `.chat-question-header`
+
+```lua
+local chat_question = use "chat-question"
+
+chat_question { id = "example", permission = { id = 1, question = { header = "Tab detail", multiple = false, options = { { description = "Shortest; best for many tabs", label = "Title only" }, { description = "Shows which agent runs there", label = "Title and agent" } }, text = "How much should each tab show?" }, title = "How should tabs show?" } }
+```
+
+#### `chat-waiting`
+
+**Chat Waiting.** What waits on the user above an agent's composer: its plan, permission questions with the agent's options, questions with choices, guests' prompts to allow, and queued prompts to take back, steer into the turn or send now.
+
+**When:** Between an agent conversation from `app.chat`'s view and its composer; `agent-chat` draws it already. For one run's question use `agent-run`; for a plain confirmation use `confirm`.
+
+| Prop | Meaning |
+| --- | --- |
+| `chat` | the chat's id, which keeps each question's instance its own |
+| `plan_open` | the plan is listed item by item rather than folded |
+| `plan_toggle` | message sent when the plan's line is clicked |
+| `view` | the chat's view: its `plan`, `permissions`, `queue`, `status` and `can_steer` |
+
+**Styles:** `.chat-waiting` `.chat-waiting-guest` `.chat-waiting-permission` `.chat-waiting-permission-icon` `.chat-waiting-permission-tool` `.chat-waiting-plan` `.chat-waiting-plan-done` `.chat-waiting-plan-running` `.chat-waiting-queued` `.chat-waiting-queued:held`
+
+```lua
+local chat_waiting = use "chat-waiting"
+
+chat_waiting { chat = "example", plan_open = false, view = { can_steer = true, permissions = { { id = 7, options = { { allows = true, id = "yes", kind = "allow_once", name = "Allow" }, { allows = false, id = "no", kind = "reject_once", name = "Reject" } }, title = "Run a command?", tool = "rm -rf build" } }, plan = { current = "Write the tests", done = 1, items = {  }, total = 3 }, queue = { { held = false, id = "q1", steered = false, text = "Also update the README" }, { held = false, id = "q2", steered = true, text = "Use tabs, not spaces" } }, status = "working" } }
+```
+
+#### `chat-working`
+
+**Chat Working.** What a coding agent is doing now: a spinner with its current step and how long the turn has run, or "Waiting for you", and its running sub-agents and background shells with their times and Stop buttons.
+
+**When:** Under an agent conversation drawn from `app.chat`'s view; `agent-chat` draws it already. For one run's status use `agent-run`; for a plain spinner use `loading`.
+
+| Prop | Meaning |
+| --- | --- |
+| `activities` | `view.activities`: { call_id, kind, label, detail?, running_for?, stoppable } |
+| `open` | the activities are listed one per line rather than counted |
+| `step` | what the agent is doing, such as the running tool's title |
+| `toggle` | message sent when the activity count is clicked |
+| `waiting` | a question waits for the user, so the agent is paused |
+| `working` | a turn runs now |
+| `working_for` | how long the turn has run (`view.working_for`) |
+
+**Styles:** `.chat-working` `.chat-working-activity` `.chat-working-list` `.chat-working-time`
+
+```lua
+local chat_working = use "chat-working"
+
+chat_working { activities = { { call_id = "a", detail = "Reading lib.rs", kind = "subagent", label = "Explore the chat crates", running_for = "1m 05s", stoppable = true }, { call_id = "b", kind = "shell", label = "npm run dev", running_for = "3m 12s", stoppable = false } }, open = true, step = "Running cargo test", working = true, working_for = "42s" }
 ```
 
 #### `code-view`
@@ -1677,6 +1805,31 @@ local date_tile = use "date-tile"
 
 date_tile { day = "9", month = "Nov", tone = "danger" }
 ```
+
+#### `diagram`
+
+**Diagram.** A freeform canvas of boxes, text and sticky notes wired by connectors: select, drag, resize, connect, pan and zoom; the document stays the parent's.
+
+**When:** An editable diagram the user draws: flows, architecture sketches, mind maps. The parent keeps `shapes`, `links` and `selected` and applies the edits it is sent. For a fixed system diagram on a grid use `flow-diagram`; for dependency arrows between dated bars use `gantt`.
+
+| Prop | Meaning |
+| --- | --- |
+| `id` | the instance's id (its pan and zoom are kept under it) |
+| `links` | list of { id, from, to (shape ids), label?, dashed? }: drawn as elbows that follow the shapes |
+| `selected` | ids of the chosen shapes and links |
+| `shapes` | list of { id, kind (box pill diamond ellipse text sticky), x, y, w, h (world pixels), label?, fill? (a color) }, bottom first |
+| `tool` | select (default), hand, box, pill, ellipse, text, sticky or connector |
+| `version` | a number the parent bumps on each change to the document |
+
+**Styles:** `.diagram` `.diagram-box` `.diagram-canvas` `.diagram-diamond` `.diagram-ellipse` `.diagram-handle` `.diagram-label` `.diagram-link-label` `.diagram-link-label:selected` `.diagram-link-pad` `.diagram-link-pad:hover` `.diagram-link-pad:selected` `.diagram-marquee` `.diagram-pill` `.diagram-port` `.diagram-port:hover` `.diagram-selection` `.diagram-shape` `.diagram-sticky` `.diagram-text` `.diagram-text-label`
+
+```lua
+local diagram = use "diagram"
+
+diagram { id = "example", links = { { from = "a", id = "l1", to = "b" }, { from = "b", id = "l2", label = "yes", to = "c" } }, selected = { "b" }, shapes = { { fill = "#e2e8f0", h = 56, id = "a", kind = "box", label = "Cart", w = 130, x = 20, y = 40 }, { fill = "#ddd6fe", h = 56, id = "b", kind = "pill", label = "Signed in?", w = 140, x = 210, y = 40 }, { fill = "#bbf7d0", h = 60, id = "c", kind = "ellipse", label = "Receipt", w = 140, x = 210, y = 160 } } }
+```
+
+A whole mod using it, with state: `app/components/demos/diagram.luau`.
 
 #### `document-card`
 
@@ -2822,8 +2975,10 @@ system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.
 | `height` | pixels: the body scrolls within it |
 | `id` | names the list a long scrolling body becomes (default "table"); two long tables in one mod need two |
 | `marker` | draw a drop line by a row: { id, after? }, or { group } for a group's end |
+| `measure` | with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too; empty, `first` and `last` are 0); a body past 200 rows is a `ui.list`, which takes `range` instead |
 | `reorder` | rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way |
 | `rows` | list of maps: `id` plus a value per column key; a value may be a string, a number or an element |
+| `scroll_to` | with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes, or `{ y = state.y, seq = n }` scrolls back to the `y` `measure` told (past 200 rows, the `y` its `ui.list`'s `range` told) |
 | `selected` | id of the selected row |
 | `sort` | key of the sorted column (shows an arrow) |
 | `sortable` | false makes no header clickable (a column can also set `sortable = false`) |
@@ -2960,6 +3115,29 @@ local timeline = use "timeline"
 ```
 
 A whole mod using it, with state: `app/components/demos/timeline.luau`.
+
+#### `tool-group`
+
+**Tool Group.** A run of an agent's tool calls folded to one line with its status and changed lines; open, each call with its output's end and its files.
+
+**When:** Inside a chat with a coding agent, for each `tools` row of `app.chat`'s view (`agent-chat` draws them). For one agent run's whole progress use `agent-run`; for a plain fold use `collapsible`.
+
+| Prop | Meaning |
+| --- | --- |
+| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, output_key?, files, steps } or { type = "thought", gist, text } } } |
+| `inspect` | enable clicking a detail to send { inspect, page, fetch } or { close_output = true } |
+| `msg` | message a click on the header sends (the mod flips `open`) |
+| `open` | show its calls |
+| `output` | the expanded detail { key, page, text?, more? } |
+| `to` | mod to send it to, if not the drawing one |
+
+**Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`
+
+```lua
+local tool_group = use "tool-group"
+
+tool_group { group = { count = 3, failed = 0, files = { { added = 12, new = false, path = "src/lib.rs", removed = 3 } }, items = { { gist = "Looking at the parser first", text = "", type = "thought" }, { files = {  }, id = "a", kind = "read", status = "done", steps = 0, title = "Read src/parse.rs", type = "tool" }, { detail = "test result: ok. 14 passed", files = {  }, id = "b", kind = "execute", status = "done", steps = 0, title = "cargo test parse", type = "tool" }, { files = { { added = 12, new = false, path = "src/lib.rs", removed = 3 } }, id = "c", kind = "edit", status = "done", steps = 0, title = "Edit src/lib.rs", type = "tool" } }, key = "e2", more = 0, status = "done", title = "Read 2 files, edited 1 file" }, open = true }
+```
 
 #### `usage-bar`
 

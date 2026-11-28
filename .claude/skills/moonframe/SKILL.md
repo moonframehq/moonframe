@@ -61,6 +61,7 @@ Pick the lowest layer that can do the job:
 | a widget with memory of its own, reusable | a component with `update` (an instance) | `components/<name>.luau` | no |
 | several modules sharing a value | a topic: publish to `topic:<name>`, `subscribe` to it | in the mods | no |
 | a web page in the window | `ui.browser` | in a mod | no |
+| HTML shown safely (a briefing, a shared file) or edited in place | `ui.document` | in a mod | no |
 | a text field, search box, prompt or text area | `ui.input` or `use "search-field"` | in a mod | no |
 | data from the machine, files, network or a CLI | a **provider** feeding `app.<name>` | `providers/<name>/` | no (the host builds Wasm providers itself) |
 | state that survives quitting the app (open panels, tabs, a choice) | nothing to add: every mod's state is saved; shape what comes back in `init` | the mod's `init` | no |
@@ -133,6 +134,19 @@ container; it reads and saves through the `docs` provider (see "Built-in
 providers"), which takes saves only from its `writers` (`editor` as
 shipped; add yours there as for git). In the starter, a markdown file
 picked in the explorer opens in a main tab of this kind.
+
+**A diagram.** To show one an agent or the data describes, give
+`ui.diagram` a `document` of nodes and edges with no places and it lays
+them out: `ui.diagram { id = "deps", document = { direction = "right",
+nodes = { { id = "api", label = "API" }, { id = "db", label = "Postgres",
+kind = "cylinder" } }, edges = { { from = "api", to = "db" } } } }` inside
+a container with `grow = true`. To let the user draw one, keep `shapes`
+and `links` in the mod's state and pass them with `selected` and `tool`;
+apply each message (`moved`, `resized`, `created`, `connected`,
+`deleted`, `edited`, `selected`) to the state and the view follows.
+`examples/diagram` is the whole editor (layers, inspector, undo), and
+falls back to the Luau `diagram` component where `app.capabilities.diagram`
+is false.
 
 **A web page.** With browser chrome (back, forward, reload, an address
 bar that navigates, the title): `local browser = use "browser"`, then
@@ -568,6 +582,61 @@ ui.input { id = "docs-address", value = state.page.url, browser = "docs" }  -- i
   it in the system browser.
 - **In the component browser** it shows its address and loads nothing.
 
+## Documents
+
+`ui.document` shows HTML the mod has (a briefing, a shared file's
+preview, a note) sealed, in the same kind of native view as a browser: no
+script in it runs, it loads nothing but itself, and it follows the app's
+light or dark look. `editable = true` makes it an editor of that HTML.
+
+```lua
+ui.document {
+	id = "brief",                     -- one page per mod and id
+	html = state.html,                -- or src = "briefs/acme.html"
+	link = "link",                    -- arrives as { msg = "link", url, text }
+	scroll = "scroll",                -- { msg = "scroll", y, height, content_height }
+	scroll_to = state.place,          -- 480, "part-2", or { y = 480 | id = "part-2", seq = n }
+	select = "select",                -- { msg = "select", text, x, y, width, height }
+	editable = state.editing,
+	change = "change",                -- { msg = "change", html }: keep it, give it back as html
+	done = "done",                    -- { msg = "done", html, edited } as it loses the keyboard
+}
+```
+
+- **Sealed:** the page's scripts are off (inline handlers and
+  `javascript:` links too), its session keeps nothing, and a
+  Content-Security-Policy put first in it refuses every load: pictures,
+  styles and fonts come inline (`<style>`, `style=`, `data:`), or not at
+  all. On macOS WebKit's content rules refuse every load but `about:` and
+  `data:` as well. The host's own script, which reports links, scrolling,
+  the selection and edits, is the only one that runs.
+- **Source:** `html`, up to 8 MB, or `src`, a file named and allowed as
+  `ui.image` names pictures (the mod's folder, the app's folders, a file
+  the user gave it). A changed file is read again. It is HTML: an SVG
+  document shows inline; put other text in a `<pre>`.
+- **Links** are never followed: `link` tells the mod, which may open one
+  with `app:open`. A fragment link (`#part-2`) scrolls to its element.
+- **Light and dark:** it takes the app's look as `color-scheme`, so its
+  default colors follow, and `prefers-color-scheme` in its styles too.
+- **Scroll:** `scroll` reports `y` as it scrolls; keep it and give it back
+  as `scroll_to = { y = state.y, seq = n }` to reopen it where it was, or
+  name a section, `scroll_to = "part-2"`, to open it there.
+- **Editing:** with `editable = true` the user types in it (a link then
+  opens with cmd or ctrl and a click). `change` sends the whole document
+  as `html` half a second after an edit: save it, and pass it back as
+  `html`; the same HTML loads nothing, so the caret stays. New HTML from
+  the mod loads in its place, and the HTML from before an edit loads again
+  (a reset). `done` is sent as it loses the keyboard, with `edited`: whether
+  it was typed into since the last `done` (or since it loaded), so a mod
+  that saves on `done` skips a blur that changed nothing (the HTML it
+  reports is the page's own writing of it, which differs from the HTML
+  given even untouched). An edit that grows
+  the document past the 8 MB `html` takes comes with `error` instead of
+  `html`.
+- **Lifetime, size, input and what lies over it** are a browser's (see
+  "Browsers"): a mod has at most four browsers and documents together.
+- **Elsewhere:** Rune and Linux show a placeholder, so far.
+
 ## Text input
 
 `ui.input` is a text field: a search box, a palette's query, a rename
@@ -601,6 +670,12 @@ ui.input {
   so the caret lands after the line, ready to edit; without it a new value
   may leave the caret at the start. A value the field already shows (the
   mod echoing what was typed) leaves the caret where the user put it.
+- **A chat's composer** is `multiline` with `enter = "submit"` (Enter
+  sends, Shift-Enter makes a new line), `max_rows` (it grows with its
+  lines, then scrolls), `history = state.sent` (the prompts sent, oldest
+  first: Up on the first line recalls the one before, Down on the last
+  line the one after and then the draft; each recall sends `change`) and
+  `paste` (files and pictures). The `agent-chat` component has one.
 - **Messages carry the text.** A table `msg` arrives as a copy with
   `value = <text>` added: `change = { query = true }` sends
   `{ query = true, value = "ab" }`. Anything else arrives as
@@ -1089,7 +1164,9 @@ return state, { { to = "app:window", msg = { open = "settings", send = { page = 
 
 - `app:open`, `msg` a web address (`https://` or `http://`): opens it in
   the system's browser, as a pull request link or a sign-in page wants.
-  Other schemes (`file`, an app's own) are the sender's error. At most 3
+  Or one `mailto:` address (`mailto:ada@example.com`), opened in the mail
+  app: no headers (`?subject=`) and no list. Other schemes (`file`, an
+  app's own) are the sender's error. At most 3
   pages open in 10 s. A control does it on a click: `ui.row { to =
   "app:open", msg = pr.url, ... }`.
 - `app:text`, `msg` `{ mod? | region?, max?, reply }`: answers with `reply`
@@ -1435,18 +1512,20 @@ Text-like elements take their main value positionally:
 | `ui.panel { ... }` | frame keys, `title`, `actions = { elements }` | header (title plus right-aligned actions) over a column body. Defaults: `gap` and `padding` `"normal"` |
 | `ui.hsplit { ... }`, `ui.vsplit { ... }` | `id`, `divider`, `resize`, `to` | user-resizable; children must be `ui.pane`. Always grows to fill. `divider = false` drops the hairline between panes (cards on a background), showing a handle only on hover. A clicked divider takes the keyboard: the arrows along the split move it 16 px (64 with Shift), Home and End take the pane before it to its `min` and `max`, and a double-click puts back the `reset` size of a pane beside it (the one before, else after), else a starting `size` the same way. The user's sizes last the session; `resize` keeps them across launches (see "Pane sizes that outlive the app") |
 | `ui.pane { ... }` | `size`, `reset`, `min`, `max`, `fixed`, `visible`, `lazy`, `gap`, `padding`, `surface`, `scroll` | only inside a split; content is a column. `fixed = true` keeps its size on window resize and needs `size`. `reset` is the size a double-click on its divider puts it back to, apart from `size` (default: the size it started with). `lazy = true` starts what it mounts only once it first shows and keeps it asleep (neither run nor drawn, state kept) while hidden: a heavy side panel or tab |
-| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
+| `ui.list { count = #rows, row_height = 24, row = function(i) ... end }` | `id`, `count`, `row_height`, `row`, `range`, `scroll_to`, frame keys, `class`, `style` | rows of which only those that show are built and drawn: use it for anything that can grow long (files, logs, search results, history). `row(i)` builds row `i` (from 1) and is called again as the list scrolls, so build the data in the view and keep `row` cheap. It scrolls itself and takes the space it is given (or its `height`). Two lists in one mod need two `id`s. See "Long lists" |
 | `ui.text "..."` | `text`, `tone`, `size`, `weight`, `truncate`, `lines`, `wrap`, `strike`, extras | a bare string child is plain text |
 | `ui.button { "Label", ... }` | `label`, `icon` (alone: icon-only), `variant`, `small`, `disabled`, extras, and `msg`/`to` or `command` | |
 | `ui.item { "Label", ... }` | `label`, `detail`, `badge`, `selected`, extras, and `msg`/`to` or `command` | clickable list row for sidebars |
 | `ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, select = "pick" }` | `entries`, `selected`, `select`, `to`, `id`, `width`, `height`, `grow`, `disabled`, `class`, `style`, `state` | native right-aligned revision ruler, with Dock-like pointer magnification; clicks and keyboard navigation choose revisions or days; `select` adds `revision`, `index`, `day`, `label` |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
+| `ui.diagram { id = "flow", document = { nodes = ..., edges = ... } }` | `id`, `shapes`/`links` or `document`, `mode`, `tool`, `selected`, `highlight`, `camera`, `scroll`, `class`, `style` | a diagram drawn and laid out in Rust (the `diagram` feature, in the starter): flows laid out in layers or placed, sequence diagrams, pan and zoom; `mode = "edit"` selects, drags, resizes, connects and creates, sending `selected`, `moved`, `resized`, `created`, `connected`, `deleted`, `edited` to this mod, which keeps the document. See "A diagram" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
+| `ui.document { html = state.html }` | `id`, `html` or `src`, `link`, `scroll`, `scroll_to`, `select`, `editable`, `change`, `done`, `class`, `style` | HTML shown sealed (no script, no network, light or dark as the app), or edited in place; see "Documents" |
 | `ui.markdown "# Notes"` | `text`, `link`, `tooltips`, `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `class`, `style` | markdown the host renders (headings, emphasis, lists, task lists, tables, quotes, highlighted code), up to 1 MiB; a link click sends `link` with `url` added, nothing opens by itself; pictures load only with `images` (from files a `ui.image` could show), except a picture titled `emoji` (`![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`), drawn inline at the line's height from the image cache alone, its alt text standing in until it loads. A link shows its title (`[text](url "title")`) on hover while every link to that address has the same one, or what `tooltips = { [url] = text }` gives for its address: where a wrapped (scanned) address really leads |
 | `ui.input { id = "q", value = state.q, change = "q" }` | `id`, `value`, `placeholder`, `change`, `submit`, `keys`, `to`, `multiline`, `rows`, `disabled`, `focus`, `mono`, `secret`, `paste`, `width`, `grow`, `browser`, `class`, `style` | a text field the host edits (caret, selection, IME, undo); see "Text input" |
-| `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
+| `ui.icon "cpu"` | `name`, `tone`, `size`, `spin`, extras | a bundled icon at the text's size and color: Lucide glyphs (`git-branch`, `git-pull-request`, `circle-dot`, `terminal`, `pin`, `trash-2`, ...), agent logos `agent-claude` `agent-codex` `agent-gemini` `agent-cursor` `agent-copilot` `agent-opencode` `agent-amp` `agent-droid` `agent-kiro` `agent-qwen` `agent-grok`, and brands `brand-anthropic` `brand-openai` `brand-mistral` `brand-ollama` `brand-github` `brand-gitlab` `brand-linkedin` `brand-x` `brand-slack` `brand-wikipedia` `brand-google-scholar`. An unknown name is an error that lists them all (also in `types/moonframe.d.luau` as `IconName`). `spin = true` turns it, for loaders |
 | `ui.image "avatar.png"` | `src`, `width`, `height`, `fit` (`contain` `cover` `fill` `scale-down` `none`), extras, `class`, `style` | a picture from a file: `src` is relative to the drawing mod's folder, `~/...`, or absolute, but must be inside the app's folders (`app/`, `~/.config/moonframe`) or the image cache `$XDG_CACHE_HOME/Moonframe/images` (default `~/.cache/moonframe/images`), at most 16 MB. Not a URL (the host has no HTTP client and views must not fetch): have a provider download into the image cache and pass the path. A missing or disallowed file draws an empty box of `width` x `height`, not an error. A `radius` rule rounds it (avatars); `fit = "cover"` fills a square |
 | `ui.line { points = { 3, 5, 2, 8 } }` | `points`, `min`, `max`, `baseline`, `area`, `dots` (`last` `all`), `stroke`, `dashed`, `width`, `height`, `class`, `style` | a line through values evenly spaced across its box (fills its parent without `width`/`height`): trends, curves in tables, forecasts. Style `color` strokes it, `background` fills the area to `baseline` (with `area = true`), `border_color` draws the baseline dashed. Use it for any line or curve, a dashed rule (two equal points with `dashed = true`) included |
 | `ui.hatch { width = 40, height = 12 }` | `gap`, `width`, `height`, `grow`, `class`, `style` | diagonal stripes in style `color` over `background`: what is held back, pending or still missing (in a stacked bar, under a floor) |
@@ -1475,8 +1554,22 @@ Text-like elements take their main value positionally:
   `scroll_end = value` scrolls to its end each time the value changes. A
   chat's "latest message" button shows while `at_end` is false and sets
   `state.jump = { seq = state.seq + 1 }` for `scroll_end = state.jump`.
+- `scroll_to`, with `scroll`, reveals what it names when it changes,
+  scrolling only as far as needed, once the stack is laid out (an
+  overlay's content as it opens): `12` the twelfth direct child, `"row-7"`
+  the first row or column with `key = "row-7"` however deep (a row in a
+  card in the list, once it is drawn), and `{ key = "row-7", seq = n }` the
+  same, asked again with each new `seq` (a link opened twice), and `{ y =
+  state.y, seq = n }` (and `x`) scrolls back to how far `measure` told it
+  was (keep `msg.y` in state as it comes: with a `seq`, only a new `seq`
+  asks again, and the stack's first `measure` already tells the `y` it was
+  put back to): a reader reopened where it was left, once the host forgot
+  the scroll of a stack it no longer drew.
 - `shrink = false` keeps the content's size when the parent is short of
-  space (strips, toolbars), instead of being squeezed.
+  space (strips, toolbars), instead of being squeezed. The rows, columns
+  and panels inside a row or column that scrolls along its axis keep it
+  without asking (as CSS's `min-height: auto` does), so they scroll rather
+  than draw over each other; `shrink = true` squeezes one anyway.
 - `self_align = "start"` (or `center`, `end`, `stretch`) places it across
   the parent's axis over the parent's `align`: a column stretches its
   children by default, so a capsule or track that should keep its own
@@ -1551,7 +1644,7 @@ return style {
 		fallbacks = { "Symbols Nerd Font Mono" },
 		ligatures = false,
 	},
-	radius = 8,          -- the theme's corner radius, which buttons use
+	radius = 8,          -- the theme's corner radius, which buttons use (0 to 64)
 	speeds = { drawer = "220ms" }, -- named durations (fast/normal/slow exist already)
 	animation_speed = 1, -- every animation: 2 twice as fast, 0.5 half, 0 off
 
@@ -1693,7 +1786,7 @@ Leave an element's own keys off if the stylesheet should decide.
 | --- | --- |
 | `background`, `color` (text, inherited), `border_color` | a color |
 | `border` | `true`, `all`, `top`, `bottom`, `left`, `right`, `none` |
-| `radius` | pixels, or each corner clockwise from the top left as in CSS: `{ 8, 8, 0, 0 }` rounds the top only, `{ a, b }` gives the top left and bottom right `a` |
+| `radius` | pixels, 0 to 1000 (`999` rounds a pill), or each corner clockwise from the top left as in CSS: `{ 8, 8, 0, 0 }` rounds the top only, `{ a, b }` gives the top left and bottom right `a` |
 | `padding`, `margin` | a space token or pixels for every edge, `{ y, x }`, `{ top, right, bottom, left }`, or named edges `{ x = 12, top = 4 }` (edge names win over `x`/`y`) |
 | `gap` | a space token or pixels |
 | `shadow` | a preset (`small` `medium` `large`, or `none` to remove one set by a lower rule), a CSS box-shadow string, a layer table, or a list of layers (see below) |
@@ -2016,7 +2109,8 @@ end,
 When the rows come from a provider that can't publish them all (a
 publish holds at most 10,000 values), give the list `range = msg`: it is
 sent, with `first` and `last` (the rows any part of which shows, from 1)
-added, as they change, at most every 100 ms and always the last. Keep
+and `y` (the pixels it is scrolled down, 0 at the top) added, as they
+change, at most every 100 ms and always the last. Keep
 `count` the whole total, ask the provider for a window of rows around
 `first`..`last`, and draw a placeholder in `row` for one not yet there:
 
@@ -2029,6 +2123,17 @@ end
 ui.list { id = "people", count = app.people.total, row_height = 40, range = "rows",
 	row = function(i) local person = app.people.rows[i] ... end }
 ```
+
+`scroll_to` moves a list when it changes: `scroll_to = 120` or `{ row =
+120, seq = n }` reveals row 120, scrolling only as far as needed, and `{ y
+= state.y, seq = n }` goes back to a `y` that `range` told (a page opened
+again where it was left). A new `seq` asks again for the same place.
+
+A feed whose new rows come at the top keeps what is being read in place:
+give each row a `key` (`ui.row { key = item.id, ... }`) and, while the list
+is scrolled down, the first row showing stays where it is on screen as
+rows arrive above it. At the top, new rows join the top. (`range`,
+`scroll_to` and keeping in place are the GPUI window's, so far.)
 
 **Views run only when needed.** The host keeps each view's last tree and
 runs `view` again only when the mod's state or props may have changed (a
@@ -2571,8 +2676,8 @@ Protocol (crates/moonframe-acp), each in the app's repository (else
 `~/.config/moonframe`; `[settings] cwd` to change), one prompt per run,
 published as it goes (every 0.25 s while something changed). Only mods in
 `[settings] starters` (`feedback` as shipped) may start runs, and a run
-obeys only the mod that started it. Agents are found as herdr-acp finds
-them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
+obeys only the mod that started it. Agents are found as Sheprd's
+`sheprd-acp` finds them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
 `gemini --acp`, `opencode acp`, `copilot --acp`; `[settings] commands`
 replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
@@ -2596,24 +2701,36 @@ for a run on the app itself, above), `{ cancel = run }`, `{ forget = run }`
 | `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }`; `changed`, `undone`, `warning?`, `checking`; `timing` milliseconds from its start `{ spawned, initialized, session, first_token, ended, check, baseline, warm }`, and each tool's `ms` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
-coding agents, each run by herdr-gpui's `herdr-acp` program with no view
-of its own (found on PATH or in Herdr.app; `[settings] program`) and
-attached over herdr's chat protocol. A chat takes prompt after prompt and
-outlives the app: the next launch attaches again. Only `[settings]
-starters` drive chats, each obeying the mod that started it: `{ start =
-"<agent>", cwd?, load? }`, `{ prompt, chat, files? }`, `{ cancel = chat }`,
-`{ answer = chat, permission, option }`, `{ mode, chat }`, `{ setting,
-value, chat }`, `{ unqueue, chat }`, `{ auto_accept, chat }`, `{ resume =
-chat }`, `{ close = chat }`, each answered `{ reply, action, ok, error? }`;
-anyone may send `{ focus = chat }`, the chat whose whole recent transcript
-is shared (the others share their last few entries). It publishes `{
-available, reason?, program, agents, default, cwd, chats }`, a chat being
-`{ id, owner, agent, cwd, created, status ("starting" "live" "reconnecting"
-"ended" "failed"), error?, session?, transcript? }` and `transcript`
-herdr's own (`Transcript` in herdr-chat-protocol: `entries`, `status`,
-`permissions`, `plan`, `options`, `modes`, `usage`, `queued`, `commands`),
-trimmed (see crates/moonframe-chat/src/project.rs). `examples/switchyard`
-is the whole example.
+coding agents, each run by Sheprd's chat program (`sheprd-acp`, also
+bundled as `herdr-acp`) with no view of its own (found on PATH or in
+Sheprd.app; `[settings] program`) and attached over its chat protocol, so
+Sheprd's agents, memory, pull request tracking and handoffs come with it.
+A chat takes prompt after prompt and outlives the app: the next launch
+attaches again. Only `[settings] starters` drive chats, each obeying the
+mod that started it: `{ start = "<agent>", cwd?, load?, context? }`, `{
+prompt, chat, files?, context? }`, `{ cancel = chat }`, `{ answer = chat,
+permission, option }` (or `answers = { ... }`, option labels or the user's
+own words, for a permission carrying a `question`), `{ mode, chat }`, `{
+setting, value, chat }`, `{ unqueue, chat }`, `{ send_now = queued, chat }`
+(into the running turn when `can_steer`, else in place of it), `{
+stop_activity = call_id, chat }` (one sub-agent or shell), `{ agent =
+"<agent>", chat }` (hand the conversation to another of `view.agents`
+while idle; a new chat offers every installed agent, a continued one
+none), `{ auto_accept, chat }`, `{ resume = chat }`, `{ close = chat }`,
+each answered `{ reply, action, ok, error? }`; anyone may send `{ focus =
+chat }`, the chat whose whole recent transcript is shared (the others
+share their last few rows). It publishes `{ available, reason?, warning?,
+program, agents, default, cwd, chats }`, a chat being `{ id, owner, agent,
+cwd, created, status ("starting" "live" "reconnecting" "ended" "failed"),
+error?, session?, view? }`, `view` what a view draws (`ChatView` in
+crates/moonframe-chat-view: `rows` (`user`, `answer`, `thought`, `tools`,
+`image`, `notice`, `handoff`, `turn`), `permissions` (with `question` or
+`guest`), `queue` (`held`, `steered`), `plan`, `mode`, `model`, `effort`,
+`settings`, `usage`, `commands`, `activities` (`stoppable`), `agents`,
+`pull_requests`, `clients`, `continued`, `can_steer`, `title`, `last`).
+`[settings] raw = true` adds the protocol's own `transcript` beside it
+(see crates/moonframe-chat/src/project.rs). The `agent-chat` component
+draws a view whole; `examples/switchyard` is the whole example.
 
 `app.speech` (speech, native, the `speech` feature, crates/moonframe-speech):
 dictation. Only `[settings] recorders` may listen, and a take obeys only the

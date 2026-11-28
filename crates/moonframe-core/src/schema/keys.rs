@@ -115,6 +115,11 @@ pub(super) fn key_type(element: &str, key: &str) -> KeyType {
         ("list", "row") => Function,
         ("list", "row_height") => OneOf(vec![number(1.0, 10_000.0), Function]),
         ("list", "count") => number(0.0, 10_000_000.0),
+        ("document", "html" | "src") => String,
+        ("document", "link" | "scroll" | "select" | "change" | "done") => Data,
+        ("document", "scroll_to") => OneOf(vec![number(0.0, 1.0e9), String, Data]),
+        ("document", "editable") => Bool,
+        ("list", "scroll_to") => OneOf(vec![number(1.0, 10_000_000.0), Data]),
         (_, key) => by_key(key),
     }
 }
@@ -157,10 +162,14 @@ fn by_key(key: &str) -> KeyType {
         },
         "place" => Tokens(token_set!(Placement)),
         "scroll" => OneOf(vec![Bool, Tokens(token_set!(Scroll))]),
-        "scroll_to" => Number {
-            min: Some(1.0),
-            max: None,
-        },
+        "scroll_to" => OneOf(vec![
+            Number {
+                min: Some(1.0),
+                max: None,
+            },
+            String,
+            Data,
+        ]),
         "size" => Tokens(token_set!(TextSize)),
         "style" => Style,
         "surface" => Tokens(token_set!(Surface)),

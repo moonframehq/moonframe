@@ -1,5 +1,5 @@
 [package]
-description            = "The `chat` native provider: agent chats on herdr-acp, attached over herdr's chat protocol"
+description            = "The `chat` native provider: agent chats on Sheprd's sheprd-acp, attached over its chat protocol"
 edition.workspace      = true
 license.workspace      = true
 name                   = "moonframe-chat"
@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 herdr-chat-protocol.workspace = true
+moonframe-chat-view.workspace = true
 moonframe-core.workspace      = true
 moonframe-providers.workspace = true
 serde_json.workspace          = true

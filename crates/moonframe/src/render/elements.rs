@@ -41,6 +41,7 @@ impl<'w> Draw<'w> for Stack {
             Direction::Column => Part::Column,
         };
         let look = painter.look(part, &self.look, self.selected, place);
+        let revealing = super::reveal::begin(self, painter, place);
         let (children, views) = painter.faded(look.base.opacity, |painter| {
             painter.focusing(!self.keys.is_empty(), |painter| {
                 painter.keyed_children(&self.children, place, self.direction, cx)
@@ -50,6 +51,7 @@ impl<'w> Draw<'w> for Stack {
             painter.outside.pop();
         }
         painter.in_drag = in_drag;
+        let (handle, revealed) = revealing.end(painter);
         let focus = painter.focus_keys(&self.keys, views, place, cx);
         let theme = cx.theme();
         let element = div()
@@ -81,7 +83,6 @@ impl<'w> Draw<'w> for Stack {
         } else {
             element
         };
-        let handle = painter.motion.scroll_to(&place.path, self.scroll_to);
         let drawn = children.len();
         if self.ends.is_none() {
             super::ends::not_asked(painter, place);
@@ -115,7 +116,7 @@ impl<'w> Draw<'w> for Stack {
                 cx,
             )
         }));
-        let element = element.children(ends);
+        let element = element.children(ends).children(revealed);
         // Hugging only says something across a column.
         let element = if self.frame.hug
             && self.frame.self_align.is_none()
@@ -607,7 +608,10 @@ impl<'w> Draw<'w> for Text {
             element = element.whitespace_nowrap().flex_shrink_0();
         }
         if let Some(lines) = self.lines {
-            element = element.min_w_0().line_clamp(usize::from(lines));
+            element = element
+                .min_w_0()
+                .line_clamp(usize::from(lines))
+                .text_ellipsis();
         }
         let text = match look.base.case {
             Some(Case::Upper) => self.text.to_uppercase(),

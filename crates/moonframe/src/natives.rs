@@ -36,6 +36,7 @@ pub(crate) fn natives() -> Natives {
         ("repo", repo),
         ("shell", shell),
         ("speech", speech),
+        ("terminals", terminals),
         ("usage", usage),
         // keep-sorted end
     ];
@@ -128,6 +129,11 @@ fn speech() -> Box<dyn Native> {
     moonframe_speech::native()
 }
 
+#[cfg(feature = "terminals")]
+fn terminals() -> Box<dyn Native> {
+    moonframe_terminals::native()
+}
+
 #[cfg(feature = "usage")]
 fn usage() -> Box<dyn Native> {
     moonframe_usage::native()
@@ -213,6 +219,11 @@ fn speech() -> Box<dyn Native> {
     Box::new(LeftOut)
 }
 
+#[cfg(not(feature = "terminals"))]
+fn terminals() -> Box<dyn Native> {
+    Box::new(LeftOut)
+}
+
 #[cfg(not(feature = "usage"))]
 fn usage() -> Box<dyn Native> {
     Box::new(LeftOut)
@@ -236,6 +247,7 @@ fn usage() -> Box<dyn Native> {
         feature = "transcripts",
         feature = "shell",
         feature = "speech",
+        feature = "terminals",
         feature = "usage"
     ),
     allow(dead_code)
@@ -287,8 +299,21 @@ mod tests {
     fn every_built_in_native_is_registered() {
         let natives = natives();
         for name in [
-            "acp", "chat", "docs", "git", "github", "gitlab", "library", "notes", "pi", "procs",
-            "projects", "repo", "shell", "usage",
+            "acp",
+            "chat",
+            "docs",
+            "git",
+            "github",
+            "gitlab",
+            "library",
+            "notes",
+            "pi",
+            "procs",
+            "projects",
+            "repo",
+            "shell",
+            "terminals",
+            "usage",
         ] {
             assert!(natives.contains_key(name), "{name}");
         }

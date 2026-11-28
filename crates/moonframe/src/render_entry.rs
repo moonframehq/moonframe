@@ -3,7 +3,7 @@
 //! stylesheet (or the host app's), drawn by the GPU and read back. A host
 //! shows it to an agent or a vision model without the user's window.
 
-mod window;
+pub(crate) mod window;
 
 use {
     moonframe_core::{

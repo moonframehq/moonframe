@@ -29,13 +29,6 @@ impl Build for Stack {
     ];
 
     fn build(kind: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
-        let scroll_to = fields.get::<i64>("scroll_to")?;
-        if scroll_to.is_some_and(|index| index < 1) {
-            return Err(fields
-                .cx()
-                .key("scroll_to")
-                .fail("expected a positive child index"));
-        }
         let measure = match fields.get::<Data>("measure")? {
             Some(msg) => Some(Action::Send {
                 to: fields.get("to")?,
@@ -55,7 +48,7 @@ impl Build for Stack {
                 .key("carry")
                 .fail("a title bar (`drag = true`) moves the window; it can't be carried too"));
         }
-        Ok(Self {
+        let mut stack = Self {
             look: Look::from_fields(fields)?,
             direction: match kind {
                 Element::Row => Direction::Row,
@@ -67,7 +60,7 @@ impl Build for Stack {
             wrap: fields.get("wrap")?.unwrap_or(false),
             spread: fields.get("spread")?.unwrap_or(false),
             selected: fields.get("selected")?.unwrap_or(false),
-            scroll_to: scroll_to.map(|index| index as usize),
+            scroll_to: fields.get("scroll_to")?,
             measure,
             outside: fields
                 .get::<Data>("outside")?
@@ -89,7 +82,14 @@ impl Build for Stack {
             children: tree.children(fields)?,
             slots: fields.slots().to_vec(),
             ends: Ends::from_fields(fields)?,
-        })
+        };
+        scrolled::hold_along(
+            &stack.frame,
+            stack.direction,
+            fields.items(),
+            &mut stack.children,
+        );
+        Ok(stack)
     }
 }
 
@@ -98,13 +98,20 @@ impl Build for Panel {
     const KEYS: &'static [&'static [&'static str]] = &[TYPE, FRAME, LOOK, &["title", "actions"]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
-        Ok(Self {
+        let mut panel = Self {
             look: Look::from_fields(fields)?,
             title: fields.get("title")?,
             actions: tree.list(fields, "actions")?,
             frame: Frame::from_fields(fields)?,
             children: tree.children(fields)?,
-        })
+        };
+        scrolled::hold_along(
+            &panel.frame,
+            Direction::Column,
+            fields.items(),
+            &mut panel.children,
+        );
+        Ok(panel)
     }
 }
 
@@ -268,6 +275,7 @@ impl Build for List {
         "row",
         "range",
         "to",
+        "scroll_to",
     ]];
 
     fn build(_: Element, fields: &Fields, tree: &mut Tree<'_>) -> Result<Self, Error> {
@@ -318,6 +326,7 @@ impl Build for List {
             range: fields
                 .get::<Data>("range")?
                 .map(|msg| Action::Send { to, msg }),
+            scroll_to: fields.get("scroll_to")?,
         })
     }
 }

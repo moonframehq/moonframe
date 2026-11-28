@@ -282,8 +282,12 @@ export type StackProps = {
 	border: Border?,
 	-- `true` scrolls along its axis; or "x", "y", "both".
 	scroll: (boolean | "x" | "y" | "both")?,
-	-- Reveal this direct child (one-based) when the index changes.
-	scroll_to: number?,
+	-- Reveal this direct child (one-based) when the index changes; or the
+	-- first row or column with this `key`, however deep, when the key (or
+	-- `seq`, to ask again) changes; or scroll to the `y` (and `x`) its
+	-- `measure` told, as far as the content goes: with a `seq`, only a new
+	-- `seq` asks again, so `measure`'s `y` can be kept as it comes.
+	scroll_to: (number | string | { key: string?, x: number?, y: number?, seq: any? })?,
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,
@@ -302,7 +306,8 @@ export type StackProps = {
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
-	-- false keeps the content's size when the parent is short of space.
+	-- false keeps the content's size when the parent is short of space;
+	-- the default in a row or column that scrolls along its axis.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
 	self_align: Align?,
@@ -414,7 +419,8 @@ export type PanelProps = {
 	-- false scrolls with no scrollbar drawn (the GPUI backend; Rune follows
 	-- the system's setting).
 	scrollbar: boolean?,
-	-- false keeps the content's size when the parent is short of space.
+	-- false keeps the content's size when the parent is short of space;
+	-- the default in a row or column that scrolls along its axis.
 	shrink: boolean?,
 	-- Where it sits across the parent's axis, over the parent's `align`.
 	self_align: Align?,
@@ -600,9 +606,14 @@ export type IconName =
 	| "brand-anthropic"
 	| "brand-github"
 	| "brand-gitlab"
+	| "brand-google-scholar"
+	| "brand-linkedin"
 	| "brand-mistral"
 	| "brand-ollama"
 	| "brand-openai"
+	| "brand-slack"
+	| "brand-wikipedia"
+	| "brand-x"
 	| "bug"
 	| "building-2"
 	| "calendar"
@@ -678,6 +689,7 @@ export type IconName =
 	| "gitlab"
 	| "globe"
 	| "grip-vertical"
+	| "hand"
 	| "hard-drive"
 	| "hash"
 	| "heading"
@@ -723,6 +735,7 @@ export type IconName =
 	| "minus"
 	| "monitor"
 	| "moon"
+	| "mouse-pointer-2"
 	| "network"
 	| "octagon-alert"
 	| "palette"
@@ -782,6 +795,7 @@ export type IconName =
 	| "star"
 	| "star-fill"
 	| "star-off"
+	| "sticky-note"
 	| "strikethrough"
 	| "sun"
 	| "tag"
@@ -794,6 +808,7 @@ export type IconName =
 	| "trash"
 	| "trash-2"
 	| "triangle-alert"
+	| "type"
 	| "undo"
 	| "undo-2"
 	| "unlock"
@@ -1061,11 +1076,128 @@ export type BrowserProps = {
 	[number]: string,
 }
 
+-- HTML shown sealed, kept by mod and `id`: its scripts never run and it
+-- loads nothing but itself (pictures and fonts inline, as `data:`), and it
+-- follows the app's light or dark look. Give `html` or `src`, a file named
+-- as `ui.image` names pictures. Links are told, never followed; `#part`
+-- scrolls to it. A table message gets the fields added; any other value
+-- arrives as `{ msg = ... }`.
+export type DocumentProps = {
+	class: Class?,
+	style: Style?,
+	state: string?,
+	id: string?,
+	html: string?,
+	src: string?,
+	-- Sent as a link is clicked, with `url` (as written) and `text` added.
+	link: Data,
+	-- Sent as it scrolls, at most every 100 ms, with `y`, `height` and
+	-- `content_height` (points) added.
+	scroll: Data,
+	-- When it changes (a new `seq` asks again): a `y` (points down, as
+	-- `scroll` told) or an element's `id`, brought to the top.
+	scroll_to: (number | string | { y: number?, id: string?, seq: any? })?,
+	-- Sent as the selection changes, with `text` ("" once none) and its box
+	-- `x`, `y`, `width`, `height`, in points from the box's top left as it
+	-- shows.
+	select: Data,
+	-- Edited in place; a link then opens with cmd (ctrl) and a click.
+	editable: boolean?,
+	-- While editable: sent with `html`, the whole document, half a second
+	-- after an edit; give it back as `html` and nothing reloads. Grown past
+	-- the 8 MB `html` takes, it comes with `error` instead.
+	change: Data,
+	-- While editable: sent with `html` as the document loses the keyboard,
+	-- and `edited`, whether it was typed into since the last `done` (or
+	-- since it loaded): skip saving a blur that changed nothing.
+	done: Data,
+	[number]: string,
+}
+
 -- A view the app writes in Rust and registers by `name` (an app on the
 -- Moonframe library; the starter has none). The host keeps it by mod and
 -- `id`, so it lives across reloads and while hidden, and hands it `props`,
 -- telling it when they change. What the user does in it comes back to this
 -- mod's `update` as messages the view chooses.
+-- One node of a `ui.diagram` document. With `x`, `y`, `w` and `h` it stays
+-- where it is; without, the diagram is laid out.
+export type DiagramNode = {
+	id: string,
+	label: string?,
+	sublabel: string?,
+	-- box rounded pill diamond circle (ellipse) cylinder note (sticky) text
+	kind: string?,
+	tone: Tone?,
+	-- `#rrggbb`, over the card color.
+	fill: string?,
+	group: string?,
+	x: number?,
+	y: number?,
+	w: number?,
+	h: number?,
+}
+
+-- One edge of a `ui.diagram` document.
+export type DiagramEdge = {
+	id: string?,
+	from: string,
+	to: string,
+	label: string?,
+	kind: ("solid" | "dashed" | "dotted" | "thick" | "invisible")?,
+	dashed: boolean?,
+	-- none arrow open circle cross triangle diamond hollow-diamond
+	start: string?,
+	["end"]: string?,
+	tone: Tone?,
+}
+
+-- A diagram the view lays out: a flow of nodes, edges and groups, or a
+-- sequence of messages between participants (its `nodes`).
+export type DiagramDocument = {
+	kind: ("flow" | "sequence")?,
+	direction: ("down" | "up" | "right" | "left")?,
+	-- `DiagramNode`s and `DiagramEdge`s.
+	nodes: { any }?,
+	edges: { any }?,
+	groups: { { id: string, label: string?, parent: string?, tone: Tone? } }?,
+	messages: { { from: string, to: string, label: string?, kind: ("sync" | "async" | "reply")? } }?,
+	notes: { { over: { string }, text: string, before: number? } }?,
+}
+
+-- `ui.diagram` (the `diagram` feature): a diagram drawn, laid out and
+-- edited in Rust. The mod keeps the document and applies what it hears:
+-- `selected`, `moved`, `resized`, `created`, `connected`, `deleted`,
+-- `edited`, `opened`, `zoom`, `tool`.
+export type DiagramProps = {
+	id: string?,
+	class: Class?,
+	style: Style?,
+	-- The Luau `diagram` component's document: every shape placed. Each
+	-- is a `DiagramNode` and a `DiagramEdge` (typed `any`: a mod's own
+	-- record types would not pass, as Luau's lists are invariant).
+	shapes: { any }?,
+	links: { any }?,
+	-- Or a document to lay out.
+	document: DiagramDocument?,
+	-- Or Mermaid (flowchart, sequence, state, class, er) or Graphviz DOT
+	-- text, laid out the same way; what does not parse shows why.
+	mermaid: string?,
+	dot: string?,
+	-- "edit" changes it (the default with `shapes`), "view" only looks.
+	mode: ("view" | "edit")?,
+	-- select hand connector, or a node kind to draw.
+	tool: string?,
+	selected: { string }?,
+	-- Nodes and edges drawn in the accent.
+	highlight: { string }?,
+	-- Asked again with each new `seq`.
+	camera: { fit: boolean?, zoom: number?, zoom_by: number?, seq: number? }?,
+	-- "focus": scrolling pans only after a click inside (in a page that
+	-- scrolls, as a chat does).
+	scroll: "focus"?,
+	[string]: any,
+}
+
 export type ViewProps = {
 	class: Class?,
 	style: Style?,
@@ -1092,8 +1224,18 @@ export type InputProps = {
 	change: Data,
 	-- Selection movement, with `value` and the caret's byte offset added.
 	select: Data,
-	-- Sent on Enter, or ⌘/Ctrl-Enter when `multiline`.
+	-- Sent on Enter, or ⌘/Ctrl-Enter when `multiline` (and Enter too with
+	-- `enter = "submit"`).
 	submit: Data,
+	-- What Enter does in a multiline field: `"newline"` (default; ⌘/Ctrl-Enter
+	-- submits) or `"submit"`, where Shift-Enter makes a new line, as in a
+	-- chat's composer.
+	enter: ("submit" | "newline")?,
+	-- What was sent before, oldest first: Up with the caret on the first
+	-- line recalls the entry before the one shown, Down on the last line the
+	-- one after, and Down past the newest puts back what was being written.
+	-- Each recall replaces the text as an edit, so `change` is sent.
+	history: { string }?,
 	-- Sent with `value` when it loses keyboard focus: a title edited in
 	-- place is saved as the user clicks away.
 	blur: Data,
@@ -1249,8 +1391,13 @@ export type ListProps = {
 	row_height: number | ((index: number) -> number),
 	row: (index: number) -> Child,
 	-- Sent with `first` and `last`, the rows (from 1) any part of which
-	-- shows, as they change while it scrolls and resizes.
+	-- shows, and `y`, the pixels it is scrolled down (0 at the top), as
+	-- they change while it scrolls and resizes.
 	range: Data,
+	-- When it changes (a new `seq` asks again): reveal row n, scrolling
+	-- only as far as needed (`n` or `{ row = n, seq = s }`), or go back to
+	-- a `y` its `range` told (`{ y = px, seq = s }`).
+	scroll_to: (number | { row: number?, y: number?, seq: any? })?,
 	-- The mod `range` goes to, if not the drawing one.
 	to: string?,
 	gap: Space?,
@@ -1442,8 +1589,10 @@ declare ui: {
 	map: (props: MapProps) -> Element,
 	terminal: (props: string | TerminalProps) -> Element,
 	browser: (props: string | BrowserProps) -> Element,
+	document: (props: string | DocumentProps) -> Element,
 	video: (props: string | VideoProps) -> Element,
 	view: (props: string | ViewProps) -> Element,
+	diagram: (props: DiagramProps) -> Element,
 	input: (props: InputProps) -> Element,
 	markdown: (props: string | MarkdownProps) -> Element,
 	divider: () -> Element,
@@ -1489,7 +1638,8 @@ export type GitCommit = {
 -- app/providers/system/types.luau.
 export type System = ProviderSystemPublished
 
-export type Platform = "macos" | "linux" | "windows"
+-- `ios` is what MoonSwift reports on an iPhone or iPad.
+export type Platform = "macos" | "linux" | "windows" | "ios"
 export type Titlebar = "system" | "hidden"
 
 -- The window, for a title bar the layout draws itself.
@@ -2132,8 +2282,8 @@ export type MountProps = {
 	[number]: string,
 }
 
--- What draws this build.
-export type Renderer = "gpui" | "rune"
+-- What draws this build; `swiftui` is what MoonSwift reports.
+export type Renderer = "gpui" | "rune" | "swiftui"
 
 -- What every `view` gets as `app`.
 export type App = {
@@ -2391,7 +2541,7 @@ export type DevtoolsMsg =
 -- `"app:notify"` (`msg` a `NotifyMsg`), `"app:pick"` (`msg` a `PickMsg`),
 -- `"app:edit"` (`msg` an `EditMsg`), `"app:window"` (`msg` a `WindowMsg`),
 -- `"app:devtools"` (`msg` a `DevtoolsMsg`), `"app:share"` (`msg` a `ShareMsg`), `"app:status-item"` (`msg` a
--- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser).
+-- `StatusItemMsg`), `"app:hotkey"` (`msg` a `HotkeyMsg`), `"app:pdf"` (`msg` a `PdfMsg`), `"app:text"` (`msg` a `TextMsg`) and `"app:open"` (`msg` a web address, opened in the system's browser, or one `mailto:` address without headers, opened in its mail app).
 export type Send = {
 	to: string,
 	msg: Data,
@@ -2738,6 +2888,21 @@ type UseActivityBarProps = {
 	read height: number?,
 	read fill: boolean?,
 }
+type UseAgentChatProps = {
+	read id: string?,
+	read chat: string?,
+	read agent: string?,
+	read cwd: string?,
+	read context: string?,
+	read placeholder: string?,
+	read suggestions: { any }?,
+	read title: string?,
+	read started: any,
+	read link: any,
+	read to: string?,
+	read view: any,
+}
+type UseAgentChatState = any
 type UseAgentRunTool = any
 type UseAgentRunOption = any
 type UseAgentRunRun = any
@@ -2900,6 +3065,26 @@ type UseChatMessageProps = {
 	read icon: string?,
 	read text: string?,
 	read [number]: any,
+}
+type UseChatQuestionProps = {
+	read id: string?,
+	read permission: any,
+}
+type UseChatQuestionState = any
+type UseChatWaitingProps = {
+	read view: any,
+	read chat: string?,
+	read plan_open: boolean?,
+	read plan_toggle: any,
+}
+type UseChatWorkingProps = {
+	read working: boolean?,
+	read waiting: boolean?,
+	read step: string?,
+	read working_for: string?,
+	read activities: { any }?,
+	read open: boolean?,
+	read toggle: any,
 }
 type UseCheckboxProps = {
 	read checked: boolean?,
@@ -3164,6 +3349,20 @@ type UseDayStripProps = {
 	read event: string?,
 	read to: string?,
 }
+type UseDiagramShape = any
+type UseDiagramLink = any
+type UseDiagramProps = {
+	read id: string,
+	read shapes: { UseDiagramShape },
+	read links: { UseDiagramLink }?,
+	read selected: { string }?,
+	read tool: string?,
+	read version: number?,
+}
+type UseDiagramView = any
+type UseDiagramDrag = any
+type UseDiagramState = any
+type UseDiagramBox = any
 type UseDialogButton = any
 type UseDialogProps = {
 	read open: boolean?,
@@ -4660,6 +4859,8 @@ type UseTableProps = {
 	read add_label: string?,
 	read reorder: string?,
 	read marker: any,
+	read measure: any,
+	read scroll_to: any,
 }
 type UseTabsTab = any
 type UseTabsProps = {
@@ -4813,6 +5014,14 @@ type UseToastsProps = {
 	read event: string?,
 	read to: string?,
 }
+type UseToolGroupProps = {
+	read group: any,
+	read inspect: boolean?,
+	read output: any,
+	read open: boolean?,
+	read msg: any,
+	read to: string?,
+}
 type UseToolbarButton = any
 type UseToolbarProps = {
 	read buttons: { UseToolbarButton },
@@ -4943,6 +5152,7 @@ type UseProps = {
 	["accordion"]: UseAccordionProps,
 	["action-tiles"]: UseActionTilesProps,
 	["activity-bar"]: UseActivityBarProps,
+	["agent-chat"]: UseAgentChatProps,
 	["agent-run"]: UseAgentRunProps,
 	["ahead-behind"]: UseAheadBehindProps,
 	["audio-meter"]: UseAudioMeterProps,
@@ -4959,6 +5169,9 @@ type UseProps = {
 	["change-tree"]: UseChangeTreeProps,
 	["chat-markdown"]: UseChatMarkdownProps,
 	["chat-message"]: UseChatMessageProps,
+	["chat-question"]: UseChatQuestionProps,
+	["chat-waiting"]: UseChatWaitingProps,
+	["chat-working"]: UseChatWorkingProps,
 	["checkbox"]: UseCheckboxProps,
 	["checks"]: UseChecksProps,
 	["chips"]: UseChipsProps,
@@ -4981,6 +5194,7 @@ type UseProps = {
 	["date-picker"]: UseDatePickerProps,
 	["date-tile"]: UseDateTileProps,
 	["day-strip"]: UseDayStripProps,
+	["diagram"]: UseDiagramProps,
 	["dialog"]: UseDialogProps,
 	["dictation"]: UseDictationProps,
 	["diff-counts"]: UseDiffCountsProps,
@@ -5120,6 +5334,7 @@ type UseProps = {
 	["title-bar"]: UseTitleBarProps,
 	["toast"]: UseToastProps,
 	["toasts"]: UseToastsProps,
+	["tool-group"]: UseToolGroupProps,
 	["toolbar"]: UseToolbarProps,
 	["tree"]: UseTreeProps,
 	["update-pill"]: UseUpdatePillProps,

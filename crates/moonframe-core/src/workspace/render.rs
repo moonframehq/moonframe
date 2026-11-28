@@ -77,6 +77,36 @@ impl Workspace {
         self.app()
     }
 
+    /// Runs the view of the module `name` again on what it last saw, and
+    /// returns the table it built, unread: the conformance tests.
+    #[cfg(test)]
+    pub(crate) fn raw_view(&self, name: &str) -> Option<Result<mlua::Value, Error>> {
+        let module = self.slot(name)?.module.as_ref()?;
+        Some(module.raw_view(&self.app))
+    }
+
+    /// Draws the view of the module `name` again, as `render` would, and
+    /// returns it without keeping it: the conformance tests compare it with
+    /// the view kept, so a change that failed to draw it again shows.
+    #[cfg(test)]
+    pub(crate) fn fresh_view(&self, name: &str) -> Option<Result<Node, Error>> {
+        let slot = self.slot(name)?;
+        let module = slot.module.as_ref()?;
+        let app = match self.mod_windows.get(name) {
+            Some(window) => {
+                let mut data = (*self.app).clone();
+                data.insert("window".to_owned(), window.data());
+                Rc::new(data)
+            },
+            None => self.app.clone(),
+        };
+        Some(
+            module
+                .view(&app, &self.stylesheet, &slot.lists, slot.strict)
+                .map(|(node, ..)| node),
+        )
+    }
+
     /// What every `view` gets as `app`: what the host shares, the mods,
     /// which regions they asked for, and the theme.
     pub(super) fn app(&self) -> AppData {

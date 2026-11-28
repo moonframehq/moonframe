@@ -1,0 +1,10 @@
+Flow Down
+node CUSTOMER "CUSTOMER" box sub="name, email"
+node ORDER "ORDER" box
+node LINE-ITEM "LINE-ITEM" box
+node PRODUCT "PRODUCT" box
+node DELIVERY-ADDRESS "DELIVERY-ADDRESS" box
+edge e0 CUSTOMER -> ORDER Solid none..open "places"
+edge e1 ORDER -> LINE-ITEM Solid none..open "contains"
+edge e2 PRODUCT -> LINE-ITEM Solid none..open "appears in"
+edge e3 ORDER -> DELIVERY-ADDRESS Dashed open..open "uses"
