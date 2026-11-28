@@ -18,9 +18,8 @@ pub(super) enum Camera {
 }
 
 pub(super) struct Props {
-    /// The diagram, or why its `mermaid` or `dot` text is not one.
-    pub diagram: Result<Diagram, String>,
-    /// The props the diagram was read from, to tell when it changed.
+    /// The props the diagram is read from, to tell when it changed: only
+    /// then is it read, with [`diagram`].
     pub document: Data,
     pub mode: Mode,
     pub tool: Tool,
@@ -126,29 +125,39 @@ fn edge(data: &Data, index: usize) -> Option<Edge> {
 }
 
 /// The document: `mermaid` or `dot` text, `shapes` and `links` (the Luau
-/// editor's), else `document`.
-fn diagram(props: &Data) -> (Result<Diagram, String>, Data) {
+/// editor's), else `document`; or why the text is not a diagram.
+pub(super) fn diagram(props: &Data) -> Result<Diagram, String> {
     for language in ["mermaid", "dot"] {
         if let Some(text) = text(props, language) {
-            let parsed = moonframe_diagram::parse::fenced(language, &text)
-                .map(|r| r.map_err(|e| e.to_string()));
-            return (
-                parsed.unwrap_or_else(|| Err(format!("no parser for `{language}`"))),
-                Data::String(text),
-            );
+            return match moonframe_diagram::parse::fenced(language, &text) {
+                Some(parsed) => parsed.map_err(|e| e.to_string()),
+                None => Err(format!("no parser for `{language}`")),
+            };
         }
     }
-    let (diagram, source) = document(props);
-    (Ok(diagram), source)
+    Ok(document(props))
 }
 
-fn document(props: &Data) -> (Diagram, Data) {
+/// The props [`diagram`] reads, cheap to compare: what text and in which
+/// language, or the document given.
+fn source(props: &Data) -> Data {
+    for language in ["mermaid", "dot"] {
+        if let Some(text) = text(props, language) {
+            return Data::map([(language, Data::String(text))]);
+        }
+    }
     if props.get("shapes").is_some() {
-        let source = Data::map([
+        return Data::map([
             ("shapes", props.get("shapes").cloned().unwrap_or_default()),
             ("links", props.get("links").cloned().unwrap_or_default()),
         ]);
-        let diagram = Diagram {
+    }
+    props.get("document").cloned().unwrap_or(Data::Nil)
+}
+
+fn document(props: &Data) -> Diagram {
+    if props.get("shapes").is_some() {
+        return Diagram {
             nodes: list(props, "shapes").iter().filter_map(node).collect(),
             edges: list(props, "links")
                 .iter()
@@ -157,12 +166,11 @@ fn document(props: &Data) -> (Diagram, Data) {
                 .collect(),
             ..Diagram::default()
         };
-        return (diagram, source);
     }
     let Some(doc) = props.get("document") else {
-        return (Diagram::default(), Data::Nil);
+        return Diagram::default();
     };
-    let diagram = Diagram {
+    Diagram {
         kind: match text(doc, "kind").as_deref() {
             Some("sequence") => DiagramKind::Sequence,
             _ => DiagramKind::Flow,
@@ -215,12 +223,11 @@ fn document(props: &Data) -> (Diagram, Data) {
                 })
             })
             .collect(),
-    };
-    (diagram, doc.clone())
+    }
 }
 
 pub(super) fn props(props: &Data) -> Props {
-    let (diagram, document) = diagram(props);
+    let document = source(props);
     let editor = props.get("shapes").is_some();
     let mode = match text(props, "mode").as_deref() {
         Some("edit") => Mode::Edit,
@@ -246,7 +253,6 @@ pub(super) fn props(props: &Data) -> Props {
         Some((seq, ask))
     });
     Props {
-        diagram,
         document,
         mode,
         tool,
@@ -264,16 +270,31 @@ mod tests {
 
     #[test]
     fn mermaid_text_is_a_document_and_bad_text_says_why() {
-        let read = props(&Data::map([(
-            "mermaid",
-            Data::String("flowchart LR\n A --> B".into()),
-        )]));
-        assert_eq!(read.diagram.unwrap().nodes.len(), 2);
-        let read = props(&Data::map([(
-            "mermaid",
-            Data::String("pie\n \"a\" : 1".into()),
-        )]));
-        assert!(read.diagram.unwrap_err().contains("pie"));
+        let given = Data::map([("mermaid", Data::String("flowchart LR\n A --> B".into()))]);
+        assert_eq!(diagram(&given).unwrap().nodes.len(), 2);
+        let bad = Data::map([("mermaid", Data::String("pie\n \"a\" : 1".into()))]);
+        assert!(diagram(&bad).unwrap_err().contains("pie"));
+    }
+
+    #[test]
+    fn the_source_changes_with_the_text_or_its_language_only() {
+        let text = |language: &str, text: &str, selected: &str| {
+            props(&Data::map([
+                (language, Data::String(text.into())),
+                ("selected", Data::List(vec![Data::String(selected.into())])),
+            ]))
+            .document
+        };
+        // A selection alone leaves the source as it was: nothing is read again.
+        assert_eq!(
+            text("mermaid", "graph TD\n a", "a"),
+            text("mermaid", "graph TD\n a", "b")
+        );
+        assert_ne!(text("mermaid", "x", "a"), text("dot", "x", "a"));
+        assert_ne!(
+            text("mermaid", "graph TD\n a", "a"),
+            text("mermaid", "graph TD\n b", "a")
+        );
     }
 
     fn shape(id: &str, kind: &str) -> Data {
@@ -306,7 +327,7 @@ mod tests {
             ("tool", Data::String("ellipse".into())),
         ]);
         let read = props(&given);
-        let diagram = read.diagram.unwrap();
+        let diagram = diagram(&given).unwrap();
         assert!(diagram.placed());
         assert_eq!(diagram.nodes[0].kind, NodeKind::Note);
         assert_eq!(diagram.nodes[1].kind, NodeKind::Circle);
@@ -324,8 +345,9 @@ mod tests {
                 Data::List(vec![Data::map([("id", Data::String("a".into()))])]),
             ),
         ]);
-        let read = props(&Data::map([("document", doc)]));
-        let diagram = read.diagram.unwrap();
+        let given = Data::map([("document", doc)]);
+        let read = props(&given);
+        let diagram = diagram(&given).unwrap();
         assert_eq!(diagram.direction, Direction::Right);
         assert!(!diagram.placed());
         assert_eq!(read.mode, Mode::View);
