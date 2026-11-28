@@ -446,7 +446,9 @@ local function live_view(d: any, camera: any, app: any): any
 			d.agent and ui.text { `from {d.agent}`, tone = "muted", size = "small" },
 			d.note and ui.text { d.note, tone = "accent", size = "small", truncate = true },
 			ui.spacer(),
-			d.from == "agent" and ui.button { "Close", small = true, variant = "ghost", msg = { close_live = d.id } },
+			-- Only a diagram an agent showed through the MCP server can be closed:
+			-- another file in its folder is the user's own.
+			d.from == "agent" and string.sub(d.key, -5) == ".json" and ui.button { "Close", small = true, variant = "ghost", msg = { close_live = d.key } },
 			ui.button { "Back to my diagram", small = true, variant = "ghost", msg = { live = false } },
 		},
 		ui.column { grow = true, gap = "none", body },

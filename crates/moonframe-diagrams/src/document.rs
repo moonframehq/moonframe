@@ -310,11 +310,27 @@ pub fn patch(doc: &mut Value, ops: &Value) -> Result<String, String> {
         }
         // A sequence draws every participant its messages name: the
         // participant's messages go with it, and it leaves its notes.
+        // Which of the messages before each place stayed, so a note keeps
+        // its place among those left (its `before` counts messages above).
+        let mut kept_before = vec![0_usize];
         if let Some(messages) = doc["messages"].as_array_mut() {
+            for m in messages.iter() {
+                let stays = usize::from(keep(m, "from") && keep(m, "to"));
+                kept_before.push(kept_before.last().copied().unwrap_or(0) + stays);
+            }
             messages.retain(|m| keep(m, "from") && keep(m, "to"));
         }
         if let Some(notes) = doc["notes"].as_array_mut() {
             for note in notes.iter_mut() {
+                if let Some(at) = note.get("before").and_then(Value::as_u64) {
+                    let at = usize::try_from(at).unwrap_or(usize::MAX);
+                    let left = kept_before
+                        .get(at)
+                        .or_else(|| kept_before.last())
+                        .copied()
+                        .unwrap_or(0);
+                    note["before"] = left.into();
+                }
                 if let Some(over) = note.get_mut("over").and_then(Value::as_array_mut) {
                     over.retain(|who| {
                         !who.as_str()
@@ -444,6 +460,22 @@ mod tests {
         assert_eq!(notes[0]["over"], json!(["A"]));
         let text = doc.to_string();
         assert!(!text.contains("\"B\""), "{text}");
+    }
+
+    #[test]
+    fn notes_keep_their_place_among_the_messages_left() {
+        let mut doc = from_text(
+            "mermaid",
+            "sequenceDiagram\n A->>B: one\n Note over C: between\n C->>D: two\n Note over D: last",
+        )
+        .unwrap();
+        assert_eq!(doc["notes"][0]["before"], 1);
+        patch(&mut doc, &json!({ "remove_nodes": ["B"] })).unwrap();
+        assert_eq!(doc["messages"].as_array().unwrap().len(), 1);
+        // Still above `C->>D`, now the first message, and the last still
+        // after it.
+        assert_eq!(doc["notes"][0]["before"], 0);
+        assert_eq!(doc["notes"][1]["before"], 1);
     }
 
     #[test]

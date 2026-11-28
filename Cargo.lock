@@ -6762,6 +6762,7 @@ dependencies = [
  "moonframe-core",
  "moonframe-diagram",
  "moonframe-providers",
+ "rustix 1.1.6",
  "serde_json",
  "tempfile",
 ]

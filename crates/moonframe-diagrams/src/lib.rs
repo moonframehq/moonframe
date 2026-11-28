@@ -11,10 +11,12 @@
 //! The two meet in a folder ([`store::agents_dir`]), one JSON file per
 //! diagram, so neither waits for the other.
 
+// keep-sorted start
 pub mod document;
 pub mod mcp;
 pub mod provider;
 pub mod store;
+// keep-sorted end
 
 pub use provider::native;
 

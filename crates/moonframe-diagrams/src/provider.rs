@@ -3,8 +3,11 @@
 //! `.json`), shared as `app.diagrams`, newest first, each with the
 //! `document` `ui.diagram` takes.
 
+mod folder;
+
 use {
     crate::{document, store},
+    folder::Folder,
     moonframe_core::Data,
     moonframe_providers::{Handle, MAX_ENTRIES, Native},
     serde_json::{Value, json},
@@ -75,9 +78,9 @@ impl Native for Diagrams {
         if from.is_empty() {
             // The app telling it the project moved.
             self.project = moonframe_providers::project();
-        } else if let Some(id) = message.get("close").and_then(Data::as_str) {
-            // Only an agent's diagram goes, and only its own file.
-            if let Ok(id) = store::safe_id(id) {
+        } else if let Some(key) = message.get("close").and_then(Data::as_str) {
+            // Only an agent's diagram goes, and only the very file listed.
+            if let Some(id) = closable(key) {
                 let _ = store::remove(&self.agents, &id);
             }
         }
@@ -85,29 +88,17 @@ impl Native for Diagrams {
     }
 }
 
-/// The project's `.moonframe/diagrams`, unless it (or `.moonframe`) is a
-/// link, or leads out of the project.
-fn project_folder(project: Option<PathBuf>) -> Option<PathBuf> {
-    let project = project?;
-    let dir = project.join(".moonframe").join("diagrams");
-    let linked = |p: &Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.file_type().is_symlink());
-    if linked(&project.join(".moonframe")) || linked(&dir) {
-        return None;
-    }
-    match (project.canonicalize(), dir.canonicalize()) {
-        (Ok(root), Ok(inside)) if inside.starts_with(&root) => Some(dir),
-        _ => None,
-    }
-}
-
 impl Diagrams {
     fn refresh(&mut self, host: &Handle) {
         // Files gone since (or of a project left) are forgotten.
         let mut before = std::mem::take(&mut self.read);
-        let mut entries = self.scan(&self.agents.clone(), From::Agent, &mut before);
-        let folder = project_folder(self.project.clone());
-        if let Some(project) = folder.clone() {
-            entries.extend(self.scan(&project, From::Project, &mut before));
+        let mut entries = match Folder::open(&self.agents) {
+            Ok(agents) => self.scan(&agents, From::Agent, &mut before),
+            Err(_) => Vec::new(),
+        };
+        let folder = self.project.as_deref().and_then(Folder::project);
+        if let Some(project) = &folder {
+            entries.extend(self.scan(project, From::Project, &mut before));
         }
         entries.sort_by_key(|e| {
             std::cmp::Reverse(e.get("updated").and_then(Value::as_u64).unwrap_or(0))
@@ -115,7 +106,7 @@ impl Diagrams {
         let mut published = json!({
             "available": true,
             "agents": self.agents.to_string_lossy(),
-            "project": folder.as_ref().map(|p| p.to_string_lossy().into_owned()),
+            "project": folder.as_ref().map(|f| f.path().to_string_lossy().into_owned()),
             "diagrams": [],
         });
         published["diagrams"] = Value::Array(within_budget(entries, document::weight(&published)));
@@ -125,29 +116,25 @@ impl Diagrams {
         }
     }
 
-    /// The diagrams in `dir`, each read again only when it changed.
+    /// The diagrams in `folder`, each read again only when it changed.
     fn scan(
         &mut self,
-        dir: &Path,
+        folder: &Folder,
         from: From,
         before: &mut HashMap<PathBuf, (SystemTime, u64, Value)>,
     ) -> Vec<Value> {
-        let Ok(listing) = std::fs::read_dir(dir) else {
-            return Vec::new();
-        };
         let mut out = Vec::new();
-        for file in listing.flatten().map(|e| e.path()).take(MOST_FILES) {
+        for name in folder.names(MOST_FILES) {
+            let file = folder.path().join(&name);
             let Some(language) = language(&file) else {
                 continue;
             };
-            // Only a file of the folder's own: a link could lead anywhere
-            // (a key in the home folder) and its text would be shared.
-            let Ok(meta) = std::fs::symlink_metadata(&file) else {
+            // Only a file of the folder's own, opened through it: a link
+            // could lead anywhere (a key in the home folder) and its text
+            // would be shared.
+            let Ok((handle, meta)) = folder.open_file(&name) else {
                 continue;
             };
-            if !meta.file_type().is_file() {
-                continue;
-            }
             let modified = meta.modified().unwrap_or(UNIX_EPOCH);
             if let Some(known) = before.remove(&file)
                 && known.0 == modified
@@ -157,7 +144,7 @@ impl Diagrams {
                 self.read.insert(file, known);
                 continue;
             }
-            let entry = entry(&file, language, from, &meta, modified);
+            let entry = entry(handle, &file, language, from, &meta, modified);
             self.read
                 .insert(file, (modified, meta.len(), entry.clone()));
             out.push(entry);
@@ -207,6 +194,7 @@ fn language(file: &Path) -> Option<&'static str> {
 }
 
 fn entry(
+    handle: std::fs::File,
     file: &Path,
     language: &str,
     from: From,
@@ -241,7 +229,7 @@ fn entry(
         return out;
     }
     if language == "json" {
-        let shown = own_bytes(file, meta).and_then(|bytes| {
+        let shown = read_whole(handle).and_then(|bytes| {
             let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
             store::Shown::from_json(&value)
         });
@@ -279,7 +267,7 @@ fn entry(
         }
         return out;
     }
-    match own_bytes(file, meta)
+    match read_whole(handle)
         .and_then(|b| String::from_utf8(b).map_err(|_| "not UTF-8 text".to_owned()))
     {
         Ok(text) => {
@@ -295,16 +283,17 @@ fn entry(
     out
 }
 
-/// The bytes of `file`, read through an open handle that must be the very
-/// file `meta` (its own, not followed through a link) described: a file
-/// swapped for a link after it was looked at is not read.
-fn own_bytes(file: &Path, meta: &std::fs::Metadata) -> Result<Vec<u8>, String> {
+/// The id of the agent's diagram `key` names, if closing may remove it:
+/// only the JSON files the MCP server writes go (`agent/<id>.json`), not
+/// a `.mmd` or `.dot` put in the agents' folder, nor a project's file.
+fn closable(key: &str) -> Option<String> {
+    let id = key.strip_prefix("agent/")?.strip_suffix(".json")?;
+    store::safe_id(id).ok()
+}
+
+/// What the opened file holds, up to [`store::MOST_BYTES`].
+fn read_whole(handle: std::fs::File) -> Result<Vec<u8>, String> {
     use std::io::Read as _;
-    let handle = std::fs::File::open(file).map_err(|e| e.to_string())?;
-    let opened = handle.metadata().map_err(|e| e.to_string())?;
-    if !opened.is_file() || !same_file(meta, &opened) {
-        return Err("changed while it was read".into());
-    }
     let mut bytes = Vec::new();
     handle
         .take(store::MOST_BYTES + 1)
@@ -314,17 +303,6 @@ fn own_bytes(file: &Path, meta: &std::fs::Metadata) -> Result<Vec<u8>, String> {
         return Err(format!("larger than {} KiB", store::MOST_BYTES / 1024));
     }
     Ok(bytes)
-}
-
-#[cfg(unix)]
-fn same_file(a: &std::fs::Metadata, b: &std::fs::Metadata) -> bool {
-    use std::os::unix::fs::MetadataExt as _;
-    a.dev() == b.dev() && a.ino() == b.ino()
-}
-
-#[cfg(not(unix))]
-fn same_file(a: &std::fs::Metadata, b: &std::fs::Metadata) -> bool {
-    a.len() == b.len() && a.modified().ok() == b.modified().ok()
 }
 
 #[cfg(test)]
@@ -367,9 +345,19 @@ mod tests {
         std::os::unix::fs::symlink(secret.path().join("key"), dir.join("key.mmd")).unwrap();
         std::fs::write(dir.join("own.mmd"), "graph TD; a-->b").unwrap();
         let mut provider = Diagrams::default();
-        let found = provider.scan(&dir, From::Project, &mut HashMap::new());
+        let folder = Folder::project(project.path()).unwrap();
+        let found = provider.scan(&folder, From::Project, &mut HashMap::new());
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0]["id"], "own");
+        // The folder swapped for a link once it is open is not read
+        // through: the scan stays in the folder it opened.
+        std::fs::rename(&dir, project.path().join(".moonframe").join("moved")).unwrap();
+        std::fs::write(secret.path().join("key.mmd"), "graph TD; secret-->leaked").unwrap();
+        std::os::unix::fs::symlink(secret.path(), &dir).unwrap();
+        let found = provider.scan(&folder, From::Project, &mut HashMap::new());
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0]["id"], "own");
+        assert!(Folder::project(project.path()).is_none());
         // A diagrams folder that is a link out of the project is not read.
         let linked = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(linked.path().join(".moonframe")).unwrap();
@@ -378,19 +366,19 @@ mod tests {
             linked.path().join(".moonframe").join("diagrams"),
         )
         .unwrap();
-        assert_eq!(project_folder(Some(linked.path().to_owned())), None);
-        assert!(project_folder(Some(project.path().to_owned())).is_some());
+        assert!(Folder::project(linked.path()).is_none());
+
         // A folder that comes later as a link is refused when it comes,
         // as each scan checks it again.
         let later = tempfile::tempdir().unwrap();
-        assert_eq!(project_folder(Some(later.path().to_owned())), None);
+        assert!(Folder::project(later.path()).is_none());
         std::fs::create_dir_all(later.path().join(".moonframe")).unwrap();
         std::os::unix::fs::symlink(
             secret.path(),
             later.path().join(".moonframe").join("diagrams"),
         )
         .unwrap();
-        assert_eq!(project_folder(Some(later.path().to_owned())), None);
+        assert!(Folder::project(later.path()).is_none());
     }
 
     #[test]
@@ -421,9 +409,30 @@ mod tests {
         provider.receive(
             &host,
             "editor",
-            Data::map([("close", Data::String("flow".into()))]),
+            Data::map([("close", Data::String("agent/flow.json".into()))]),
         );
         assert!(!store::path(dir.path(), "flow").exists());
+    }
+
+    #[test]
+    fn closing_removes_only_the_file_listed() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("arch.dot"), "digraph { a -> b }").unwrap();
+        std::fs::write(dir.path().join("arch.json"), "{}").unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let host = handle(&seen, dir.path());
+        let mut provider = Diagrams::default();
+        provider.start(&host).unwrap();
+        let close = |key: &str| Data::map([("close", Data::String(key.into()))]);
+        // A text diagram is not closed, nor the JSON file of its name.
+        provider.receive(&host, "editor", close("agent/arch.dot"));
+        provider.receive(&host, "editor", close("arch"));
+        provider.receive(&host, "editor", close("project/arch.json"));
+        assert!(dir.path().join("arch.dot").exists());
+        assert!(dir.path().join("arch.json").exists());
+        provider.receive(&host, "editor", close("agent/arch.json"));
+        assert!(!dir.path().join("arch.json").exists());
+        assert_eq!(closable("agent/../x.json"), None);
     }
 
     #[test]

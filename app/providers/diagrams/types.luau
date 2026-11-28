@@ -39,5 +39,6 @@ export type Published = {
 	diagrams: { Shown },
 }
 
--- `send "provider:diagrams" { close = id }` removes an agent's diagram.
+-- `send "provider:diagrams" { close = key }` removes an agent's diagram: one
+-- the MCP server wrote (`agent/<id>.json`), not another file of its folder.
 export type Message = { close: string }

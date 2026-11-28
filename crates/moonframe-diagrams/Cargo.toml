@@ -17,5 +17,10 @@ moonframe-diagram.workspace   = true
 moonframe-providers.workspace = true
 serde_json.workspace          = true
 
+# Reads a project's diagram files through the folder it opened, never
+# following a link.
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true

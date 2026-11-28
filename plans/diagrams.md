@@ -328,7 +328,9 @@ before the app, outlive it, or belong to an agent the app didn't start.
   `app.diagrams` (typed in `app/providers/diagrams/types.luau`) only when
   something did: newest first, each with the `document` `ui.diagram`
   takes, documents dropped past a budget of 8,000 values so a publish
-  stays under 10,000. `{ close = id }` removes an agent's diagram.
+  stays under 10,000. `{ close = key }` removes an agent's diagram (only
+  a JSON file the MCP server wrote, `agent/<id>.json`). Files are read
+  through the folder opened, never through a link.
 - `examples/diagram` lists them under FROM AGENTS (the app's
   `live-diagrams` component) and shows one read-only with the agent's
   highlight and note.

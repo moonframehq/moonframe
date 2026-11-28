@@ -8,7 +8,8 @@
 # to every agent this app starts (and any other agent given the command):
 # its tools write one file per diagram to `folder`. The project's
 # `.moonframe/diagrams/*.mmd`, `.dot` and `.json` are read too.
-# `{ close = "<id>" }` removes an agent's diagram.
+# `{ close = "<key>" }` removes an agent's diagram, one the MCP server
+# wrote (`agent/<id>.json`).
 # A native provider: Rust built into the app (crates/moonframe-diagrams,
 # the `diagram` feature).
 interval = 1.0
