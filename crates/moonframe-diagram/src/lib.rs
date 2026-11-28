@@ -14,11 +14,12 @@
 //!   itself.
 //!
 //! - [`parse`]: Mermaid and Graphviz DOT into the model; [`write`]: the
-//!   model back to Mermaid.
+//!   model back to Mermaid; [`export`]: a laid-out diagram as SVG.
 //!
 //! Nothing here knows about Moonframe: any gpui-kit app can embed the view,
 //! and a program with no GUI can lay diagrams out.
 
+pub mod export;
 pub mod geometry;
 pub mod layout;
 pub mod model;

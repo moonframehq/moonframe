@@ -127,6 +127,32 @@ pub fn hex(text: &str) -> Option<Hsla> {
     Some(rgb(value).into())
 }
 
+/// The theme's colors for an SVG export, so it matches the view, light or
+/// dark.
+pub fn export_colors(cx: &App) -> crate::export::Colors {
+    let p = Palette::of(cx);
+    let theme = cx.theme();
+    let hex = |c: Hsla| {
+        let rgb = c.to_rgb();
+        let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+        format!("#{:02x}{:02x}{:02x}", byte(rgb.r), byte(rgb.g), byte(rgb.b))
+    };
+    crate::export::Colors {
+        background: hex(p.background),
+        card: hex(p.card),
+        outline: hex(p.outline),
+        text: hex(p.text),
+        quiet: hex(p.quiet),
+        edge: hex(p.edge),
+        accent: hex(p.accent),
+        note: hex(p.note),
+        note_text: hex(p.note_text),
+        success: hex(theme.success),
+        warning: hex(theme.warning),
+        danger: hex(theme.danger),
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {

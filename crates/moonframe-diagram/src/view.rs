@@ -38,6 +38,7 @@ use {
 pub use {
     camera::Camera,
     picture::{measure, picture},
+    style::export_colors,
 };
 
 /// Diagrams with up to this many nodes are laid out at once, on the UI
@@ -273,6 +274,11 @@ impl DiagramView {
         self.selected = ids.iter().cloned().collect();
         self.selected_order = ids;
         cx.notify();
+    }
+
+    /// The ids drawn in the accent.
+    pub fn highlighted(&self) -> Vec<String> {
+        self.highlight.iter().cloned().collect()
     }
 
     pub fn selected(&self) -> &[String] {

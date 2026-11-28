@@ -1,0 +1,554 @@
+//! A laid-out diagram as SVG, drawn as the view draws it (shapes, edges
+//! with rounded corners and their heads, labels, groups, a sequence's
+//! lifelines and notes) in the colors given, so an export matches the
+//! app's theme, light or dark. Plain text, no GUI: rasterize it for a PNG.
+
+use {
+    crate::{
+        geometry::{Point, Rect},
+        layout::Layout,
+        model::{Diagram, EdgeKind, Head, MessageKind, NodeKind, Tone},
+    },
+    std::fmt::Write as _,
+};
+
+/// The colors an export is drawn in, as `#rrggbb` (or any SVG color).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Colors {
+    pub background: String,
+    pub card: String,
+    pub outline: String,
+    pub text: String,
+    pub quiet: String,
+    pub edge: String,
+    pub accent: String,
+    pub note: String,
+    pub note_text: String,
+    pub success: String,
+    pub warning: String,
+    pub danger: String,
+}
+
+impl Colors {
+    pub fn light() -> Self {
+        Self {
+            background: "#ffffff".into(),
+            card: "#ffffff".into(),
+            outline: "#d4d4d8".into(),
+            text: "#18181b".into(),
+            quiet: "#71717a".into(),
+            edge: "#71717a".into(),
+            accent: "#4f46e5".into(),
+            note: "#fde68a".into(),
+            note_text: "#422006".into(),
+            success: "#16a34a".into(),
+            warning: "#d97706".into(),
+            danger: "#dc2626".into(),
+        }
+    }
+
+    pub fn dark() -> Self {
+        Self {
+            background: "#0a0a0a".into(),
+            card: "#1c1c1f".into(),
+            outline: "#3f3f46".into(),
+            text: "#f4f4f5".into(),
+            quiet: "#a1a1aa".into(),
+            edge: "#a1a1aa".into(),
+            accent: "#818cf8".into(),
+            note: "#6b5a17".into(),
+            note_text: "#fef3c7".into(),
+            success: "#4ade80".into(),
+            warning: "#fbbf24".into(),
+            danger: "#f87171".into(),
+        }
+    }
+
+    fn tone(&self, tone: Tone) -> &str {
+        match tone {
+            Tone::Accent => &self.accent,
+            Tone::Success => &self.success,
+            Tone::Warning => &self.warning,
+            Tone::Danger => &self.danger,
+            Tone::Muted => &self.quiet,
+        }
+    }
+}
+
+/// Room around the diagram, in pixels.
+const MARGIN: f32 = 24.0;
+const FONT: f32 = 14.0;
+
+/// `font` with fallbacks every renderer knows, so a name it doesn't (a
+/// system UI font's private name) still draws in a sans serif.
+fn families(font: &str) -> String {
+    let named = if font.trim().is_empty() {
+        String::new()
+    } else {
+        format!("'{}', ", font.replace('\'', ""))
+    };
+    format!("{named}-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif")
+}
+
+fn escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// `diagram` laid out as `layout`, as an SVG document; `highlight` ids in
+/// the accent.
+pub fn svg(
+    diagram: &Diagram,
+    layout: &Layout,
+    colors: &Colors,
+    font: &str,
+    highlight: &[String],
+) -> String {
+    let b = layout.bounds;
+    let (w, h) = (b.w + MARGIN * 2.0, b.h + MARGIN * 2.0);
+    let (dx, dy) = (MARGIN - b.x, MARGIN - b.y);
+    let at = |p: Point| Point::new(p.x + dx, p.y + dy);
+    let lit = |id: &str| highlight.iter().any(|h| h == id);
+    let mut out = String::new();
+    let _ = write!(
+        out,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.0} {h:.0}" font-family="{}" font-size="{FONT}">"#,
+        escape(&families(font))
+    );
+    let _ = write!(
+        out,
+        r#"<rect width="100%" height="100%" fill="{}"/>"#,
+        colors.background
+    );
+
+    for group in &diagram.groups {
+        if let Some(r) = layout.groups.get(&group.id) {
+            let tint = group.tone.map_or(colors.quiet.as_str(), |t| colors.tone(t));
+            let _ = write!(
+                out,
+                r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="10" fill="{tint}" fill-opacity="0.06" stroke="{tint}" stroke-opacity="0.4" stroke-dasharray="4 3"/>"#,
+                r.x + dx,
+                r.y + dy,
+                r.w,
+                r.h
+            );
+            let _ = write!(
+                out,
+                r#"<text x="{:.1}" y="{:.1}" fill="{}" font-size="11" font-weight="500">{}</text>"#,
+                r.x + dx + 10.0,
+                r.y + dy + 16.0,
+                colors.quiet,
+                escape(&group.label)
+            );
+        }
+    }
+    for (_, top, bottom) in &layout.lifelines {
+        let (a, z) = (at(*top), at(*bottom));
+        let _ = write!(
+            out,
+            r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{}" stroke-dasharray="4 4"/>"#,
+            a.x, a.y, z.x, z.y, colors.outline
+        );
+    }
+    for (message, route) in diagram.messages.iter().zip(&layout.messages) {
+        let points: Vec<Point> = route.points.iter().map(|p| at(*p)).collect();
+        let (dash, end) = match message.kind {
+            MessageKind::Sync => (None, Head::Arrow),
+            MessageKind::Async => (None, Head::Open),
+            MessageKind::Reply => (Some("5 4"), Head::Open),
+        };
+        line(
+            &mut out,
+            &points,
+            &colors.text,
+            1.5,
+            dash,
+            6.0,
+            Head::None,
+            end,
+        );
+        if let Some(label) = route.label {
+            text(
+                &mut out,
+                &message.label,
+                at(label),
+                &colors.text,
+                12.0,
+                false,
+            );
+        }
+    }
+    let mut labels = String::new();
+    for edge in diagram
+        .edges
+        .iter()
+        .filter(|e| e.kind != EdgeKind::Invisible)
+    {
+        let Some(route) = layout.edges.get(&edge.id) else {
+            continue;
+        };
+        let points: Vec<Point> = route.points.iter().map(|p| at(*p)).collect();
+        let color = if lit(&edge.id) {
+            colors.accent.as_str()
+        } else {
+            edge.tone.map_or(colors.edge.as_str(), |t| colors.tone(t))
+        };
+        let width = if edge.kind == EdgeKind::Thick {
+            3.0
+        } else {
+            1.5
+        };
+        let dash = match edge.kind {
+            EdgeKind::Dashed => Some("6 4"),
+            EdgeKind::Dotted => Some("1.5 3.5"),
+            _ => None,
+        };
+        line(
+            &mut out, &points, color, width, dash, 10.0, edge.start, edge.end,
+        );
+        if let (Some(p), Some(label)) =
+            (route.label, edge.label.as_deref().filter(|l| !l.is_empty()))
+        {
+            let p = at(p);
+            let wide = label.chars().count() as f32 * 12.0 * 0.56 + 10.0;
+            let _ = write!(
+                labels,
+                r#"<rect x="{:.1}" y="{:.1}" width="{wide:.1}" height="18" rx="9" fill="{}"/>"#,
+                p.x - wide / 2.0,
+                p.y - 9.0,
+                colors.background
+            );
+            text(
+                &mut labels,
+                label,
+                p,
+                if color == colors.edge {
+                    &colors.quiet
+                } else {
+                    color
+                },
+                12.0,
+                false,
+            );
+        }
+    }
+    for node in &diagram.nodes {
+        let Some(r) = layout.nodes.get(&node.id) else {
+            continue;
+        };
+        let r = r.translate(dx, dy);
+        let (fill, stroke, ink) = node_colors(node.kind, node.tone, node.fill.as_deref(), colors);
+        let (stroke, width) = if lit(&node.id) {
+            (colors.accent.clone(), 2.0)
+        } else {
+            (stroke, 1.0)
+        };
+        shape(&mut out, node.kind, r, &fill, &stroke, width);
+        let center = if node.kind == NodeKind::Note {
+            Point::new(r.center().x, r.y + 20.0)
+        } else {
+            r.center()
+        };
+        match &node.sublabel {
+            Some(sub) => {
+                text(
+                    &mut out,
+                    &node.label,
+                    Point::new(center.x, center.y - 9.0),
+                    &ink,
+                    FONT,
+                    true,
+                );
+                text(
+                    &mut out,
+                    sub,
+                    Point::new(center.x, center.y + 10.0),
+                    &colors.quiet,
+                    12.0,
+                    false,
+                );
+            },
+            None => text(&mut out, &node.label, center, &ink, FONT, true),
+        }
+    }
+    for (note, r) in diagram.notes.iter().zip(&layout.notes) {
+        let r = r.translate(dx, dy);
+        shape(&mut out, NodeKind::Note, r, &colors.note, &colors.note, 1.0);
+        text(
+            &mut out,
+            &note.text,
+            r.center(),
+            &colors.note_text,
+            13.0,
+            false,
+        );
+    }
+    out.push_str(&labels);
+    out.push_str("</svg>");
+    out
+}
+
+fn node_colors(
+    kind: NodeKind,
+    tone: Option<Tone>,
+    fill: Option<&str>,
+    colors: &Colors,
+) -> (String, String, String) {
+    if let Some(fill) = fill.filter(|f| f.starts_with('#')) {
+        return (
+            fill.to_owned(),
+            colors.outline.clone(),
+            "#18181b".to_owned(),
+        );
+    }
+    match (kind, tone) {
+        (NodeKind::Text, _) => ("none".into(), "none".into(), colors.text.clone()),
+        (NodeKind::Note, None) => (
+            colors.note.clone(),
+            colors.note.clone(),
+            colors.note_text.clone(),
+        ),
+        (_, Some(tone)) => (
+            colors.tone(tone).to_owned() + "24",
+            colors.tone(tone).to_owned(),
+            colors.text.clone(),
+        ),
+        (_, None) => (
+            colors.card.clone(),
+            colors.outline.clone(),
+            colors.text.clone(),
+        ),
+    }
+}
+
+fn shape(out: &mut String, kind: NodeKind, r: Rect, fill: &str, stroke: &str, width: f32) {
+    let style = format!(r#"fill="{fill}" stroke="{stroke}" stroke-width="{width}""#);
+    let rect = |rx: f32| {
+        format!(
+            r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="{rx:.1}" {style}/>"#,
+            r.x, r.y, r.w, r.h
+        )
+    };
+    let c = r.center();
+    let svg = match kind {
+        NodeKind::Text => String::new(),
+        NodeKind::Box => rect(4.0),
+        NodeKind::Rounded => rect(12.0),
+        NodeKind::Pill => rect(r.h.min(r.w) / 2.0),
+        NodeKind::Note => rect(3.0),
+        NodeKind::Circle => format!(
+            r#"<ellipse cx="{:.1}" cy="{:.1}" rx="{:.1}" ry="{:.1}" {style}/>"#,
+            c.x,
+            c.y,
+            r.w / 2.0,
+            r.h / 2.0
+        ),
+        NodeKind::Diamond => format!(
+            r#"<polygon points="{:.1},{:.1} {:.1},{:.1} {:.1},{:.1} {:.1},{:.1}" {style}/>"#,
+            c.x,
+            r.y,
+            r.right(),
+            c.y,
+            c.x,
+            r.bottom(),
+            r.x,
+            c.y
+        ),
+        NodeKind::Cylinder => {
+            let lid = (r.h * 0.18).min(14.0);
+            format!(
+                r#"<path d="M{x0:.1},{t:.1} V{b:.1} A{rx:.1},{lid:.1} 0 0 0 {x1:.1},{b:.1} V{t:.1} A{rx:.1},{lid:.1} 0 0 0 {x0:.1},{t:.1} Z" {style}/><path d="M{x0:.1},{t:.1} A{rx:.1},{lid:.1} 0 0 0 {x1:.1},{t:.1}" fill="none" stroke="{stroke}" stroke-width="{width}"/>"#,
+                x0 = r.x,
+                x1 = r.right(),
+                t = r.y + lid,
+                b = r.bottom() - lid,
+                rx = r.w / 2.0
+            )
+        },
+    };
+    out.push_str(&svg);
+}
+
+fn text(out: &mut String, words: &str, at: Point, color: &str, size: f32, bold: bool) {
+    if words.is_empty() {
+        return;
+    }
+    let weight = if bold {
+        r#" font-weight="500""#
+    } else {
+        ""
+    };
+    let _ = write!(
+        out,
+        r#"<text x="{:.1}" y="{:.1}" fill="{color}" font-size="{size}" text-anchor="middle" dominant-baseline="central"{weight}>{}</text>"#,
+        at.x,
+        at.y,
+        escape(words)
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn line(
+    out: &mut String,
+    points: &[Point],
+    color: &str,
+    width: f32,
+    dash: Option<&str>,
+    radius: f32,
+    start: Head,
+    end: Head,
+) {
+    if points.len() < 2 {
+        return;
+    }
+    let mut d = format!("M{:.1},{:.1}", points[0].x, points[0].y);
+    for i in 1..points.len() {
+        let corner = points[i];
+        match points.get(i + 1) {
+            Some(&next) => {
+                let room = points[i - 1].distance(corner).min(corner.distance(next)) / 2.0;
+                let r = radius.min(room);
+                let a = toward(corner, points[i - 1], r);
+                let z = toward(corner, next, r);
+                let _ = write!(
+                    d,
+                    " L{:.1},{:.1} Q{:.1},{:.1} {:.1},{:.1}",
+                    a.x, a.y, corner.x, corner.y, z.x, z.y
+                );
+            },
+            None => {
+                let _ = write!(d, " L{:.1},{:.1}", corner.x, corner.y);
+            },
+        }
+    }
+    let dash = dash
+        .map(|d| format!(r#" stroke-dasharray="{d}""#))
+        .unwrap_or_default();
+    let _ = write!(
+        out,
+        r#"<path d="{d}" fill="none" stroke="{color}" stroke-width="{width}"{dash}/>"#
+    );
+    let n = points.len();
+    head(out, start, points[0], points[1], color, width);
+    head(out, end, points[n - 1], points[n - 2], color, width);
+}
+
+fn toward(from: Point, to: Point, by: f32) -> Point {
+    let span = from.distance(to);
+    if span <= f32::EPSILON {
+        return from;
+    }
+    let t = (by / span).min(1.0);
+    Point::new(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t)
+}
+
+fn head(out: &mut String, kind: Head, tip: Point, from: Point, color: &str, width: f32) {
+    let span = tip.distance(from);
+    if kind == Head::None || span <= f32::EPSILON {
+        return;
+    }
+    let length = (width * 4.0).max(8.0);
+    let half = length * 0.6;
+    let (ux, uy) = ((tip.x - from.x) / span, (tip.y - from.y) * (1.0 / span));
+    let back = |d: f32| Point::new(tip.x - ux * d, tip.y - uy * d);
+    let side = |p: Point, s: f32| Point::new(p.x - uy * s, p.y + ux * s);
+    let poly = |out: &mut String, pts: &[Point], filled: bool| {
+        let list: Vec<String> = pts
+            .iter()
+            .map(|p| format!("{:.1},{:.1}", p.x, p.y))
+            .collect();
+        let fill = if filled {
+            color
+        } else {
+            "none"
+        };
+        let _ = write!(
+            out,
+            r#"<polygon points="{}" fill="{fill}" stroke="{color}" stroke-width="{width}"/>"#,
+            list.join(" ")
+        );
+    };
+    match kind {
+        Head::None => {},
+        Head::Arrow => poly(
+            out,
+            &[tip, side(back(length), half), side(back(length), -half)],
+            true,
+        ),
+        Head::Triangle => poly(
+            out,
+            &[tip, side(back(length), half), side(back(length), -half)],
+            false,
+        ),
+        Head::Open => {
+            let (a, z) = (side(back(length), half), side(back(length), -half));
+            let _ = write!(
+                out,
+                r#"<polyline points="{:.1},{:.1} {:.1},{:.1} {:.1},{:.1}" fill="none" stroke="{color}" stroke-width="{width}"/>"#,
+                a.x, a.y, tip.x, tip.y, z.x, z.y
+            );
+        },
+        Head::Diamond | Head::HollowDiamond => {
+            let pts = [
+                tip,
+                side(back(length * 0.8), half * 0.7),
+                back(length * 1.6),
+                side(back(length * 0.8), -half * 0.7),
+            ];
+            poly(out, &pts, kind == Head::Diamond);
+        },
+        Head::Circle => {
+            let c = back(length * 0.45);
+            let _ = write!(
+                out,
+                r#"<circle cx="{:.1}" cy="{:.1}" r="{:.1}" fill="none" stroke="{color}" stroke-width="{width}"/>"#,
+                c.x,
+                c.y,
+                length * 0.4
+            );
+        },
+        Head::Cross => {
+            let c = back(length * 0.6);
+            let d = length * 0.35;
+            for s in [d, -d] {
+                let (a, z) = (
+                    side(Point::new(c.x - ux * d, c.y - uy * d), s),
+                    side(Point::new(c.x + ux * d, c.y + uy * d), -s),
+                );
+                let _ = write!(
+                    out,
+                    r#"<line x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}" stroke="{color}" stroke-width="{width}"/>"#,
+                    a.x, a.y, z.x, z.y
+                );
+            }
+        },
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use {
+        super::*,
+        crate::{
+            layout::{Approx, Options, layout},
+            parse,
+        },
+    };
+
+    #[test]
+    fn a_diagram_exports_as_svg_with_every_part() {
+        let d = parse::mermaid::parse("flowchart LR\n a[\"A & B\"] -->|go| b{B?}\n b -.-> c[(C)]\n subgraph g [Group]\n c\n end").unwrap();
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let svg = svg(&d, &out, &Colors::dark(), "Inter", &["b".into()]);
+        assert!(svg.starts_with("<svg ") && svg.ends_with("</svg>"));
+        assert!(svg.contains("A &amp; B"), "{svg}");
+        assert!(svg.contains("<polygon"), "a diamond and an arrowhead");
+        assert!(svg.contains("stroke-dasharray=\"6 4\""), "the dashed edge");
+        assert!(svg.contains(">go<"), "the edge label");
+        assert!(svg.contains(&Colors::dark().accent), "the highlight");
+        assert!(svg.contains(">Group<"));
+    }
+}
