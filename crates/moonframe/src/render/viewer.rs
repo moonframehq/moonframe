@@ -43,6 +43,13 @@ pub(super) fn begin_frame(window: WindowId) -> u64 {
     })
 }
 
+/// Starts `window`'s frame count over: a window opened anew under an id
+/// one had before (headless renders, one app after another), so what it
+/// draws counts as drawn anew and is measured again.
+pub(crate) fn forget_window(window: WindowId) {
+    FRAMES.with_borrow_mut(|frames| frames.remove(&window));
+}
+
 /// The number of the last frame `window` drew.
 pub(super) fn frame(window: WindowId) -> u64 {
     FRAMES.with_borrow(|frames| frames.get(&window).copied().unwrap_or_default())
@@ -68,7 +75,7 @@ pub(super) fn draw<'w>(
     // state starts over, so it must be told the picture's size again.
     let frame = painter.frame;
     let last = SEEN.with_borrow_mut(|seen| seen.insert(key.clone(), frame));
-    if frame > 0 && !matches!(last, Some(seen) if seen + 1 >= frame) {
+    if !super::stack_measure::drawn_just_before(last, frame) {
         TOLD.with_borrow_mut(|told| told.remove(&key));
     }
     if image.measure.is_none() {
