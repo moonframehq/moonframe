@@ -132,7 +132,13 @@ impl Acp {
             | crate::agents::Found::Fetched(program, args) => (program, args),
             crate::agents::Found::Missing => return,
         };
-        let run = Run::new(waiting(agent, cwd), Some(host.clone()));
+        // Its id now, as its session (and the MCP servers it offers, told
+        // the run they work for) opens before the run comes.
+        self.serial += 1;
+        let run = Run::new(
+            waiting(agent, cwd, crate::run_id(self.serial)),
+            Some(host.clone()),
+        );
         if let Err(error) = self.launch(run, &program, &args, true) {
             tracing::warn!(provider = "acp", "cannot warm {}: {error}", agent.title);
         }
@@ -151,10 +157,11 @@ impl Acp {
     }
 }
 
-/// A run with no prompt yet, for a warm agent.
-fn waiting(agent: &'static Agent, cwd: PathBuf) -> Start {
+/// A run with no prompt yet, for a warm agent: the run that takes it
+/// keeps `id`.
+fn waiting(agent: &'static Agent, cwd: PathBuf, id: String) -> Start {
     Start {
-        id: String::new(),
+        id,
         owner: String::new(),
         request: Value::Null,
         agent,

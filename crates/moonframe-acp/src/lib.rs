@@ -548,9 +548,17 @@ impl Acp {
         if context.to_string().len() > MAX_TEXT {
             return Err("the context is too large".to_owned());
         }
-        self.serial += 1;
+        // A warm agent's run already has its id: its MCP servers were told
+        // it as its session opened.
+        let warm = self.take_warm(agent, &cwd);
         let now = now();
-        let id = run_id(self.serial);
+        let id = match &warm {
+            Some(run) => run.id.clone(),
+            None => {
+                self.serial += 1;
+                run_id(self.serial)
+            },
+        };
         // A run on the app itself: its agent is told about the app, and the
         // app is checked before and after it.
         let on_app = message.get("app").and_then(Value::as_bool) == Some(true);
@@ -594,7 +602,7 @@ impl Acp {
             installed: self.installed.clone(),
             now,
         };
-        let launched = match self.take_warm(agent, &cwd) {
+        let launched = match warm {
             Some(mut run) => {
                 run.adopt(start);
                 lock(&self.state).runs.push(run);
