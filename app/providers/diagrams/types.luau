@@ -5,7 +5,7 @@
 -- One diagram: an agent's (through `moonframe mcp diagrams`) or a file of
 -- the project's `.moonframe/diagrams`.
 export type Shown = {
-	-- Unique in the list: `agent/<id>` or `project/<id>`.
+	-- Unique in the list: `agent/<file name>` or `project/<file name>`.
 	key: string,
 	id: string,
 	title: string,

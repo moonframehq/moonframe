@@ -81,17 +81,17 @@ const QUIT_WAIT: Duration = Duration::from_millis(1500);
 /// The longest request, instructions and context a mod may send.
 const MAX_TEXT: usize = 64 << 10;
 
-/// Makes the provider, for the app's registry.
-/// The MCP servers every agent session is offered, as ACP's `session/new`
-/// lists them (`{ name, command, args, env }`): the app's own tools for
-/// its agents, such as `moonframe mcp diagrams`.
-static MCP_SERVERS: Mutex<Vec<Value>> = Mutex::new(Vec::new());
+/// What lists the MCP servers every agent session is offered, as ACP's
+/// `session/new` lists them (`{ name, command, args, env }`): the app's
+/// own tools for its agents, such as `moonframe mcp diagrams`.
+static MCP_SERVERS: Mutex<Option<fn() -> Vec<Value>>> = Mutex::new(None);
 
-/// Offers `servers` to every session started from now on; `{run}` and
-/// `{agent}` in their `args` are filled in per session.
-pub fn offer_mcp_servers(servers: Vec<Value>) {
+/// Offers what `servers` lists, asked again as each session starts (so a
+/// setting changed since is followed), to every session from now on;
+/// `{run}` and `{agent}` in their `args` are filled in per session.
+pub fn offer_mcp_servers(servers: fn() -> Vec<Value>) {
     if let Ok(mut offered) = MCP_SERVERS.lock() {
-        *offered = servers;
+        *offered = Some(servers);
     }
 }
 
@@ -99,10 +99,8 @@ pub fn offer_mcp_servers(servers: Vec<Value>) {
 /// `{agent}` in their arguments become those, so a server can tell whose
 /// work it does.
 pub(crate) fn mcp_servers(run: &str, agent: &str) -> Vec<Value> {
-    let mut servers = MCP_SERVERS
-        .lock()
-        .map(|offered| offered.clone())
-        .unwrap_or_default();
+    let offered = MCP_SERVERS.lock().ok().and_then(|offered| *offered);
+    let mut servers = offered.map(|list| list()).unwrap_or_default();
     for server in &mut servers {
         if let Some(Value::Array(args)) = server.get_mut("args") {
             for arg in args {
@@ -115,6 +113,7 @@ pub(crate) fn mcp_servers(run: &str, agent: &str) -> Vec<Value> {
     servers
 }
 
+/// Makes the provider, for the app's registry.
 pub fn native() -> Box<dyn Native> {
     Box::new(Acp::default())
 }

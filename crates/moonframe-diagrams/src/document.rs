@@ -223,8 +223,18 @@ pub fn patch(doc: &mut Value, ops: &Value) -> Result<String, String> {
                 return Err("every one of `add_edges` needs `from` and `to`".into());
             }
             let mut edge = edge.clone();
-            if id_of(&edge).is_none() {
-                edge["id"] = Value::String(format!("e{}", edges.len()));
+            let taken = |id: &str| edges.iter().any(|e| id_of(e).as_deref() == Some(id));
+            match id_of(&edge) {
+                // Routes are kept by edge id: two edges may not share one.
+                Some(id) if taken(&id) => return Err(format!("there is an edge `{id}` already")),
+                Some(_) => {},
+                None => {
+                    let id = (edges.len()..)
+                        .map(|n| format!("e{n}"))
+                        .find(|id| !taken(id))
+                        .unwrap_or_default();
+                    edge["id"] = Value::String(id);
+                },
             }
             edges.push(edge);
         }
@@ -337,6 +347,35 @@ mod tests {
         );
         assert!(patch(&mut doc, &json!({ "set": { "zz": { "label": "x" } } })).is_err());
         assert!(patch(&mut doc, &json!({})).is_err());
+    }
+
+    #[test]
+    fn added_edges_never_share_an_id() {
+        let mut doc = from_text("mermaid", "flowchart TD\n a --> b\n b --> c").unwrap();
+        patch(&mut doc, &json!({ "remove_edges": ["e0"] })).unwrap();
+        patch(
+            &mut doc,
+            &json!({ "add_edges": [{ "from": "a", "to": "c" }, { "from": "c", "to": "a" }] }),
+        )
+        .unwrap();
+        let mut ids: Vec<&str> = doc["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["id"].as_str().unwrap())
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), 3, "{ids:?}");
+        let before = doc.clone();
+        assert!(
+            patch(
+                &mut doc,
+                &json!({ "add_edges": [{ "id": "e1", "from": "a", "to": "b" }] })
+            )
+            .is_err()
+        );
+        assert_eq!(doc, before, "a refused patch changes nothing");
     }
 
     #[test]
