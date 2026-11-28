@@ -6,7 +6,7 @@ use {
     super::*,
     crate::{
         layout::{Approx, Options, layout},
-        model::{DiagramKind, EdgeKind, Head, NodeKind, Tone},
+        model::{DiagramKind, Direction, EdgeKind, Head, NodeKind, Tone},
         write,
     },
     std::{fmt::Write as _, path::PathBuf},
@@ -381,4 +381,39 @@ fn class_heads_and_names_survive_writing() {
     };
     assert_eq!(heads(&again), heads(&d), "{written}");
     assert_eq!(again.nodes[0].label, "The canvas");
+}
+
+#[test]
+fn a_later_dot_statement_keeps_earlier_choices() {
+    let d =
+        dot::parse("digraph { node [shape=box]; a [shape=diamond]; a [label=\"A\"]; }").unwrap();
+    assert_eq!(
+        (d.nodes[0].kind, d.nodes[0].label.as_str()),
+        (NodeKind::Diamond, "A")
+    );
+    // Fill needs `style=filled` and a color, given in either order.
+    let d = dot::parse("digraph { a [style=filled]; a [fillcolor=\"#fff\"]; }").unwrap();
+    assert_eq!(d.nodes[0].fill.as_deref(), Some("#fff"));
+}
+
+#[test]
+fn text_after_a_dot_graph_is_an_error() {
+    let err = dot::parse("digraph {\n a -> b\n}\nc -> d").unwrap_err();
+    assert_eq!(err.line, 4);
+}
+
+#[test]
+fn subgraphs_open_and_close_in_pairs() {
+    let err = mermaid::parse("flowchart TD\n  subgraph g\n  A --> B").unwrap_err();
+    assert_eq!(err.line, 2);
+    let err = mermaid::parse("flowchart TD\n  A --> B\n  end").unwrap_err();
+    assert_eq!(err.line, 3);
+}
+
+#[test]
+fn class_and_er_diagrams_take_their_direction() {
+    let d = mermaid::parse("classDiagram\n  direction LR\n  A --> B").unwrap();
+    assert_eq!(d.direction, Direction::Right);
+    let d = mermaid::parse("erDiagram\n  direction RL\n  A ||--o{ B : has").unwrap();
+    assert_eq!(d.direction, Direction::Left);
 }

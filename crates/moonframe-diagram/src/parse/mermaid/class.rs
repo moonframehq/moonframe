@@ -47,8 +47,11 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
             }
             continue;
         }
-        if line.starts_with("direction ")
-            || line.starts_with("note")
+        if let Some(direction) = super::direction(line) {
+            d.direction = direction;
+            continue;
+        }
+        if line.starts_with("note")
             || line.starts_with("<<")
             || line.starts_with("style ")
             || line.starts_with("cssClass")
