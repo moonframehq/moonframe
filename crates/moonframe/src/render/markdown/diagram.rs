@@ -1,0 +1,234 @@
+//! ` ```mermaid `, ` ```dot ` and ` ```graphviz ` fences drawn as diagrams
+//! in every `ui.markdown` (chat answers, docs, notes), laid out by
+//! moonframe-diagram in the theme's colors and font, with "Copy as
+//! Mermaid" and "Copy source" in the corner.
+//!
+//! While an answer streams in, the fence grows: each version that parses
+//! is laid out from the one before (so what was there stays put), and one
+//! that does not yet (a line half written) shows the longest earlier
+//! version that did, so it never flickers back to source. Text that never
+//! parses shows as its source, with why.
+
+use {
+    gpui_kit::{
+        component::{
+            ActiveTheme as _,
+            text::{MarkdownExtensions, MarkdownNode, markdown_ast::Node},
+        },
+        *,
+    },
+    moonframe_diagram::{Diagram, Layout, Options, layout::layout, parse, view, write},
+    std::{cell::RefCell, collections::HashMap, sync::Arc},
+};
+
+const BLOCK: &str = "moonframe-diagram";
+/// The tallest a diagram stands in a document; wider ones scale down.
+const MOST_HEIGHT: f32 = 480.0;
+/// The most nodes a fence draws: it is laid out as the document draws,
+/// so a bigger one would hold the window up. Agents' diagrams are far
+/// smaller.
+const MOST_INLINE: usize = 300;
+/// Laid-out fences kept: a few long chats' worth.
+const KEPT: usize = 256;
+
+/// A fence: its language and text.
+#[derive(Clone)]
+struct Fence {
+    language: String,
+    source: String,
+}
+
+type Laid = Result<(Arc<Diagram>, Arc<Layout>), String>;
+
+thread_local! {
+    /// Each fence's text laid out (or why not), by language and text.
+    static LAID: RefCell<HashMap<(String, String), Laid>> = RefCell::new(HashMap::new());
+}
+
+pub(super) fn with(extensions: MarkdownExtensions) -> MarkdownExtensions {
+    extensions
+        .block_parser(|node, cx| {
+            let Node::Code(code) = node else {
+                return None;
+            };
+            let language = code.lang.as_deref()?.to_ascii_lowercase();
+            if !matches!(language.as_str(), "mermaid" | "dot" | "graphviz" | "gv") {
+                return None;
+            }
+            let fence = Fence {
+                language,
+                source: code.value.clone(),
+            };
+            Some(
+                MarkdownNode::new(BLOCK, fence)
+                    .text(code.value.clone())
+                    .markdown(cx.node_source(node)?.to_owned()),
+            )
+        })
+        .block_renderer(BLOCK, |node, window, cx| {
+            let Some(fence) = node.data::<Fence>() else {
+                return div().into_any_element();
+            };
+            draw(fence, window, cx)
+        })
+}
+
+/// The fence laid out: this text, else the longest earlier text of it
+/// that was, else why not.
+fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
+    let key = (fence.language.clone(), fence.source.clone());
+    if let Some(known) = LAID.with_borrow(|laid| laid.get(&key).cloned()) {
+        return known;
+    }
+    let before = LAID.with_borrow(|laid| earlier(laid, &fence.language, &fence.source));
+    let parsed = parse::fenced(&fence.language, &fence.source).unwrap_or_else(|| {
+        Err(parse::Unsupported {
+            line: 0,
+            reason: format!("no parser for `{}`", fence.language),
+        })
+    });
+    let result: Laid = match parsed {
+        // Laid out as the document draws: bigger diagrams show as source.
+        Ok(diagram) if diagram.nodes.len() > MOST_INLINE => Err(format!(
+            "{} nodes, more than a document draws ({MOST_INLINE})",
+            diagram.nodes.len()
+        )),
+        Ok(diagram) => {
+            let options = Options::default();
+            let widths = view::measure(&diagram, options.font_size, window, cx);
+            let previous = before
+                .as_ref()
+                .and_then(|b| b.as_ref().ok())
+                .map(|(_, l)| l.as_ref());
+            let out = layout(&diagram, &widths, &options, previous);
+            Ok((Arc::new(diagram), Arc::new(out)))
+        },
+        // Half written: show what was there, and try again next time.
+        Err(problem) => match before {
+            Some(earlier) => return earlier,
+            None => Err(problem.to_string()),
+        },
+    };
+    LAID.with_borrow_mut(|laid| {
+        if laid.len() >= KEPT {
+            laid.clear();
+        }
+        laid.insert(key, result.clone());
+    });
+    result
+}
+
+/// The longest text laid out before in `language` that `source` grew
+/// from, as a streaming fence does.
+fn earlier(laid: &HashMap<(String, String), Laid>, language: &str, source: &str) -> Option<Laid> {
+    laid.iter()
+        .filter(|((lang, text), result)| {
+            lang == language && result.is_ok() && source.starts_with(text.as_str())
+        })
+        .max_by_key(|((_, text), _)| text.len())
+        .map(|(_, result)| result.clone())
+}
+
+fn draw(fence: &Fence, window: &mut Window, cx: &mut App) -> AnyElement {
+    let theme = cx.theme();
+    let (border, muted, background) = (theme.border, theme.muted_foreground, theme.background);
+    let frame = div()
+        .relative()
+        .w_full()
+        .my_2()
+        .rounded(px(10.0))
+        .border_1()
+        .border_color(border)
+        .overflow_hidden();
+    match laid(fence, window, cx) {
+        Ok((diagram, layout)) => {
+            let mermaid = write::mermaid(&diagram);
+            let source = fence.source.clone();
+            let action = |label: &'static str, text: String| {
+                div()
+                    .id(label)
+                    .px_2()
+                    .py_0p5()
+                    .rounded(px(6.0))
+                    .text_xs()
+                    .text_color(muted)
+                    .cursor_pointer()
+                    .hover(|style| style.bg(muted.opacity(0.12)))
+                    .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+                        cx.stop_propagation();
+                    })
+                    .child(label)
+            };
+            let corner = div()
+                .absolute()
+                .top_1()
+                .right_1()
+                .flex()
+                .gap_1()
+                .bg(background.opacity(0.85))
+                .rounded(px(6.0))
+                .child(action("Copy as Mermaid", mermaid))
+                .child(action("Copy source", source));
+            frame
+                .child(view::picture(diagram, layout, MOST_HEIGHT))
+                .child(corner)
+                .into_any_element()
+        },
+        Err(problem) => frame
+            .p_3()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(format!("Not drawn: {problem}")),
+            )
+            .child(
+                div()
+                    .font_family(theme.mono_font_family.clone())
+                    .text_sm()
+                    .child(fence.source.clone()),
+            )
+            .into_any_element(),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use {
+        super::{Laid, earlier},
+        moonframe_diagram::{Diagram, Layout},
+        std::{collections::HashMap, sync::Arc},
+    };
+
+    fn ok(nodes: usize) -> Laid {
+        let mut diagram = Diagram::default();
+        for i in 0..nodes {
+            diagram
+                .nodes
+                .push(moonframe_diagram::Node::new(format!("n{i}"), "x"));
+        }
+        Ok((Arc::new(diagram), Arc::new(Layout::default())))
+    }
+
+    #[test]
+    fn a_growing_fence_shows_the_longest_version_it_grew_from() {
+        let mut laid = HashMap::new();
+        let key = |s: &str| ("mermaid".to_owned(), s.to_owned());
+        laid.insert(key("flowchart TD\n A-->B"), ok(2));
+        laid.insert(key("flowchart TD\n A-->B\n B-->C"), ok(3));
+        laid.insert(
+            key("flowchart TD\n A-->B\n B-->C\n C-->["),
+            Err("half".into()),
+        );
+        laid.insert(key("flowchart LR\n X-->Y"), ok(9));
+        let found = earlier(&laid, "mermaid", "flowchart TD\n A-->B\n B-->C\n C-->[Do").unwrap();
+        assert_eq!(found.unwrap().0.nodes.len(), 3);
+        assert!(earlier(&laid, "dot", "flowchart TD\n A-->B").is_none());
+        assert!(earlier(&laid, "mermaid", "sequenceDiagram").is_none());
+    }
+}

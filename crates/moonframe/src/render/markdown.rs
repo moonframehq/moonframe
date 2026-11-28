@@ -6,6 +6,8 @@
 //! `images`, from files a `ui.image` could show.
 
 mod blocks;
+#[cfg(feature = "diagram")]
+mod diagram;
 mod document;
 mod emoji;
 mod holding;

@@ -77,6 +77,8 @@ pub(super) fn extensions(shared: &SharedRef) -> MarkdownExtensions {
         .plugin(Chips);
     #[cfg(feature = "math")]
     let extensions = super::math::with(extensions);
+    #[cfg(feature = "diagram")]
+    let extensions = super::diagram::with(extensions);
     extensions
 }
 
