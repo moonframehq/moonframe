@@ -39,7 +39,6 @@ local MENUS: { { title: string, items: { any } } } = {
 		to_editor("Add 100 Shapes (stress test)", { stress = 100 }),
 		to_editor("Add 500 Shapes (stress test)", { stress = 500 }),
 		"-",
-		to_editor("Copy as Mermaid", "copy", "secondary-shift-c"),
 		to_editor("Export PNG…", { export = "png" }, "secondary-shift-e"),
 		to_editor("Export SVG…", { export = "svg" }),
 		"-",

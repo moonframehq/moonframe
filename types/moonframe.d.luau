@@ -1196,8 +1196,6 @@ export type DiagramProps = {
 	-- `{ exported = { path, format } | { error, format } }` and may pass
 	-- the path to `app:share`.
 	export: { format: ("png" | "svg")?, seq: any }?,
-	-- Puts the diagram on the clipboard as Mermaid, once per new `seq`.
-	copy: { seq: any }?,
 	[string]: any,
 }
 

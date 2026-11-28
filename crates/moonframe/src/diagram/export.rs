@@ -1,11 +1,11 @@
 //! What `ui.diagram` hands out: the diagram as SVG or PNG, written to the
 //! app's share folder (where `app:share` may take it from, and nowhere a
-//! mod names), and as Mermaid on the clipboard.
+//! mod names).
 
 use {
-    gpui_kit::{App, ClipboardItem},
+    gpui_kit::App,
     moonframe_core::Data,
-    moonframe_diagram::{Diagram, Layout, export, view, write},
+    moonframe_diagram::{Diagram, Layout, export, view},
     std::path::PathBuf,
 };
 
@@ -62,11 +62,6 @@ fn png(svg: &str, path: &std::path::Path, cx: &App) -> Result<(), String> {
     image
         .save_with_format(path, image::ImageFormat::Png)
         .map_err(|e| e.to_string())
-}
-
-/// The diagram as Mermaid, on the clipboard.
-pub(super) fn copy(diagram: &Diagram, cx: &mut App) {
-    cx.write_to_clipboard(ClipboardItem::new_string(write::mermaid(diagram)));
 }
 
 /// What the mod hears of an export.

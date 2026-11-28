@@ -125,7 +125,7 @@ pub fn svg(
 
     for group in &diagram.groups {
         if let Some(r) = layout.groups.get(&group.id) {
-            let tint = group.tone.map_or(colors.quiet.as_str(), |t| colors.tone(t));
+            let tint = escape(group.tone.map_or(colors.quiet.as_str(), |t| colors.tone(t)));
             let _ = write!(
                 out,
                 r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="10" fill="{tint}" fill-opacity="0.06" stroke="{tint}" stroke-opacity="0.4" stroke-dasharray="4 3"/>"#,
@@ -296,7 +296,7 @@ fn node_colors(
     fill: Option<&str>,
     colors: &Colors,
 ) -> (String, String, String) {
-    if let Some(fill) = fill.filter(|f| f.starts_with('#')) {
+    if let Some(fill) = fill.filter(|f| crate::model::is_hex_color(f)) {
         return (
             fill.to_owned(),
             colors.outline.clone(),
@@ -324,6 +324,7 @@ fn node_colors(
 }
 
 fn shape(out: &mut String, kind: NodeKind, r: Rect, fill: &str, stroke: &str, width: f32) {
+    let (fill, stroke) = (escape(fill), escape(stroke));
     let style = format!(r#"fill="{fill}" stroke="{stroke}" stroke-width="{width}""#);
     let rect = |rx: f32| {
         format!(
@@ -375,6 +376,7 @@ fn text(out: &mut String, words: &str, at: Point, color: &str, size: f32, bold: 
     if words.is_empty() {
         return;
     }
+    let color = escape(color);
     let weight = if bold {
         r#" font-weight="500""#
     } else {
@@ -444,6 +446,7 @@ fn toward(from: Point, to: Point, by: f32) -> Point {
     Point::new(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t)
 }
 
+/// `color` is already escaped by `line`.
 fn head(out: &mut String, kind: Head, tip: Point, from: Point, color: &str, width: f32) {
     let span = tip.distance(from);
     if kind == Head::None || span <= f32::EPSILON {
@@ -550,5 +553,16 @@ mod tests {
         assert!(svg.contains(">go<"), "the edge label");
         assert!(svg.contains(&Colors::dark().accent), "the highlight");
         assert!(svg.contains(">Group<"));
+    }
+
+    #[test]
+    fn a_fill_that_is_not_a_color_never_reaches_the_svg() {
+        let mut d = parse::mermaid::parse("flowchart LR\n a --> b").unwrap();
+        d.nodes[0].fill = Some("#\" onload=\"alert(1)".into());
+        d.nodes[1].fill = Some("#abc".into());
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let svg = svg(&d, &out, &Colors::light(), "\"><script>", &[]);
+        assert!(!svg.contains("onload") && !svg.contains("<script"), "{svg}");
+        assert!(svg.contains("fill=\"#abc\""));
     }
 }

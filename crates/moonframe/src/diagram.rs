@@ -3,6 +3,9 @@
 //! hears each edit as a message to its `update`, so it keeps the document
 //! and its undo; the view never changes the document by itself.
 //!
+//! The user copies a diagram as Mermaid with ⌘C in it; a mod cannot put
+//! anything on the clipboard by itself.
+//!
 //! Props ([`read`]): `mermaid` or `dot` text, `shapes` and `links` (an
 //! editor's document, every shape placed) or `document` (nodes, edges,
 //! groups, a sequence's messages and notes, laid out when unplaced), `mode`, `tool`,
@@ -45,9 +48,8 @@ pub(crate) struct DiagramHost {
     problem: Option<String>,
     /// The last `camera` request acted on, by its `seq`.
     camera_seq: Option<Data>,
-    /// The last `export` and `copy` requests acted on, by their `seq`.
+    /// The last `export` request acted on, by its `seq`.
     export_seq: Option<Data>,
-    copy_seq: Option<Data>,
     /// Exports and copies asked for, done once the frame has laid the
     /// document out.
     asked: Vec<read::Hand>,
@@ -72,7 +74,6 @@ impl DiagramHost {
             problem: None,
             camera_seq: None,
             export_seq: None,
-            copy_seq: None,
             asked: Vec::new(),
             messenger,
             name: format!("{}-{}", init.owner(), init.id()),
@@ -108,10 +109,6 @@ impl HostView for DiagramHost {
         {
             self.export_seq = Some(seq);
             self.asked.push(read::Hand::Export(format));
-        }
-        if let Some(seq) = props.copy.filter(|seq| Some(seq) != self.copy_seq.as_ref()) {
-            self.copy_seq = Some(seq);
-            self.asked.push(read::Hand::Copy);
         }
         self.view.update(cx, |view, cx| {
             view.set_mode(props.mode, cx);
@@ -150,7 +147,6 @@ impl Render for DiagramHost {
                     let done = export::file(&diagram, &layout, &lit, &format, &self.name, cx);
                     self.messenger.send(export::told(done, &format));
                 },
-                read::Hand::Copy => export::copy(&diagram, cx),
             }
         }
         let problem = self.problem.clone().map(|problem| {

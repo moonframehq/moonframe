@@ -405,10 +405,14 @@ As built:
 - `ui.diagram { export = { format = "png" | "svg", seq } }` writes the
   diagram to the app's share folder (where `app:share` may take it, and
   nowhere a mod names) and sends `{ exported = { path, format } }`; PNG
-  is the SVG rasterized at 2x by GPUI's SVG renderer. `copy = { seq }`
-  puts it on the clipboard as Mermaid.
-- `examples/diagram`: Document > Copy as Mermaid, Export PNG…, Export
-  SVG… (handed to the system's share menu).
+  is the SVG rasterized at 2x by GPUI's SVG renderer. ⌘C in the view
+  copies it as Mermaid: the user's action, as a mod may not write the
+  clipboard by itself.
+- Only strict `#rgb`/`#rrggbb` fills are taken (`model::is_hex_color`),
+  and every SVG attribute is escaped, so text from an agent can't inject
+  markup into an exported SVG.
+- `examples/diagram`: Document > Export PNG…, Export SVG… (handed to the
+  system's share menu).
 - Light and dark: every PR's screenshots show both.
 - A parser fix found on the way: a node named before a subgraph and
   listed inside it joins it, as Mermaid has it.

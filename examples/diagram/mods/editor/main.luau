@@ -28,9 +28,8 @@ type State = {
 	-- The agent's (or project's) diagram on show instead of the document,
 	-- by its key in `app.diagrams`.
 	live: string?,
-	-- Exports and copies asked of the view, each new `seq` once.
+	-- An export asked of the view, each new `seq` once.
 	export: { [string]: any }?,
-	copy: { [string]: any }?,
 	undo: { Doc },
 	redo: { Doc },
 }
@@ -449,7 +448,6 @@ return mod {
 		state.camera = nil
 		state.live = nil
 		state.export = nil
-		state.copy = nil
 		-- History lives for the session only.
 		state.undo, state.redo = {}, {}
 		return state
@@ -475,8 +473,6 @@ return mod {
 				remember(state)
 				duplicate(state, state.selected)
 			end
-		elseif msg == "copy" then
-			state.copy = { seq = if state.copy then (state.copy.seq or 0) + 1 else 1 }
 		elseif msg == "select-all" then
 			local all = {}
 			for _, s in state.doc.shapes do
@@ -569,7 +565,6 @@ return mod {
 							tool = state.tool,
 							camera = state.camera,
 							export = state.export,
-							copy = state.copy,
 						}
 						else diagram {
 							id = "main",

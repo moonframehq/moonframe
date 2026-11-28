@@ -430,7 +430,7 @@ fn look(body: &str, name: &str) -> Look {
             && key.trim() == "fill"
         {
             let value = value.trim().trim_end_matches(';');
-            if value.starts_with('#') && matches!(value.len(), 4 | 7) {
+            if crate::model::is_hex_color(value) {
                 out.fill = Some(value.to_owned());
             }
         }
