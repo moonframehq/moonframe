@@ -13,6 +13,7 @@
 
 #[cfg(feature = "prose")]
 mod prose;
+mod recall;
 
 use {
     crate::app::MoonframeApp,
@@ -205,6 +206,10 @@ pub(crate) struct Wiring {
     pub(crate) change: Option<Data>,
     pub(crate) select: Option<Data>,
     pub(crate) submit: Option<Data>,
+    /// Enter submits a multiline field; Shift-Enter makes a new line.
+    pub(crate) enter_submits: bool,
+    /// Entries Up and Down recall, oldest first.
+    pub(crate) history: Rc<[String]>,
     pub(crate) blur: Option<Data>,
     pub(crate) keys: Vec<(KeyChord, Data)>,
     pub(crate) capture: Option<Data>,
@@ -225,6 +230,8 @@ impl Wiring {
             change: input.change.clone(),
             select: input.select.clone(),
             submit: input.submit.clone(),
+            enter_submits: input.enter_submits,
+            history: input.history.as_slice().into(),
             blur: input.blur.clone(),
             keys: input.keys.clone(),
             capture: input.capture.clone(),
@@ -272,6 +279,8 @@ struct Field {
     window: WindowId,
     selection: (std::ops::Range<usize>, usize),
     scrolling: moonframe_core::ScrollFollow,
+    /// Where Up and Down are in the field's `history`.
+    recall: Option<recall::Recall>,
     _events: Subscription,
     _selection: Subscription,
     /// A writing field follows its caret, for what it keeps in focus.
@@ -358,6 +367,7 @@ impl Inputs {
                 seen: frame,
                 window: window.window_handle().window_id(),
                 scrolling: moonframe_core::ScrollFollow::default(),
+                recall: None,
                 _events: events,
                 _selection: selection,
                 _caret: caret,
@@ -540,6 +550,37 @@ impl Inputs {
         })
     }
 
+    /// Up or Down in the focused field, stepping through its `history`:
+    /// the recalled text replaces what it holds as an edit (so it sends
+    /// `change`), with the caret at its end. False when the key should
+    /// move the caret instead.
+    fn recall(&self, step: recall::Step, window: &mut Window, cx: &mut App) -> bool {
+        let (editor, text) = {
+            let mut registry = self.0.borrow_mut();
+            let Some(field) = registry.fields.values_mut().find(|field| {
+                field.mounted.upgrade().is_some()
+                    && field.editor.focus_handle(cx).is_focused(window)
+            }) else {
+                return false;
+            };
+            let value = field.editor.value(cx);
+            let caret = field.editor.caret(cx);
+            let history = field.wiring.history.clone();
+            let Some(text) = recall::step(&history, &mut field.recall, step, &value, caret) else {
+                return false;
+            };
+            (field.editor.clone(), text)
+        };
+        let all = editor.value(cx).len();
+        editor.select(0..all, cx);
+        let end = text.len();
+        on_state!(&editor, |state| state.update(cx, |state, cx| {
+            state.replace(text, window, cx);
+        }));
+        editor.select(end..end, cx);
+        true
+    }
+
     /// The field with keyboard focus in `window`, if any.
     pub(crate) fn focused(&self, window: &Window, cx: &App) -> Option<(Wiring, String)> {
         let registry = self.0.borrow();
@@ -719,7 +760,8 @@ impl MoonframeApp {
 
     /// A keystroke while a field has focus, before key bindings and any
     /// terminal see it: one of the field's `keys` sends its message instead
-    /// of editing, and ⌘/Ctrl-Enter submits a multiline field. Returns
+    /// of editing, ⌘/Ctrl-Enter submits a multiline field (Enter too with
+    /// `enter = "submit"`), and Up and Down step through its `history`. Returns
     /// whether the field took it.
     pub(crate) fn input_keystroke(
         &mut self,
@@ -751,10 +793,26 @@ impl MoonframeApp {
             return true;
         }
         let msg = msg.or_else(|| {
-            let submits =
-                wiring.multiline && pressed(&KeyChord::parse("secondary-enter").ok()?, keystroke);
+            let chord = |name: &str| KeyChord::parse(name).is_ok_and(|c| pressed(&c, keystroke));
+            let submits = wiring.multiline
+                && (chord("secondary-enter") || (wiring.enter_submits && chord("enter")));
             submits.then_some(wiring.submit.as_ref()).flatten()
         });
+        if msg.is_none() && !wiring.history.is_empty() && wiring.capture.is_none() {
+            let chord = |name: &str| KeyChord::parse(name).is_ok_and(|c| pressed(&c, keystroke));
+            let step = if chord("up") {
+                Some(recall::Step::Older)
+            } else if chord("down") {
+                Some(recall::Step::Newer)
+            } else {
+                None
+            };
+            if let Some(step) = step
+                && self.inputs.recall(step, window, cx)
+            {
+                return true;
+            }
+        }
         if msg.is_none()
             && let Some(capture) = &wiring.capture
         {

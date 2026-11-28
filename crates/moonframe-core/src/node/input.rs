@@ -22,8 +22,17 @@ pub struct Input {
     pub change: Option<Data>,
     /// Sent when the selection/caret moves, with the text and caret.
     pub select: Option<Data>,
-    /// Sent on Enter (single-line), or ⌘/Ctrl-Enter (multiline).
+    /// Sent on Enter (single-line), or ⌘/Ctrl-Enter (multiline), or Enter
+    /// in a multiline field with [`Input::enter_submits`].
     pub submit: Option<Data>,
+    /// A multiline field sends `submit` on Enter and makes a new line on
+    /// Shift-Enter, as a chat's composer does; otherwise Enter makes a new
+    /// line and ⌘/Ctrl-Enter submits.
+    pub enter_submits: bool,
+    /// What was sent before, oldest first: Up with the caret on the first
+    /// line recalls the one before what the field shows, Down on the last
+    /// line the one after, and past the newest the text being written.
+    pub history: Vec<String>,
     /// Sent with the text when the field loses keyboard focus: a title
     /// edited in place is saved as the user clicks away.
     pub blur: Option<Data>,
@@ -116,6 +125,8 @@ pub enum Dim {
 impl Input {
     /// Lines a multiline field shows without `rows`.
     pub const DEFAULT_ROWS: u32 = 3;
+    /// Most entries a field's `history` holds; older ones are left out.
+    pub const MAX_HISTORY: usize = 200;
     /// Most `rows` a field can ask for.
     pub const MAX_ROWS: u32 = 200;
 

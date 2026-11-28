@@ -6552,6 +6552,7 @@ dependencies = [
 name = "moonframe-chat"
 version = "1.8.0"
 dependencies = [
+ "moonframe-chat-view",
  "moonframe-core",
  "moonframe-providers",
  "rustix 1.1.6",
@@ -6559,6 +6560,15 @@ dependencies = [
  "sheprd-chat-protocol",
  "tempfile",
  "tracing",
+]
+
+[[package]]
+name = "moonframe-chat-view"
+version = "1.8.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sheprd-chat-protocol",
 ]
 
 [[package]]
