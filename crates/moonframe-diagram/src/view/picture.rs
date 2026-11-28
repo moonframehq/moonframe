@@ -66,6 +66,7 @@ pub fn measure(diagram: &Diagram, font_size: f32, window: &mut Window, cx: &App)
         .iter()
         .flat_map(|n| std::iter::once(&n.label).chain(n.sublabel.as_ref()))
         .chain(diagram.messages.iter().map(|m| &m.label))
+        .chain(diagram.edges.iter().filter_map(|e| e.label.as_ref()))
         .chain(diagram.notes.iter().map(|n| &n.text));
     for text in texts {
         if !widths.contains_key(text) {

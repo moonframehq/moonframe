@@ -29,8 +29,10 @@ const BUDGET: usize = MAX_ENTRIES - 16;
 /// Where a file is from.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum From {
+    // keep-sorted start
     Agent,
     Project,
+    // keep-sorted end
 }
 
 impl From {

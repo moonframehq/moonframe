@@ -30,7 +30,7 @@ pub use cost::cost;
 use {
     crate::{
         geometry::{Point, Rect, Size, bounds},
-        model::{Diagram, DiagramKind, Node, NodeKind},
+        model::{Diagram, DiagramKind, EdgeKind, Node, NodeKind},
     },
     std::collections::{BTreeMap, HashMap},
 };
@@ -162,6 +162,7 @@ pub fn layout(
         DiagramKind::Flow => layered::layout(diagram, measure, options, previous),
     };
     groups::place(diagram, options, &mut out);
+    edge_labels(diagram, measure, options, &mut out);
     // Everything drawn: boxes, and every corner of every line.
     let dots: Vec<Rect> = out
         .edges
@@ -181,6 +182,30 @@ pub fn layout(
     )
     .unwrap_or_default();
     out
+}
+
+/// A flow's edge labels, drawn over their edge as a pill as wide as the
+/// text and 1.5 lines tall at 0.86 of the font (as the painter draws
+/// them), counted in the bounds: one beside a loop reaches past every box.
+fn edge_labels(diagram: &Diagram, measure: &dyn Measure, options: &Options, out: &mut Layout) {
+    let size = options.font_size * 0.86;
+    for edge in &diagram.edges {
+        let text = edge.label.as_deref().filter(|l| !l.is_empty());
+        let center = out.edges.get(&edge.id).and_then(|r| r.label);
+        let (Some(text), Some(center)) = (text, center) else {
+            continue;
+        };
+        if edge.kind == EdgeKind::Invisible {
+            continue;
+        }
+        let w = measure.width(text, size) + 10.0;
+        out.extents.push(Rect::new(
+            center.x - w / 2.0,
+            center.y - size * 0.75,
+            w,
+            size * 1.5,
+        ));
+    }
 }
 
 /// The size `node` takes: its own when placed, else what its label needs.

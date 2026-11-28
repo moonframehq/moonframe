@@ -268,6 +268,18 @@ fn participants_only_messages_name_get_a_box() {
 }
 
 #[test]
+fn a_flows_bounds_hold_its_edge_labels() {
+    let long = "a rather long sentence beside the loop";
+    let mut d = flow(&["a", "b"], &[("a", "a"), ("a", "b")]);
+    d.edges[0].label = Some(long.into());
+    let out = lay(&d);
+    let label = out.edges["e0"].label.unwrap();
+    let half = (Approx.width(long, 14.0 * 0.86) + 10.0) / 2.0;
+    assert!(out.bounds.right() >= label.x + half, "{:?}", out.bounds);
+    assert!(out.bounds.x <= label.x - half, "{:?}", out.bounds);
+}
+
+#[test]
 fn a_sequences_bounds_hold_its_message_labels() {
     let long = "a rather long label for a message to itself";
     let d = Diagram {
