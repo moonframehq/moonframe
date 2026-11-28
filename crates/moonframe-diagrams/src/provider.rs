@@ -41,6 +41,8 @@ impl From {
 #[derive(Default)]
 pub struct Diagrams {
     agents: PathBuf,
+    /// The project, whose `.moonframe/diagrams` is checked again on each
+    /// scan (it may come later, or be swapped for a link).
     project: Option<PathBuf>,
     /// Each file read, by path: when it changed and how big it was, and
     /// what it read as, so an unchanged file is not read again.
@@ -58,7 +60,7 @@ impl Native for Diagrams {
             Some(dir) if !dir.is_empty() => PathBuf::from(dir),
             _ => store::default_dir(),
         };
-        self.project = project_folder(moonframe_providers::project());
+        self.project = moonframe_providers::project();
         self.refresh(host);
         Ok(())
     }
@@ -70,7 +72,7 @@ impl Native for Diagrams {
     fn receive(&mut self, host: &Handle, from: &str, message: Data) {
         if from.is_empty() {
             // The app telling it the project moved.
-            self.project = project_folder(moonframe_providers::project());
+            self.project = moonframe_providers::project();
         } else if let Some(id) = message.get("close").and_then(Data::as_str) {
             // Only an agent's diagram goes, and only its own file.
             if let Ok(id) = store::safe_id(id) {
@@ -92,8 +94,6 @@ fn project_folder(project: Option<PathBuf>) -> Option<PathBuf> {
     }
     match (project.canonicalize(), dir.canonicalize()) {
         (Ok(root), Ok(inside)) if inside.starts_with(&root) => Some(dir),
-        // Not there yet: watched for when it comes.
-        (Ok(_), Err(_)) => Some(dir),
         _ => None,
     }
 }
@@ -101,7 +101,8 @@ fn project_folder(project: Option<PathBuf>) -> Option<PathBuf> {
 impl Diagrams {
     fn refresh(&mut self, host: &Handle) {
         let mut entries = self.scan(&self.agents.clone(), From::Agent);
-        if let Some(project) = self.project.clone() {
+        let folder = project_folder(self.project.clone());
+        if let Some(project) = folder.clone() {
             entries.extend(self.scan(&project, From::Project));
         }
         entries.sort_by_key(|e| {
@@ -122,7 +123,7 @@ impl Diagrams {
         let published = json!({
             "available": true,
             "agents": self.agents.to_string_lossy(),
-            "project": self.project.as_ref().map(|p| p.to_string_lossy().into_owned()),
+            "project": folder.as_ref().map(|p| p.to_string_lossy().into_owned()),
             "diagrams": entries,
         });
         if self.last.as_ref() != Some(&published) {
@@ -211,7 +212,11 @@ fn entry(
         return out;
     }
     if language == "json" {
-        match store::read(file) {
+        let shown = own_bytes(file, meta).and_then(|bytes| {
+            let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            store::Shown::from_json(&value)
+        });
+        match shown {
             Ok(shown) => {
                 let checked = if shown.document.get("nodes").is_some()
                     || shown.document.get("messages").is_some()
@@ -245,7 +250,9 @@ fn entry(
         }
         return out;
     }
-    match std::fs::read_to_string(file) {
+    match own_bytes(file, meta)
+        .and_then(|b| String::from_utf8(b).map_err(|_| "not UTF-8 text".to_owned()))
+    {
         Ok(text) => {
             match document::from_text(language, &text) {
                 Ok(doc) => out["document"] = doc,
@@ -254,9 +261,41 @@ fn entry(
             out["language"] = language.into();
             out["text"] = text.into();
         },
-        Err(e) => out["error"] = e.to_string().into(),
+        Err(e) => out["error"] = e.into(),
     }
     out
+}
+
+/// The bytes of `file`, read through an open handle that must be the very
+/// file `meta` (its own, not followed through a link) described: a file
+/// swapped for a link after it was looked at is not read.
+fn own_bytes(file: &Path, meta: &std::fs::Metadata) -> Result<Vec<u8>, String> {
+    use std::io::Read as _;
+    let handle = std::fs::File::open(file).map_err(|e| e.to_string())?;
+    let opened = handle.metadata().map_err(|e| e.to_string())?;
+    if !opened.is_file() || !same_file(meta, &opened) {
+        return Err("changed while it was read".into());
+    }
+    let mut bytes = Vec::new();
+    handle
+        .take(store::MOST_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > store::MOST_BYTES {
+        return Err(format!("larger than {} KiB", store::MOST_BYTES / 1024));
+    }
+    Ok(bytes)
+}
+
+#[cfg(unix)]
+fn same_file(a: &std::fs::Metadata, b: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt as _;
+    a.dev() == b.dev() && a.ino() == b.ino()
+}
+
+#[cfg(not(unix))]
+fn same_file(a: &std::fs::Metadata, b: &std::fs::Metadata) -> bool {
+    a.len() == b.len() && a.modified().ok() == b.modified().ok()
 }
 
 #[cfg(test)]
@@ -312,6 +351,17 @@ mod tests {
         .unwrap();
         assert_eq!(project_folder(Some(linked.path().to_owned())), None);
         assert!(project_folder(Some(project.path().to_owned())).is_some());
+        // A folder that comes later as a link is refused when it comes,
+        // as each scan checks it again.
+        let later = tempfile::tempdir().unwrap();
+        assert_eq!(project_folder(Some(later.path().to_owned())), None);
+        std::fs::create_dir_all(later.path().join(".moonframe")).unwrap();
+        std::os::unix::fs::symlink(
+            secret.path(),
+            later.path().join(".moonframe").join("diagrams"),
+        )
+        .unwrap();
+        assert_eq!(project_folder(Some(later.path().to_owned())), None);
     }
 
     #[test]
