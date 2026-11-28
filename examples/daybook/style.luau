@@ -13,11 +13,13 @@ return style {
 		card = { light = "#ffffff", dark = "#202023" },
 		["card-sepia"] = { light = "#f6efe2", dark = "#202023" },
 		["card-ink-sepia"] = { light = "#2a2118", dark = "#ececec" },
+		["surface-soft"] = { light = "#f6f5f3", dark = "#2a2a2e" },
 		["list-hover"] = { light = "#0000000a", dark = "#ffffff0d" },
 		["muted-foreground"] = { light = "#8a8a8e", dark = "#8e8e93" },
 		border = { light = "#e7e5e2", dark = "#2e2e32" },
 		danger = { light = "#e5484d", dark = "#ff6369" },
 		warning = { light = "#f1a10d", dark = "#ffb224" },
+		success = { light = "#2f9e5b", dark = "#3ecf78" },
 	},
 
 	rules = {
@@ -27,9 +29,11 @@ return style {
 		[".chrome-light"] = { background = "frame-light", color = "frame-ink-light" },
 		[".card-pane"] = { padding = { 0, 8, 12, 0 } },
 		[".card-pane-last"] = { padding = { 0, 12, 12, 0 } },
-		[".card"] = { radius = 16, shadow = "0 1px 2px #00000010, 0 8px 24px -8px #00000022", color = "foreground" },
+		[".card"] = { radius = 16, shadow = "0 1px 2px #00000010, 0 8px 24px -8px #00000022", color = "foreground", clip = true },
 		[".card-classic"] = { background = "card" },
 		[".card-light"] = { background = "card", border = true, border_color = "border" },
 		[".card-sepia"] = { background = "card-sepia", color = "card-ink-sepia" },
+		-- Selected task row in Daybook gets a crisp rounded border like Woday.
+		[".task-row:selected"] = { background = "card", border = "all", border_color = "foreground/75", shadow = "0 1px 3px #00000010" },
 	},
 }
