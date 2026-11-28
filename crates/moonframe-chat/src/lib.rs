@@ -145,6 +145,10 @@ pub(crate) struct State {
     pub(crate) focus: Option<String>,
     /// Something changed since the last publish.
     pub(crate) dirty: bool,
+    /// A chat shows a clock that moves, so it is shared again each second,
+    /// and when it last was (Unix ms).
+    pub(crate) ticking: bool,
+    pub(crate) published_ms: u64,
     /// The chats' records changed since they were last saved.
     pub(crate) unsaved: bool,
     /// The provider was dropped (a reload, the app quitting): connections
@@ -275,6 +279,12 @@ impl Native for Chats {
     }
 
     fn tick(&mut self, host: &Handle) {
+        {
+            let mut state = lock(&self.state);
+            if state.ticking && now_ms().saturating_sub(state.published_ms) >= 1000 {
+                state.dirty = true;
+            }
+        }
         self.publish(host);
     }
 
@@ -659,11 +669,14 @@ impl Chats {
             return;
         }
         let focus = state.focus.clone();
+        let now = now_ms();
         let chats: Vec<Value> = state
             .chats
             .iter()
-            .map(|chat| project::chat(chat, focus.as_deref() == Some(&chat.id), self.raw))
+            .map(|chat| project::chat(chat, focus.as_deref() == Some(&chat.id), self.raw, now))
             .collect();
+        state.ticking = state.chats.iter().any(project::ticking);
+        state.published_ms = now;
         let program = self.program.as_ref().map(|path| path.display().to_string());
         let mut published = json!({
             "available": program.is_some(),

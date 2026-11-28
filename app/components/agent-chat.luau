@@ -1,10 +1,14 @@
 -- A whole conversation with a coding agent (Claude, Codex, OpenCode, pi,
--- Gemini…) run through herdr-acp by the `chat` provider: the transcript
--- with folded tool runs and thoughts, the agent's permission questions,
--- the prompts queued behind the running turn, Stop and Resume, pickers for
--- the agent, mode, model and effort, and a composer that grows with its
--- lines, sends on Enter, recalls earlier prompts with Up, completes `/`
--- commands and takes pasted or dropped files.
+-- Gemini…) run through Sheprd's sheprd-acp by the `chat` provider: the
+-- transcript with folded tool runs and thoughts, handoffs between agents,
+-- what the agent is doing and for how long, its sub-agents and shells
+-- (each stoppable), its permission questions and questions with choices,
+-- the prompts queued behind the running turn (steered in, sent now or
+-- taken back), Stop and Resume, the pull requests it worked on, pickers
+-- for the agent (switched mid-conversation), mode, model, effort and any
+-- other setting, auto-accept, and a composer that grows with its lines,
+-- sends on Enter, recalls earlier prompts with Up, completes `/` commands
+-- and takes pasted or dropped files.
 --
 -- It draws one chat of `app.chat` from the view the provider prepares
 -- (moonframe-chat-view), so it parses nothing itself. Without `chat` it
@@ -61,6 +65,8 @@ local AGENT_ICONS: { [string]: string } = {
 }
 
 local chat_markdown = use "chat-markdown"
+local chat_waiting = use "chat-waiting"
+local chat_working = use "chat-working"
 local dropdown = use "dropdown"
 local menu = use "menu"
 local thinking = use "thinking"
@@ -215,7 +221,21 @@ local function picker(name: string, value: any, state: State): any
 	}
 end
 
-local function status_line(chat: any, view: any): any
+-- The step the running turn is on: the live tool run's current call.
+local function current_step(view: any): string?
+	local rows = view.rows or {}
+	for index = #rows, 1, -1 do
+		local row = rows[index]
+		if row.type == "tools" then
+			return if row.live then (row.current or row.title) else nil
+		elseif row.type ~= "thought" then
+			return nil
+		end
+	end
+	return nil
+end
+
+local function status_line(chat: any, view: any, state: State): any
 	if chat.status == "failed" or chat.status == "ended" then
 		return ui.row {
 			class = "agent-chat-ended",
@@ -236,15 +256,17 @@ local function status_line(chat: any, view: any): any
 			ui.text { label, size = "small" },
 		}
 	end
-	if view.status == "working" then
-		local running = #(view.activities or {})
-		return ui.row {
-			class = "agent-chat-working",
-			gap = "small",
-			align = "center",
-			ui.icon { name = "loader-circle", size = "small", spin = true },
-			ui.text { if #(view.permissions or {}) > 0 then "Waiting for you" else "Working…", size = "small" },
-			running > 0 and ui.text { `· {running} running in the background`, size = "small", tone = "muted" },
+	-- Background work outlives its turn, so it shows while idle too.
+	if view.status == "working" or #(view.activities or {}) > 0 then
+		local working = view.status == "working"
+		return chat_working {
+			working = working,
+			waiting = working and #(view.permissions or {}) > 0,
+			step = if working then current_step(view) else nil,
+			working_for = view.working_for,
+			activities = view.activities,
+			open = state.folds["activities"] == true,
+			toggle = { fold = "activities" },
 		}
 	end
 	if view.status == "failed" or view.status == "exited" then
@@ -260,6 +282,16 @@ end
 
 local function user_row(row: any): any
 	local chips: { any } = {}
+	if row.guest then
+		table.insert(chips, ui.row {
+			class = "agent-chat-guest",
+			gap = "small",
+			align = "center",
+			hug = true,
+			ui.icon { name = "user-round", size = "small" },
+			ui.text { `{row.guest} · guest`, size = "small" },
+		})
+	end
 	for _, name in row.files or {} do
 		table.insert(chips, ui.row {
 			class = "agent-chat-file",
@@ -340,13 +372,31 @@ local function row_element(row: any, state: State, props: Props): any
 			ui.text { row.text, size = "small" },
 		}
 	elseif kind == "notice" then
-		return ui.row {
+		local open = state.folds[row.key] == true
+		return ui.column {
 			key = row.key,
 			class = "agent-chat-notice",
 			state = row.level,
 			gap = "small",
-			ui.icon { name = if row.level == "info" then "info" else "triangle-alert", size = "small" },
-			ui.text { row.text, size = "small", wrap = true },
+			ui.row {
+				gap = "small",
+				msg = row.details and { fold = row.key },
+				ui.icon { name = if row.level == "info" then "info" else "triangle-alert", size = "small" },
+				ui.column { grow = true, ui.text { row.text, size = "small", wrap = true } },
+				row.details and ui.icon { name = if open then "chevron-down" else "chevron-right", size = "small" },
+			},
+			open and row.details and ui.text { row.details, size = "small", wrap = true, class = "agent-chat-notice-details" },
+		}
+	elseif kind == "handoff" then
+		return ui.row {
+			key = row.key,
+			class = "agent-chat-handoff",
+			gap = "small",
+			align = "center",
+			ui.column { class = "agent-chat-handoff-line", grow = true, height = 1 },
+			ui.icon { name = agent_icon(row.to), size = "small" },
+			ui.text { row.text, size = "small" },
+			ui.column { class = "agent-chat-handoff-line", grow = true, height = 1 },
 		}
 	elseif kind == "image" then
 		return ui.row {
@@ -362,79 +412,39 @@ local function row_element(row: any, state: State, props: Props): any
 	return nil
 end
 
-local function permission_card(permission: any): any
-	local buttons: { any } = {}
-	for _, option in permission.options or {} do
-		table.insert(buttons, ui.button {
-			option.name,
-			small = true,
-			variant = if option.kind == "allow_once" then "primary" elseif option.allows then "outline" else "ghost",
-			msg = { answer = permission.id, option = option.id },
-		})
+-- How many rows came before this chat, from a continued session.
+local function continued_rows(rows: { any }, view: any): number
+	local key = view and view.continued
+	if key == nil then
+		return 0
 	end
-	return ui.column {
-		class = "agent-chat-permission",
-		gap = "small",
-		ui.row {
-			gap = "small",
-			align = "center",
-			ui.icon { name = "shield", size = "small", class = "agent-chat-permission-icon" },
-			ui.text { permission.title, weight = "medium", wrap = true },
-		},
-		permission.tool and permission.tool ~= permission.title
-			and ui.text { permission.tool, size = "small", class = "agent-chat-permission-tool", wrap = true },
-		ui.row { gap = "small", wrap = true, table.unpack(buttons) },
-	}
-end
-
-local function plan_strip(plan: any, state: State): any
-	if plan == nil or plan.total == 0 then
-		return nil
-	end
-	local open = state.folds["plan"] == true
-	local items: { any } = {}
-	if open then
-		for _, item in plan.items do
-			local icon = if item.status == "done" then "circle-check" elseif item.status == "running" then "circle-dot" else "circle"
-			table.insert(items, ui.row {
-				gap = "small",
-				align = "center",
-				ui.icon { name = icon :: any, size = "small", class = "agent-chat-plan-" .. item.status },
-				ui.text { item.text, size = "small", strike = item.status == "done", wrap = true },
-			})
+	for index, row in rows do
+		if row.key == key then
+			return index
 		end
 	end
-	return ui.column {
-		class = "agent-chat-plan",
-		gap = "small",
-		ui.row {
-			gap = "small",
-			align = "center",
-			msg = { fold = "plan" },
-			ui.icon { name = if open then "chevron-down" else "list-checks", size = "small" },
-			ui.text { `Plan {plan.done}/{plan.total}`, size = "small", weight = "medium" },
-			not open and plan.current and ui.text { plan.current, size = "small", tone = "muted", truncate = true },
-		},
-		table.unpack(items),
-	}
+	return 0
 end
 
-local function queue_list(queue: { any }): any
-	if #queue == 0 then
+-- The pull requests the agent worked on, each opening on GitHub.
+local function pull_requests(view: any): any
+	local pulls = view.pull_requests or {}
+	if #pulls == 0 then
 		return nil
 	end
-	local rows: { any } = {}
-	for _, queued in queue do
-		table.insert(rows, ui.row {
-			class = "agent-chat-queued",
-			gap = "small",
-			align = "center",
-			ui.icon { name = "clock", size = "small" },
-			ui.text { queued.text, size = "small", truncate = true },
-			ui.button { icon = "close", small = true, variant = "ghost", tooltip = "Take it back", msg = { unqueue = queued.id } },
+	local chips: { any } = {}
+	for _, pull in pulls do
+		table.insert(chips, ui.button {
+			`#{pull.number}` .. (if pull.state then ` · {pull.state}` else ""),
+			icon = if pull.state == "Merged" then "git-merge" else "git-pull-request",
+			small = true,
+			variant = "outline",
+			tooltip = `{pull.repo}#{pull.number}`,
+			to = "app:open",
+			msg = pull.url,
 		})
 	end
-	return ui.column { gap = "small", table.unpack(rows) }
+	return ui.row { gap = "small", wrap = true, align = "center", table.unpack(chips) }
 end
 
 local function empty_state(props: Props, service: any): any
@@ -493,13 +503,48 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 			ui.button { icon = "close", small = true, variant = "ghost", msg = { unfile = index } },
 		})
 	end
-	-- Before the first prompt, which agent it starts.
+	-- Before the first prompt, which agent it starts; after, the agent the
+	-- conversation is handed to, while the agent is idle.
 	local agents: { any } = {}
 	local agent = state.agent or props.agent or (service and service.default) or "claude"
+	local agent_event = "pick_agent"
+	local agent_name: string? = nil
 	if chat == nil and service and #(service.agents or {}) > 1 then
 		for _, name in service.agents do
 			table.insert(agents, { id = name, label = name, icon = agent_icon(name) })
 		end
+	elseif view and #(view.agents or {}) > 1 then
+		agent_event = "switch_agent"
+		for _, choice in view.agents do
+			table.insert(agents, { id = choice.id, label = choice.name, icon = agent_icon(choice.id) })
+			if choice.current then
+				agent, agent_name = choice.id, choice.name
+			end
+		end
+	end
+	-- The mode, model and effort, then every other setting.
+	local settings: { any } = {}
+	if view then
+		local function add(element: any)
+			if element then
+				table.insert(settings, element)
+			end
+		end
+		for _, name in { "mode", "model", "effort" } do
+			add(picker(name, view[name], state))
+		end
+		for _, setting in view.settings or {} do
+			add(picker(`setting-{setting.id}`, setting, state))
+		end
+		table.insert(settings, ui.button {
+			if view.auto_accept then "Auto-accepting" else "Asks first",
+			icon = if view.auto_accept then "zap" else "shield",
+			small = true,
+			variant = if view.auto_accept then "outline" else "ghost",
+			class = if view.auto_accept then "agent-chat-auto-accept" else nil,
+			msg = { auto_accept = not view.auto_accept },
+			tooltip = if view.auto_accept then "Allows every request without asking; click to ask first again" else "Asks before acting; click to allow every request",
+		})
 	end
 	local field = ui.input {
 		id = "prompt",
@@ -540,19 +585,17 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 			wrap = true,
 			#agents > 0 and dropdown {
 				icon = agent_icon(agent),
-				value = agent,
+				value = agent_name or agent,
 				selected = agent,
 				options = agents,
 				open = state.open == "agent",
 				toggle = { open = if state.open == "agent" then "" else "agent" },
 				dismiss = { open = "" },
-				event = "pick_agent",
+				event = agent_event,
+				disabled = agent_event == "switch_agent" and working,
 				side = "top",
 			},
-			view and picker("mode", view.mode, state),
-			view and picker("model", view.model, state),
-			view and picker("effort", view.effort, state),
-			view and view.auto_accept and ui.button { "Auto-accept", icon = "zap", small = true, variant = "ghost", msg = { auto_accept = false }, tooltip = "Asks before acting again" },
+			ui.row { gap = "small", align = "center", wrap = true, table.unpack(settings) },
 			ui.spacer(),
 			ui.row {
 				class = "agent-chat-actions",
@@ -584,7 +627,7 @@ return component {
 	title = "Agent Chat",
 	category = "Data",
 	icon = "messages-square",
-	description = "A whole conversation with a coding agent through herdr-acp: transcript with folded tool runs, permission questions, queue, Stop and Resume, mode/model/effort pickers and a multiline composer with history, / commands and attachments.",
+	description = "A whole conversation with a coding agent through Sheprd's sheprd-acp: transcript with folded tool runs and handoffs, what the agent is doing with its stoppable sub-agents and shells, permission questions and questions with choices, a queue to steer or send now, Stop and Resume, pull requests, pickers for the agent (switched mid-conversation), mode, model, effort and other settings, auto-accept, and a multiline composer with history, / commands and attachments.",
 	when = "Give an app a chat with Claude, Codex, OpenCode, pi or Gemini on the `chat` provider (crates/moonframe-chat) in a few lines; the mod must be in providers/chat's `starters`. For one run of an agent the app starts itself use `agent-run`; for a static message use `chat-message`; for a send box alone use `composer`.",
 	props = {
 		["id"] = "the instance's id (one per chat drawn)",
@@ -612,16 +655,14 @@ return component {
 		[".agent-chat-notice"] = { color = "muted-foreground", radius = 8, padding = { 6, 10 }, background = "muted" },
 		[".agent-chat-notice:warning"] = { color = "warning" },
 		[".agent-chat-notice:error"] = { color = "danger" },
+		[".agent-chat-notice-details"] = { font = "mono", color = "muted-foreground" },
+		[".agent-chat-handoff"] = { color = "muted-foreground", padding = { 4, 0 } },
+		[".agent-chat-handoff-line"] = { background = "border" },
+		[".agent-chat-guest"] = { background = "accent/10", color = "accent", radius = 6, padding = { 2, 8 } },
+		[".agent-chat-auto-accept"] = { color = "warning", border_color = "warning/50" },
 		[".agent-chat-working"] = { color = "muted-foreground", padding = { 0, 2 } },
 		[".agent-chat-ended"] = { color = "danger", background = "danger/10", radius = 8, padding = { 6, 10 } },
 		[".agent-chat-bottom"] = { padding = { 0, 16, 14, 16 }, gap = 8 },
-		[".agent-chat-permission"] = { border = true, border_color = "warning/50", background = "warning/8", radius = 12, padding = { 10, 12 } },
-		[".agent-chat-permission-icon"] = { color = "warning" },
-		[".agent-chat-permission-tool"] = { font = "mono", color = "muted-foreground" },
-		[".agent-chat-queued"] = { background = "muted", radius = 8, padding = { 2, 4, 2, 10 }, color = "muted-foreground" },
-		[".agent-chat-plan"] = { border = true, border_color = "border", radius = 10, padding = { 6, 10 } },
-		[".agent-chat-plan-done"] = { color = "success" },
-		[".agent-chat-plan-running"] = { color = "accent" },
 		[".agent-chat-composer"] = { background = "background", border = true, border_color = "border", radius = 14, padding = { 8, 10 }, shadow = "0 2px 8px #0000000d" },
 		[".agent-chat-field"] = { background = "#00000000", border = "none", shadow = "none", padding = { 4, 2 } },
 		[".agent-chat-empty-icon"] = { color = "accent" },
@@ -776,6 +817,17 @@ end
 		elseif type(msg) == "table" and msg.pick_agent then
 			state.open = ""
 			state.agent = msg.pick_agent
+		elseif type(msg) == "table" and msg.switch_agent then
+			state.open = ""
+			chat_msg({ agent = msg.switch_agent, id = "agent-chat" })
+		elseif type(msg) == "table" and msg.answer_question then
+			if id then
+				table.insert(sends, tell(props, { answer = id, permission = msg.answer_question, answers = msg.answers, id = "agent-chat" }))
+			end
+		elseif type(msg) == "table" and msg.send_now then
+			chat_msg({ send_now = msg.send_now, id = "agent-chat" })
+		elseif type(msg) == "table" and msg.stop_activity then
+			chat_msg({ stop_activity = msg.stop_activity, id = "agent-chat" })
 		elseif kind == "link" then
 			if props.link ~= nil then
 				local forward = if type(props.link) == "table" then table.clone(props.link) else { msg = props.link }
@@ -827,7 +879,22 @@ end
 			local rows = (view and view.rows) or {}
 			local first = math.max(1, #rows - state.shown + 1)
 			local earlier = first - 1 + ((view and view.hidden) or 0)
-			if first > 1 then
+			-- A continued session's conversation from before this chat
+			-- stays folded until asked for.
+			local before = continued_rows(rows, view)
+			if before > 0 and not state.folds["continued"] and first <= before then
+				first = before + 1
+				table.insert(children, ui.row {
+					justify = "center",
+					ui.button {
+						`Show the conversation before this chat ({before})`,
+						icon = "history",
+						small = true,
+						variant = "ghost",
+						msg = { fold = "continued" },
+					},
+				})
+			elseif first > 1 then
 				table.insert(children, ui.row {
 					justify = "center",
 					ui.button { `Show earlier ({earlier})`, small = true, variant = "ghost", msg = "show-earlier" },
@@ -847,7 +914,7 @@ end
 			if state.waiting then
 				table.insert(children, user_row({ key = "waiting", text = state.waiting.prompt, files = {}, context = props.context ~= nil }))
 			end
-			local status = status_line(chat or { status = "starting" }, view)
+			local status = status_line(chat or { status = "starting" }, view, state)
 			if status then
 				table.insert(children, status)
 			end
@@ -861,16 +928,18 @@ end
 				table.unpack(children),
 			}
 			if view then
-				local plan = plan_strip(view.plan, state)
-				if plan then
-					table.insert(bottom, plan)
+				local pulls = pull_requests(view)
+				if pulls then
+					table.insert(bottom, pulls)
 				end
-				for _, permission in view.permissions or {} do
-					table.insert(bottom, permission_card(permission))
-				end
-				local queue = queue_list(view.queue or {})
-				if queue then
-					table.insert(bottom, queue)
+				local waiting = chat_waiting {
+					view = view,
+					chat = chat_id(props, state),
+					plan_open = state.folds["plan"] == true,
+					plan_toggle = { fold = "plan" },
+				}
+				if waiting then
+					table.insert(bottom, waiting)
 				end
 			end
 		end

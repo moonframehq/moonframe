@@ -196,3 +196,29 @@ fn agents_to_switch_to_pull_requests_and_activities() {
     assert_eq!(view.clients, 2);
     assert_eq!(view.continued.as_deref(), Some(view.rows[0].key()));
 }
+
+#[test]
+fn the_clock_says_how_long_the_turn_and_activities_have_run() {
+    let mut chat = transcript(vec![user("hi")]);
+    let view = prepare(&chat, &Limits::FULL);
+    assert!(!ticking(&view), "an idle chat has no clock");
+    chat.status = Status::Working;
+    chat.turn = Some(Turn { started_ms: 1_000 });
+    chat.activities.push(Activity {
+        call_id: "a1".to_owned(),
+        detail: None,
+        finished_ms: None,
+        kind: ActivityKind::Subagent,
+        label: "Explore".to_owned(),
+        started_ms: 0,
+        state: ActivityState::Running,
+        stoppable: false,
+    });
+    let mut view = prepare(&chat, &Limits::FULL);
+    assert!(ticking(&view));
+    clock(&mut view, 43_500);
+    assert_eq!(view.working_for.as_deref(), Some("42s"));
+    assert_eq!(view.activities[0].running_for.as_deref(), Some("43s"));
+    clock(&mut view, 1_200);
+    assert_eq!(view.working_for.as_deref(), Some("0s"));
+}

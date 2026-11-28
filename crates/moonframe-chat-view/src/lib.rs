@@ -20,6 +20,7 @@
 //! without its frame; [`unframe`] reads one back.
 
 // keep-sorted start
+mod clock;
 mod controls;
 mod rows;
 mod session;
@@ -33,6 +34,7 @@ use {
 };
 
 pub use {
+    clock::{clock, ticking},
     controls::{
         ActivityView, ChoiceView, CommandView, PermissionChoice, PermissionView, Picker, PlanItem,
         PlanView, QuestionAsked, QuestionChoice, QueuedView, UsageView,
@@ -133,6 +135,9 @@ pub struct ChatView {
     /// When the running turn started (Unix ms), while one runs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub since_ms: Option<u64>,
+    /// How long it has run, `42s`, once [`clock`] filled it in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_for: Option<String>,
     /// It takes prompts now (perhaps queued behind the running turn).
     pub accepts: bool,
     /// The session's title, as the agent named it.
@@ -212,6 +217,7 @@ pub fn prepare(transcript: &Transcript, limits: &Limits) -> ChatView {
             .turn
             .filter(|_| working)
             .map(|turn| turn.started_ms),
+        working_for: None,
         accepts: transcript.status.accepts_prompts() && !transcript.read_only,
         title: session
             .and_then(|session| session.title.as_deref())

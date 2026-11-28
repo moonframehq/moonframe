@@ -11,12 +11,13 @@
 use {
     crate::{Chat, Phase},
     herdr_chat_protocol::Transcript,
-    moonframe_chat_view::{Limits, prepare},
+    moonframe_chat_view::{Limits, clock, prepare},
     serde_json::{Map, Value, json},
 };
 
-/// `chat` as `app.chat` shares it; `focus` says whether a view shows it.
-pub(crate) fn chat(chat: &Chat, focus: bool, raw: bool) -> Value {
+/// `chat` as `app.chat` shares it at `now_ms`; `focus` says whether a view
+/// shows it.
+pub(crate) fn chat(chat: &Chat, focus: bool, raw: bool, now_ms: u64) -> Value {
     let (status, error) = match &chat.phase {
         Phase::Starting => ("starting", None),
         Phase::Live => ("live", None),
@@ -38,10 +39,11 @@ pub(crate) fn chat(chat: &Chat, focus: bool, raw: bool) -> Value {
         "status": status,
         "error": error,
         "session": chat.session,
-        "view": chat
-            .transcript
-            .as_ref()
-            .and_then(|transcript| serde_json::to_value(prepare(transcript, &limits)).ok()),
+        "view": chat.transcript.as_ref().and_then(|transcript| {
+            let mut view = prepare(transcript, &limits);
+            clock(&mut view, now_ms);
+            serde_json::to_value(view).ok()
+        }),
     });
     if raw && let Some(whole) = &chat.transcript {
         let entries = if focus {
@@ -66,6 +68,18 @@ const MAX_TEXT: usize = 15 * 1024;
 const MAX_TOOL_TEXT: usize = 4 * 1024;
 /// Slash commands shared, for completing `/`.
 const MAX_COMMANDS: usize = 200;
+
+/// Whether `chat`'s view shows a clock that moves: a turn or background
+/// work running.
+pub(crate) fn ticking(chat: &Chat) -> bool {
+    chat.transcript.as_ref().is_some_and(|transcript| {
+        transcript.status == herdr_chat_protocol::Status::Working
+            || transcript
+                .activities
+                .iter()
+                .any(|activity| activity.is_running())
+    })
+}
 
 pub(crate) fn transcript(transcript: &Transcript, max_entries: usize) -> Value {
     let Ok(Value::Object(mut fields)) = serde_json::to_value(transcript) else {
