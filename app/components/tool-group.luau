@@ -10,6 +10,8 @@ type Props = {
 	msg: any,
 	to: string?,
 	diagrams: { any }?,
+	-- Which group draws each diagram's card: its id to that group's key.
+	cards: { [string]: string }?,
 }
 
 -- Lucide icons for herdr's tool kinds.
@@ -98,28 +100,50 @@ local function is_diagram_call(item: any): boolean
 	return string.find(item.title or "", "diagram_", 1, true) ~= nil
 end
 
--- Cards for the diagrams the group's `diagram_*` calls showed: their
--- answers name it first ("Showing `plan` ...", "`plan`: ..."), and each
--- draws once, as it stands now in `app.diagrams`.
-local function diagram_cards(group: any, diagrams: { any }?): { any }
-	local cards: { any } = {}
-	if not diagrams then
-		return cards
+-- The diagram a call names first in its answer ("Showing `plan` ...",
+-- "`plan`: ..."), for the group's calls still listed.
+local function named_diagram(item: any): string?
+	return item.detail and string.match(item.detail, "`([%w_-]+)`")
+end
+
+-- The ids of the diagrams the group's `diagram_*` calls showed: from
+-- `group.diagrams`, which keeps them past its trimmed `items`.
+local function diagram_ids(group: any): { string }
+	if group.diagrams then
+		return group.diagrams
 	end
-	local seen: { [string]: boolean } = {}
+	local ids: { string } = {}
 	for _, item in group.items or {} do
-		local id = item.type == "tool" and is_diagram_call(item) and item.detail and string.match(item.detail, "`([%w_-]+)`")
-		if id and not seen[id] then
-			seen[id] = true
+		local id = item.type == "tool" and item.status ~= "failed" and is_diagram_call(item) and named_diagram(item)
+		if id and not table.find(ids, id) then
+			table.insert(ids, id)
+		end
+	end
+	return ids
+end
+
+-- Cards for the diagrams the group showed that it draws (the first group
+-- of a chat to show one, by `cards`), each as it stands now in
+-- `app.diagrams`; and which ids those are.
+local function diagram_cards(group: any, diagrams: { any }?, owners: { [string]: string }?): ({ any }, { [string]: boolean })
+	local cards: { any } = {}
+	local drawn: { [string]: boolean } = {}
+	if not diagrams then
+		return cards, drawn
+	end
+	for _, id in diagram_ids(group) do
+		local owner = owners and owners[id]
+		if not drawn[id] and (owner == nil or owner == group.key) then
 			for _, d in diagrams do
 				if d.id == id and d.from == "agent" then
+					drawn[id] = true
 					table.insert(cards, diagram_card { diagram = d })
 					break
 				end
 			end
 		end
 	end
-	return cards
+	return cards, drawn
 end
 
 return component {
@@ -129,11 +153,12 @@ return component {
 	description = "A run of an agent's tool calls folded to one line with its status and changed lines; open, each call with its output's end and its files.",
 	when = "Inside a chat with a coding agent, for each `tools` row of `app.chat`'s view (`agent-chat` draws them). For one agent run's whole progress use `agent-run`; for a plain fold use `collapsible`.",
 	props = {
-		["group"] = "a `ToolGroup` from `app.chat`: { key, title, status (\"running\" \"done\" \"failed\"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = \"tool\", id, kind, title, status, detail?, files, steps } or { type = \"thought\", gist, text } } }",
+		["group"] = "a `ToolGroup` from `app.chat`: { key, title, status (\"running\" \"done\" \"failed\"), count, failed, current?, files = { { path, added?, removed?, new } }, more, diagrams? = { id }, items = { { type = \"tool\", id, kind, title, status, detail?, files, steps } or { type = \"thought\", gist, text } } }",
 		["open"] = "show its calls",
 		["msg"] = "message a click on the header sends (the mod flips `open`)",
 		["to"] = "mod to send it to, if not the drawing one",
-		["diagrams"] = "`app.diagrams.diagrams`: the diagrams its `diagram_*` calls showed draw as cards, open or folded",
+		["diagrams"] = "`app.diagrams.diagrams`: the diagrams its `diagram_*` calls showed (`group.diagrams`) draw as cards, open or folded, in place of the calls",
+		["cards"] = "which group draws each diagram's card, its id to the group's `key`: a chat passes the first group to show it, so a diagram draws once however many groups change it",
 	},
 	styles = {
 		[".tool-group"] = { border = true, border_color = "border", radius = 10, gap = 0 },
@@ -176,14 +201,16 @@ return component {
 	build = function(props: Props)
 		local group = props.group or {}
 		local items: { any } = {}
-		local cards = diagram_cards(group, props.diagrams)
+		local cards, drawn = diagram_cards(group, props.diagrams, props.cards)
 		if props.open then
 			if (group.more or 0) > 0 then
 				table.insert(items, ui.text { `{group.more} earlier calls`, size = "small", tone = "muted" })
 			end
 			for _, item in group.items or {} do
-				if item.type == "tool" and is_diagram_call(item) then
-					-- Drawn as its card instead.
+				local id = item.type == "tool" and item.status ~= "failed" and is_diagram_call(item) and named_diagram(item)
+				if id and drawn[id] then
+					-- Drawn as its card instead; a failed call, or one whose
+					-- diagram draws elsewhere or not at all, stays a line.
 				elseif item.type == "tool" then
 					table.insert(items, call_line(item))
 				elseif item.gist and item.gist ~= "" then

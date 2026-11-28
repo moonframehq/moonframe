@@ -3073,8 +3073,9 @@ A whole mod using it, with state: `app/components/demos/timeline.luau`.
 
 | Prop | Meaning |
 | --- | --- |
-| `diagrams` | `app.diagrams.diagrams`: the diagrams its `diagram_*` calls showed draw as cards, open or folded |
-| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, files, steps } or { type = "thought", gist, text } } } |
+| `cards` | which group draws each diagram's card, its id to the group's `key`: a chat passes the first group to show it, so a diagram draws once however many groups change it |
+| `diagrams` | `app.diagrams.diagrams`: the diagrams its `diagram_*` calls showed (`group.diagrams`) draw as cards, open or folded, in place of the calls |
+| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, diagrams? = { id }, items = { { type = "tool", id, kind, title, status, detail?, files, steps } or { type = "thought", gist, text } } } |
 | `msg` | message a click on the header sends (the mod flips `open`) |
 | `open` | show its calls |
 | `to` | mod to send it to, if not the drawing one |

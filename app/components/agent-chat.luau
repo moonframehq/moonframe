@@ -293,7 +293,23 @@ local function user_row(row: any): any
 	}
 end
 
-local function row_element(row: any, state: State, props: Props, diagrams: { any }?): any
+-- The group that draws each diagram's card among `rows`: the first to
+-- show it, so a diagram the agent shows, explains and then patches draws
+-- once.
+local function card_owners(rows: { any }, first: number): { [string]: string }
+	local owners: { [string]: string } = {}
+	for index = first, #rows do
+		local row = rows[index]
+		if row.type == "tools" then
+			for _, id in row.diagrams or {} do
+				owners[id] = owners[id] or row.key
+			end
+		end
+	end
+	return owners
+end
+
+local function row_element(row: any, state: State, props: Props, diagrams: { any }?, owners: { [string]: string }?): any
 	local kind = row.type
 	if kind == "user" then
 		return user_row(row)
@@ -325,6 +341,7 @@ local function row_element(row: any, state: State, props: Props, diagrams: { any
 				open = open,
 				msg = { fold = row.key, open = not open },
 				diagrams = diagrams,
+				cards = owners,
 			},
 		}
 	elseif kind == "turn" then
@@ -807,8 +824,10 @@ end
 					ui.text { `{earlier} earlier rows are not kept`, size = "small", tone = "muted" },
 				})
 			end
+			local diagrams = app.diagrams and app.diagrams.diagrams
+			local owners = card_owners(rows, first)
 			for index = first, #rows do
-				local element = row_element(rows[index], state, props, app.diagrams and app.diagrams.diagrams)
+				local element = row_element(rows[index], state, props, diagrams, owners)
 				if element then
 					table.insert(children, element)
 				end

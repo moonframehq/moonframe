@@ -5036,6 +5036,7 @@ type UseToolGroupProps = {
 	read msg: any,
 	read to: string?,
 	read diagrams: { any }?,
+	read cards: { [string]: string }?,
 }
 type UseToolbarButton = any
 type UseToolbarProps = {
