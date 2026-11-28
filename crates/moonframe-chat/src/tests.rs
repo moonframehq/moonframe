@@ -1,5 +1,6 @@
 use {
     super::*,
+    crate::commands::{MAX_CONTEXT, command},
     herdr_chat_protocol::{Change, Entry, EntryId, EntryKind},
     moonframe_providers::Event,
 };
@@ -113,49 +114,6 @@ fn a_bad_agent_name_or_folder_is_refused() {
 }
 
 #[test]
-fn messages_become_herdr_commands() {
-    let prompt = command(
-        "prompt",
-        &json!({ "prompt": "hi", "files": ["/a/b.png"] }),
-        None,
-    )
-    .unwrap();
-    assert_eq!(prompt, Command::Prompt {
-        text: "hi".to_owned(),
-        attachments: vec![Attachment {
-            path: "/a/b.png".to_owned()
-        }],
-    });
-    assert!(command("prompt", &json!({ "prompt": "  " }), None).is_err());
-    assert_eq!(
-        command(
-            "setting",
-            &json!({ "setting": "model", "value": "opus" }),
-            None
-        )
-        .unwrap(),
-        Command::SetOption {
-            id: "model".to_owned(),
-            value: OptionValue::Choice {
-                id: "opus".to_owned()
-            },
-        }
-    );
-    assert_eq!(
-        command(
-            "answer",
-            &json!({ "answer": "c", "permission": 3, "option": "allow" }),
-            None
-        )
-        .unwrap(),
-        Command::Answer {
-            option: "allow".to_owned(),
-            permission: PermissionId(3)
-        }
-    );
-}
-
-#[test]
 fn chats_are_saved_and_one_that_ended_comes_back_resumable() {
     let dir = tempfile::tempdir().unwrap();
     let settings = r#"{ "starters": ["chat"], "store": "STORE", "program": "/nowhere/herdr-acp" }"#;
@@ -264,6 +222,57 @@ fn a_real_chat_starts_attaches_and_takes_commands() {
     chats.tick(&host);
     assert_eq!(published(&seen)["chats"][0]["view"]["auto_accept"], true);
     eprintln!("model: {}", published(&seen)["chats"][0]["view"]["model"]);
+    // A new chat lets the user switch to any other installed agent.
+    let installed = published(&seen)["agents"].as_array().map_or(0, Vec::len);
+    let offered = published(&seen)["chats"][0]["view"]["agents"].clone();
+    eprintln!(
+        "program: {}, agents: {offered}",
+        published(&seen)["program"]
+    );
+    if installed > 1 {
+        assert!(
+            offered.as_array().is_some_and(|agents| agents.len() > 1),
+            "{offered}"
+        );
+    }
+    // Switching to Codex, when it is there, is acknowledged and recorded,
+    // so a resume would start Codex.
+    let codex = offered
+        .as_array()
+        .is_some_and(|agents| agents.iter().any(|agent| agent["id"] == "codex"));
+    if codex {
+        chats.receive(
+            &host,
+            "chat",
+            message(&format!(
+                r#"{{ "agent": "codex", "chat": "{id}", "id": "sw" }}"#
+            )),
+        );
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        loop {
+            chats.tick(&host);
+            let switched = published(&seen)["chats"][0]["agent"] == "codex";
+            let acked = replies(&seen).iter().any(|reply| reply["reply"] == "sw");
+            if switched && acked {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "no switch: {:?}",
+                replies(&seen)
+            );
+            thread::sleep(std::time::Duration::from_millis(100));
+        }
+        let ack = replies(&seen)
+            .into_iter()
+            .find(|reply| reply["reply"] == "sw")
+            .unwrap();
+        assert_eq!(ack["ok"], true, "{ack}");
+        eprintln!(
+            "switched: {}",
+            published(&seen)["chats"][0]["view"]["agent"]
+        );
+    }
     chats.receive(&host, "chat", message(&format!(r#"{{ "close": "{id}" }}"#)));
 }
 
@@ -284,10 +293,17 @@ fn a_program_setting_naming_no_file_falls_back_to_the_search() {
         program: Some(installed.clone()),
         missing: None
     });
+    // An app's newest name for the program comes before its old one.
+    let bundled = program::bundled(Some(Path::new("/Users/me")));
+    let at = |name: &str| {
+        bundled
+            .iter()
+            .position(|path| path == Path::new(name))
+            .unwrap()
+    };
     assert!(
-        program::bundled(Some(Path::new("/Users/me"))).contains(&PathBuf::from(
-            "/Users/me/Applications/Sheprd.app/Contents/MacOS/herdr-acp"
-        ))
+        at("/Users/me/Applications/Sheprd.app/Contents/MacOS/sheprd-acp")
+            < at("/Users/me/Applications/Sheprd.app/Contents/MacOS/herdr-acp")
     );
     // The provider says the setting was passed over.
     let (_chats, _host, seen) = chats(
@@ -364,6 +380,8 @@ fn chats_share_a_prepared_view_and_the_raw_transcript_only_on_request() {
                 EntryKind::User {
                     text: moonframe_chat_view::frame("hidden", "Hello"),
                     files: 0,
+                    note: None,
+                    guest: None,
                 },
                 EntryKind::Agent {
                     text: "Hi there".to_owned(),
@@ -430,6 +448,7 @@ fn commands_wait_for_a_starting_chat_and_answer_their_sender() {
     let prompt = || Command::Prompt {
         text: "hi".to_owned(),
         attachments: Vec::new(),
+        origin: None,
     };
     let from = "chat/agent-chat#main";
     for _ in 0..MAX_HELD {

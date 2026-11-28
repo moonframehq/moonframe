@@ -27,8 +27,8 @@ browser = ["dep:dispatch2", "dep:objc2-web-kit", "dep:wry"]
 # Developer-only export of this app's own rendered frame, without desktop capture,
 # and `render_entry`: one miniapp entry drawn headless to PNG.
 capture = ["dep:gpui-apple-capture", "dep:gpui-capture", "dep:gpui-platform-capture", "dep:image"]
-# The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
-# attached over herdr's chat protocol.
+# The `chat` native provider (`app.chat`): agent chats run by Sheprd's
+# sheprd-acp, attached over its chat protocol.
 chat = ["dep:moonframe-chat"]
 default = [
   # keep-sorted start

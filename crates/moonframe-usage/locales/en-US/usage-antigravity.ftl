@@ -4,7 +4,7 @@
 ## environment variables, URLs, cookie and header names, and the
 ## service's own menu paths stay as written.
 
-usage-antigravity-setting-cli-path = The agy executable on the probed host when it is not on the PATH (install it with `brew install --cask antigravity-cli`, run `agy` once, and sign in). agy runs only when this is set or antigravity is in show_providers, as a signed-out agy opens a browser to sign in.
+usage-antigravity-setting-cli-path = The agy executable on the probed host when it is not on the PATH (install it with `brew install --cask antigravity-cli`, run `agy` or `agy acp --login`, and sign in). A signed-in agy CLI is detected automatically; set this or list antigravity in show_providers to override detection.
 
 ## The report: each model group's limits, as agy reports them. Model
 ## families (Gemini, Claude/GPT) and the names agy gives groups and limits

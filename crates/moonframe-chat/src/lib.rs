@@ -1,6 +1,7 @@
 //! The `chat` native provider: conversations with coding agents, each run
-//! by herdr-gpui's `herdr-acp` program with no view of its own, attached
-//! over herdr's chat protocol, and shared as `app.chat` for mods to draw.
+//! by Sheprd's chat program (`sheprd-acp`) with no view of its own,
+//! attached over its chat protocol, and shared as `app.chat` for mods to
+//! draw.
 //!
 //! A chat is one agent session that takes prompt after prompt. Its program
 //! runs in a process group of its own, so it outlives the app: the next
@@ -22,7 +23,17 @@
 //! - `{ cancel = chat }`, `{ answer = chat, permission, option }`,
 //!   `{ mode = "<id>", chat }`, `{ setting = "<id>", value, chat }` (a
 //!   choice's id, or a boolean), `{ unqueue = "<queued id>", chat }`,
-//!   `{ auto_accept = bool, chat }`: herdr's commands of the same names.
+//!   `{ auto_accept = bool, chat }`: the protocol's commands of the same
+//!   names.
+//! - `{ answer = chat, permission, answers = { "<label or words>", .. } }`
+//!   answers a permission request that carries a question.
+//! - `{ send_now = "<queued id>", chat }` sends a queued prompt ahead of
+//!   the others: into the running turn when the agent steers, else as the
+//!   turn is stopped.
+//! - `{ stop_activity = "<call id>", chat }` ends one sub-agent or
+//!   background shell, leaving the turn running.
+//! - `{ agent = "<agent>", chat }` hands the conversation to another
+//!   installed agent while the chat is idle (a new chat offers them all).
 //! - `{ resume = chat }` starts an ended chat again on its agent session;
 //!   `{ close = chat }` ends its program and forgets it.
 //! - `{ focus = chat }` (anyone): the chat a view shows, whose transcript
@@ -42,6 +53,7 @@
 //! `text` and `more`. Each page holds up to 4096 Unicode characters.
 
 // keep-sorted start
+mod commands;
 mod output;
 mod program;
 mod project;
@@ -51,9 +63,7 @@ mod project;
 mod link;
 
 use {
-    herdr_chat_protocol::{
-        Attachment, Command, CommandId, Cursor, EndpointId, OptionValue, PermissionId, Transcript,
-    },
+    herdr_chat_protocol::{Command, CommandId, Cursor, EndpointId, Transcript},
     moonframe_core::Data,
     moonframe_providers::{Handle, Mods, Native, owner, to_json},
     serde_json::{Value, json},
@@ -72,13 +82,9 @@ use std::os::unix::net::UnixStream;
 
 /// Chats kept, ended ones dropped oldest first.
 const MAX_CHATS: usize = 24;
-/// The longest prompt a mod may send.
-const MAX_PROMPT: usize = 256 * 1024;
 /// Commands a chat holds until it attaches. Commands go out on Unix alone.
 #[cfg(unix)]
 const MAX_HELD: usize = 8;
-/// The longest context a mod may put before a prompt.
-const MAX_CONTEXT: usize = 64 * 1024;
 
 /// Makes the provider, for the app's registry.
 pub fn native() -> Box<dyn Native> {
@@ -235,7 +241,7 @@ impl Native for Chats {
         let found = program::find(setting.as_deref(), &self.path, &bundled);
         if let Some(missing) = &found.missing {
             tracing::warn!(
-                "chat: `program` {} is not a file; looking for herdr-acp instead",
+                "chat: `program` {} is not a file; looking for sheprd-acp instead",
                 missing.display()
             );
         }
@@ -322,21 +328,10 @@ impl Chats {
             lock(&self.state).focus = Some(chat.to_owned());
             return None;
         }
-        let action = [
-            "tool_output",
-            "start",
-            "prompt",
-            "cancel",
-            "answer",
-            "mode",
-            "setting",
-            "unqueue",
-            "auto_accept",
-            "resume",
-            "close",
-        ]
-        .into_iter()
-        .find(|key| message.get(*key).is_some());
+        let action = commands::ACTIONS
+            .iter()
+            .copied()
+            .find(|key| message.get(*key).is_some());
         let Some(action) = action else {
             self.look_for_agents();
             return None;
@@ -367,18 +362,16 @@ impl Chats {
             "resume" => self.resume(host, owner, text("resume").unwrap_or_default()),
             "close" => self.close(host, owner, text("close").unwrap_or_default()),
             _ => {
-                let chat = match action {
-                    "cancel" | "answer" => text(action),
-                    _ => text("chat"),
-                };
-                let id = chat.unwrap_or_default();
+                let id = commands::chat_of(action, message).unwrap_or_default();
                 // A prompt without a context of its own takes its start's.
                 let own = match action {
-                    "prompt" => context_of(message),
+                    "prompt" => commands::context_of(message),
                     _ => Ok(None),
                 };
                 let context = own.map(|own| own.or_else(|| self.start_context(owner, id)));
-                match context.and_then(|context| command(action, message, context.as_deref())) {
+                let command = context
+                    .and_then(|context| commands::command(action, message, context.as_deref()));
+                match command {
                     Ok(command) => {
                         let reply = message.get("id").cloned().unwrap_or_else(|| json!(action));
                         let sent = self.command(from, id, command, reply, action);
@@ -429,7 +422,7 @@ impl Chats {
             .get("load")
             .and_then(Value::as_str)
             .map(str::to_owned);
-        let context = context_of(message)?;
+        let context = commands::context_of(message)?;
         self.serial += 1;
         let id = format!("{}-{}", now_ms(), self.serial);
         {
@@ -473,7 +466,7 @@ impl Chats {
         let Some(program) = self.program.clone() else {
             let mut state = lock(&self.state);
             if let Some(chat) = state.chat_mut(id) {
-                chat.phase = Phase::Failed("herdr-acp is not installed".to_owned());
+                chat.phase = Phase::Failed("sheprd-acp is not installed".to_owned());
             }
             return;
         };
@@ -682,13 +675,13 @@ impl Chats {
         });
         if self.program.is_none() {
             published["reason"] = json!(
-                "herdr-acp was not found: install Sheprd or Herdr, or set `program` in \
+                "sheprd-acp was not found: install Sheprd, or set `program` in \
                  providers/chat"
             );
         }
         if let Some(missing) = &self.missing {
             published["warning"] = json!(format!(
-                "`program` {} is not a file; herdr-acp was looked for instead",
+                "`program` {} is not a file; sheprd-acp was looked for instead",
                 missing.display()
             ));
         }
@@ -827,81 +820,6 @@ fn trim(state: &mut State) {
             break;
         };
         state.chats.remove(at);
-    }
-}
-
-/// The herdr command a message asks for.
-fn command(action: &str, message: &Value, context: Option<&str>) -> Result<Command, String> {
-    let text = |key: &str| message.get(key).and_then(Value::as_str);
-    Ok(match action {
-        "prompt" => {
-            let text = text("prompt").unwrap_or_default();
-            if text.trim().is_empty() {
-                return Err("nothing to send".to_owned());
-            }
-            if text.len() > MAX_PROMPT {
-                return Err(format!("a prompt is at most {MAX_PROMPT} bytes"));
-            }
-            let text = match context {
-                Some(context) => moonframe_chat_view::frame(context, text),
-                None => text.to_owned(),
-            };
-            let attachments = message
-                .get("files")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .map(|path| Attachment {
-                    path: path.to_owned(),
-                })
-                .collect();
-            Command::Prompt { text, attachments }
-        },
-        "cancel" => Command::Cancel,
-        "answer" => Command::Answer {
-            option: text("option").ok_or("which option?")?.to_owned(),
-            permission: PermissionId(
-                message
-                    .get("permission")
-                    .and_then(Value::as_u64)
-                    .ok_or("which permission?")?,
-            ),
-        },
-        "mode" => Command::SetMode {
-            id: text("mode").unwrap_or_default().to_owned(),
-        },
-        "setting" => Command::SetOption {
-            id: text("setting").unwrap_or_default().to_owned(),
-            value: match message.get("value") {
-                Some(Value::Bool(value)) => OptionValue::Toggle { value: *value },
-                Some(Value::String(id)) => OptionValue::Choice { id: id.clone() },
-                _ => return Err("a setting's value is a choice's id or a boolean".to_owned()),
-            },
-        },
-        "unqueue" => Command::Unqueue {
-            id: serde_json::from_value(json!(text("unqueue").unwrap_or_default()))
-                .map_err(|_| "no such queued prompt".to_owned())?,
-        },
-        "auto_accept" => Command::SetAutoAccept {
-            on: message
-                .get("auto_accept")
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
-        },
-        _ => return Err(format!("unknown action `{action}`")),
-    })
-}
-
-/// A message's `context`, at most [`MAX_CONTEXT`] bytes.
-fn context_of(message: &Value) -> Result<Option<String>, String> {
-    match message.get("context") {
-        None | Some(Value::Null) => Ok(None),
-        Some(Value::String(context)) if context.len() > MAX_CONTEXT => {
-            Err(format!("a context is at most {MAX_CONTEXT} bytes"))
-        },
-        Some(Value::String(context)) => Ok(Some(context.clone()).filter(|c| !c.trim().is_empty())),
-        Some(_) => Err("a context is text".to_owned()),
     }
 }
 

@@ -5,7 +5,7 @@ use {
     crate::{Limits, text, unframe},
     herdr_chat_protocol::{
         ActivityKind, ConfigOption, EntryKind, OptionCategory, OptionKind, PermissionKind,
-        PlanPriority, PlanStatus, Transcript, Usage,
+        PlanPriority, PlanStatus, Question, Transcript, Usage,
     },
     serde::Serialize,
 };
@@ -22,6 +22,36 @@ pub struct PermissionView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool: Option<String>,
     pub options: Vec<PermissionChoice>,
+    /// The question in full, when the agent asked one with choices:
+    /// answered with `{ answer = chat, permission = id, answers }`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub question: Option<QuestionAsked>,
+    /// A guest's prompt waiting for the user to allow it, rather than a
+    /// question from the agent: `Bob via tma`, and what they wrote.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guest_text: Option<String>,
+}
+
+/// A question the agent asks with choices.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct QuestionAsked {
+    /// A short label for it, such as `Tab detail`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
+    pub text: String,
+    /// Several choices may be picked.
+    pub multiple: bool,
+    pub options: Vec<QuestionChoice>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct QuestionChoice {
+    /// What is sent back as the answer.
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -42,6 +72,15 @@ pub struct QueuedView {
     pub context: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub files: Vec<String>,
+    /// Kept when the turn was stopped: it waits to be sent now
+    /// (`{ send_now = id, chat }`) or taken back.
+    pub held: bool,
+    /// Already sent into the running turn, for the agent to take at its
+    /// next step; it can no longer be taken back.
+    pub steered: bool,
+    /// Who wrote it, for a guest's prompt the user allowed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guest: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -124,6 +163,8 @@ pub struct ActivityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
     pub started_ms: u64,
+    /// The agent can end it alone: `{ stop_activity = call_id, chat }`.
+    pub stoppable: bool,
 }
 
 /// The most running activities shown.
@@ -172,9 +213,45 @@ pub(crate) fn permissions(transcript: &Transcript, limits: &Limits) -> Vec<Permi
                         allows: option.kind.allows(),
                     })
                     .collect(),
+                question: permission
+                    .question
+                    .as_ref()
+                    .map(|question| question_asked(question, limits)),
+                guest: permission
+                    .guest
+                    .as_ref()
+                    .map(|prompt| crate::rows::guest_name(&prompt.guest)),
+                guest_text: permission
+                    .guest
+                    .as_ref()
+                    .map(|prompt| text::head(&prompt.text, limits.text)),
             }
         })
         .collect()
+}
+
+fn question_asked(question: &Question, limits: &Limits) -> QuestionAsked {
+    QuestionAsked {
+        header: question
+            .header
+            .as_deref()
+            .map(|header| text::head(header, 200)),
+        text: text::head(&question.text, limits.text),
+        multiple: question.multiple,
+        options: question
+            .options
+            .iter()
+            .take(32)
+            .map(|option| QuestionChoice {
+                // Sent back as it came: a cut label would not match.
+                label: option.label.clone(),
+                description: option
+                    .description
+                    .as_deref()
+                    .map(|description| text::head(description, 500)),
+            })
+            .collect(),
+    }
 }
 
 pub(crate) fn queue(transcript: &Transcript, limits: &Limits) -> Vec<QueuedView> {
@@ -193,6 +270,9 @@ pub(crate) fn queue(transcript: &Transcript, limits: &Limits) -> Vec<QueuedView>
                     .iter()
                     .map(|file| text::head(file.name(), 512))
                     .collect(),
+                held: queued.held,
+                steered: queued.steered,
+                guest: queued.guest.as_ref().map(crate::rows::guest_name),
             }
         })
         .collect()
@@ -407,6 +487,7 @@ pub(crate) fn activities(transcript: &Transcript) -> Vec<ActivityView> {
                 .as_deref()
                 .map(|detail| text::head(detail, 300)),
             started_ms: activity.started_ms,
+            stoppable: activity.stoppable,
         })
         .collect()
 }
