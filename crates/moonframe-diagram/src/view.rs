@@ -8,6 +8,7 @@
 //! Layouts of big diagrams run on a background thread; the view keeps the
 //! last one meanwhile, then eases nodes to their new places.
 
+// keep-sorted start
 pub mod camera;
 mod hit;
 mod input;
@@ -15,6 +16,7 @@ mod paint;
 mod scene;
 mod snap;
 pub mod style;
+// keep-sorted end
 
 pub use camera::Camera;
 use {
@@ -45,34 +47,31 @@ const EASE: Duration = Duration::from_millis(240);
 /// What the user may do.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
+    // keep-sorted start
+    /// Change it: everything [`Tool`] offers too.
+    Edit,
     /// Look: select, pan, zoom, open a node with a double click.
     #[default]
     View,
-    /// Change it: everything [`Tool`] offers too.
-    Edit,
+    // keep-sorted end
 }
 
 /// What a press on the canvas does in [`Mode::Edit`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Tool {
+    // keep-sorted start
+    Connect,
+    Create(NodeKind),
+    Hand,
     #[default]
     Select,
-    Hand,
-    Create(NodeKind),
-    Connect,
+    // keep-sorted end
 }
 
 /// An edit or a request, for the view's owner to act on.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DiagramEvent {
-    /// The chosen nodes and edges, by id.
-    Select(Vec<String>),
-    /// Nodes dragged to these boxes.
-    Move(Vec<(String, Rect)>),
-    Resize {
-        id: String,
-        rect: Rect,
-    },
+    // keep-sorted start
     Connect {
         from: String,
         to: String,
@@ -89,12 +88,21 @@ pub enum DiagramEvent {
         id: String,
         label: String,
     },
+    /// Nodes dragged to these boxes.
+    Move(Vec<(String, Rect)>),
     /// A node double-clicked in [`Mode::View`].
     Open(String),
-    /// The zoom changed, as a fraction (1.0 is 100 %).
-    Zoom(f32),
+    Resize {
+        id: String,
+        rect: Rect,
+    },
+    /// The chosen nodes and edges, by id.
+    Select(Vec<String>),
     /// The tool changed by itself (back to select after a new node).
     Tool(Tool),
+    /// The zoom changed, as a fraction (1.0 is 100 %).
+    Zoom(f32),
+    // keep-sorted end
 }
 
 /// Nodes easing from where they were to the new layout's places.

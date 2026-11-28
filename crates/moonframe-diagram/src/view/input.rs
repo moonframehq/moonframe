@@ -29,9 +29,21 @@ const LEAST: f32 = 16.0;
 pub(crate) const PORT_OUT: f32 = 12.0;
 
 pub(crate) enum Gesture {
-    Pan {
+    // keep-sorted start
+    Connect {
+        from: String,
+        end: Point,
+        over: Option<String>,
+    },
+    Create {
+        kind: NodeKind,
         start: Point,
-        camera: Camera,
+        end: Point,
+    },
+    Marquee {
+        start: Point,
+        end: Point,
+        add: bool,
     },
     Move {
         ids: Vec<String>,
@@ -44,6 +56,10 @@ pub(crate) enum Gesture {
         /// rest chosen.
         shift: bool,
     },
+    Pan {
+        start: Point,
+        camera: Camera,
+    },
     Resize {
         id: String,
         corner: Corner,
@@ -51,21 +67,7 @@ pub(crate) enum Gesture {
         original: Rect,
         now: Rect,
     },
-    Marquee {
-        start: Point,
-        end: Point,
-        add: bool,
-    },
-    Connect {
-        from: String,
-        end: Point,
-        over: Option<String>,
-    },
-    Create {
-        kind: NodeKind,
-        start: Point,
-        end: Point,
-    },
+    // keep-sorted end
 }
 
 /// A window position in the view, from its corner.

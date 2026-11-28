@@ -11,11 +11,13 @@
 //! `edited`, `opened`, `zoom`, `tool`, the names the Luau `diagram`
 //! component sends, so a mod can use either.
 
+// keep-sorted start
 #[cfg(all(test, feature = "capture"))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod bench;
 mod read;
 mod tell;
+// keep-sorted end
 
 use {
     crate::hosted::{HostView, Messenger, Registry, ViewInit},
