@@ -228,6 +228,8 @@ pub(crate) fn paint(
             let room = match node.kind {
                 NodeKind::Diamond => r.w * 0.6,
                 NodeKind::Circle => r.w * 0.8,
+                // No outline to keep clear of: sized to its label alone.
+                NodeKind::Text => r.w,
                 _ => r.w - 12.0 * zoom,
             };
             let note = node.kind == NodeKind::Note;
