@@ -55,7 +55,7 @@ default = [
 crash = []
 # `ui.diagram`: diagrams drawn, laid out and edited by moonframe-diagram.
 # Off by default; the starter turns it on.
-diagram = ["dep:moonframe-diagram", "dep:moonframe-diagrams", "moonframe-diagram/view"]
+diagram = ["dep:image", "dep:moonframe-diagram", "dep:moonframe-diagrams", "moonframe-diagram/view"]
 # `app.displays`, and a mod's window placed with `display` and `fullscreen`.
 # Off by default; the starter turns it on.
 displays = []

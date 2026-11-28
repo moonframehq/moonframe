@@ -3,7 +3,7 @@ group backend "Backend services" in -
 group data "Data" in backend
 node client "Browser" pill
 node cdn "CDN edge" note
-node api-gw "API gateway" box
+node api-gw "API gateway" box group="backend"
 node users "Users" rounded group="backend"
 node orders "Orders" rounded group="backend"
 node pg "Postgres" cylinder group="data"

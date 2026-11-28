@@ -3,6 +3,9 @@
 //! hears each edit as a message to its `update`, so it keeps the document
 //! and its undo; the view never changes the document by itself.
 //!
+//! The user copies a diagram as Mermaid with ⌘C in it; a mod cannot put
+//! anything on the clipboard by itself.
+//!
 //! Props ([`read`]): `mermaid` or `dot` text, `shapes` and `links` (an
 //! editor's document, every shape placed) or `document` (nodes, edges,
 //! groups, a sequence's messages and notes, laid out when unplaced), `mode`, `tool`,
@@ -15,6 +18,10 @@
 #[cfg(all(test, feature = "capture"))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod bench;
+mod export;
+#[cfg(all(test, feature = "capture"))]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod export_tests;
 mod read;
 mod tell;
 // keep-sorted end
@@ -43,18 +50,37 @@ pub(crate) struct DiagramHost {
     problem: Option<String>,
     /// The last `camera` request acted on, by its `seq`.
     camera_seq: Option<Data>,
+    /// The last `export` request acted on, by its `seq`.
+    export_seq: Option<Data>,
+    /// Exports asked for, done once the view has laid the document out;
+    /// a new document turns them down, as theirs is gone.
+    asked: Vec<read::Hand>,
+    /// Exports made, so each writes a file of its own.
+    exports: u64,
+    messenger: Messenger,
+    /// The view's `id`, naming its exported files.
+    name: String,
     /// A fit asked for with a new document, done once that document is
     /// the view's.
     fit_waiting: bool,
     _events: Subscription,
+    /// Draws again when a background layout lands, for the exports
+    /// waiting on it.
+    _laid_out: Subscription,
 }
 
 impl DiagramHost {
     fn new(init: &ViewInit, _: &mut Window, cx: &mut Context<Self>) -> Self {
         let view = cx.new(DiagramView::new);
         let messenger: Messenger = init.messenger();
+        let tells = messenger.clone();
         let events = cx.subscribe(&view, move |_, _, event: &DiagramEvent, _| {
-            messenger.send(tell::message(event))
+            tells.send(tell::message(event))
+        });
+        let laid_out = cx.observe(&view, |host: &mut Self, _, cx| {
+            if !host.asked.is_empty() {
+                cx.notify();
+            }
         });
         let mut host = Self {
             view,
@@ -62,8 +88,14 @@ impl DiagramHost {
             waiting: None,
             problem: None,
             camera_seq: None,
+            export_seq: None,
+            asked: Vec::new(),
+            exports: 0,
+            messenger,
+            name: format!("{}-{}", init.owner(), init.id()),
             fit_waiting: false,
             _events: events,
+            _laid_out: laid_out,
         };
         host.set_props(init.props(), cx);
         host
@@ -75,6 +107,13 @@ impl HostView for DiagramHost {
         let props = read::props(given);
         if props.document != self.document {
             self.document = props.document.clone();
+            for read::Hand::Export { format, seq } in std::mem::take(&mut self.asked) {
+                self.messenger.send(export::told(
+                    Err("the diagram changed before it was laid out".to_owned()),
+                    &format,
+                    seq,
+                ));
+            }
             match read::diagram(given) {
                 Ok(diagram) => {
                     self.problem = None;
@@ -88,6 +127,13 @@ impl HostView for DiagramHost {
             .filter(|(seq, _)| Some(seq) != self.camera_seq.as_ref());
         if let Some((seq, _)) = &camera {
             self.camera_seq = Some(seq.clone());
+        }
+        if let Some((seq, format)) = props
+            .export
+            .filter(|(seq, _)| Some(seq) != self.export_seq.as_ref())
+        {
+            self.export_seq = Some(seq.clone());
+            self.asked.push(read::Hand::Export { format, seq });
         }
         self.view.update(cx, |view, cx| {
             view.set_mode(props.mode, cx);
@@ -121,6 +167,36 @@ impl Render for DiagramHost {
                     view.fit(cx);
                 }
             });
+        }
+        // An export waits for the layout of the document it was asked
+        // with; only the SVG text is made here, the file in the background.
+        // Text that is no diagram has none to export: the view still shows
+        // the last one that was.
+        if !self.view.read(cx).is_laying_out() {
+            for hand in std::mem::take(&mut self.asked) {
+                let read::Hand::Export { format, seq } = hand;
+                if let Some(problem) = &self.problem {
+                    self.messenger
+                        .send(export::told(Err(problem.clone()), &format, seq));
+                    continue;
+                }
+                let view = self.view.read(cx);
+                let svg = moonframe_diagram::view::export_svg(
+                    view.diagram(),
+                    view.layout(),
+                    &view.highlighted(),
+                    window,
+                    cx,
+                );
+                self.exports += 1;
+                let name = format!("{}-{}", self.name, self.exports);
+                let (messenger, renderer) = (self.messenger.clone(), cx.svg_renderer());
+                cx.background_spawn(async move {
+                    let done = export::write(&svg, &format, &name, &renderer);
+                    messenger.send(export::told(done, &format, seq));
+                })
+                .detach();
+            }
         }
         let problem = self.problem.clone().map(|problem| {
             let theme = cx.theme();

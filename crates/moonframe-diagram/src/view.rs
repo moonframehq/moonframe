@@ -40,6 +40,7 @@ use {
 pub use {
     camera::Camera,
     picture::{measure, picture},
+    style::{export_colors, export_svg},
 };
 
 /// Diagrams with up to this many nodes are laid out at once, on the UI
@@ -146,7 +147,8 @@ pub struct DiagramView {
     pub(crate) scroll_needs_focus: bool,
     pub(crate) told_zoom: f32,
     layout_task: Option<Task<()>>,
-    /// A layout is under way on a background thread; a fit waits for it.
+    /// A layout runs in the background: `layout` is not yet the diagram's,
+    /// and a fit or an export waits for it.
     laying_out: bool,
 }
 
@@ -193,6 +195,12 @@ impl DiagramView {
 
     pub fn layout(&self) -> &Layout {
         &self.layout
+    }
+
+    /// Whether the diagram given last is still being laid out, so
+    /// [`Self::layout`] is an older one's.
+    pub fn is_laying_out(&self) -> bool {
+        self.laying_out
     }
 
     pub fn camera(&self) -> Camera {
@@ -300,6 +308,11 @@ impl DiagramView {
         self.selected = ids.iter().cloned().collect();
         self.selected_order = ids;
         cx.notify();
+    }
+
+    /// The ids drawn in the accent.
+    pub fn highlighted(&self) -> Vec<String> {
+        self.highlight.iter().cloned().collect()
     }
 
     pub fn selected(&self) -> &[String] {

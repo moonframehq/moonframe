@@ -561,6 +561,11 @@ pub(crate) fn key(
             let all = order(view);
             view.select(all, cx);
         },
+        // The user's own copy: the diagram as Mermaid. (A mod can't put
+        // it on the clipboard by itself.)
+        "c" if secondary => cx.write_to_clipboard(ClipboardItem::new_string(
+            crate::write::mermaid(&view.diagram),
+        )),
         "0" if secondary => view.zoom_to(1.0, cx),
         "=" | "+" if secondary => view.zoom_by(1.25, cx),
         "-" if secondary => view.zoom_by(0.8, cx),

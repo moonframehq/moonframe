@@ -493,7 +493,7 @@ impl Parser {
                 .then(|| attributes.get("color"))
                 .flatten()
         });
-        if let Some(color) = color.filter(|c| c.starts_with('#') && matches!(c.len(), 4 | 7)) {
+        if let Some(color) = color.filter(|c| crate::model::is_hex_color(c)) {
             node.fill = Some(color.clone());
         }
     }
