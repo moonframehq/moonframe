@@ -38,6 +38,12 @@ pub(super) fn order(
             }
         }
     }
+    // Every rank with its groups together, the first and a kept one too,
+    // before an order with no crossings is taken as it is.
+    for layer in &mut layers {
+        let clustered = cluster(layer, group);
+        layer.copy_from_slice(&clustered);
+    }
     place(&layers, &mut pos);
     let mut best = layers.clone();
     let mut best_crossings = crossings(&layers, down, &pos);
@@ -236,6 +242,18 @@ mod tests {
             }
         }
         assert_eq!(crossings(&done, &down, &pos), 0);
+    }
+
+    #[test]
+    fn a_first_rank_with_no_crossings_still_keeps_groups_together() {
+        // a, x, b in one rank, no edges: a and b share a group, x is apart.
+        let (down, up) = neighbours(3, &[]);
+        let group = [Some(0), None, Some(0)];
+        for keep in [false, true] {
+            assert_eq!(order(vec![vec![0, 1, 2]], &down, &up, &group, keep), vec![
+                vec![0, 2, 1]
+            ]);
+        }
     }
 
     #[test]

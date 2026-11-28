@@ -12,6 +12,7 @@
 //! A layout given the previous one keeps each node's rank and order where
 //! it can, so a diagram that grows (an agent adding nodes) keeps its shape.
 
+// keep-sorted start
 mod groups;
 mod layered;
 mod order;
@@ -22,6 +23,7 @@ mod sequence;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests;
+// keep-sorted end
 
 use {
     crate::{
@@ -134,6 +136,9 @@ pub struct Layout {
     pub notes: Vec<Rect>,
     /// A sequence diagram's lifelines: participant, top, bottom.
     pub lifelines: Vec<(String, Point, Point)>,
+    /// Text drawn outside every box (a sequence's message labels), counted
+    /// in the bounds.
+    pub(crate) extents: Vec<Rect>,
     /// Everything drawn.
     pub bounds: Rect,
     /// Each laid-out node's rank and place in it, for the next layout.
@@ -169,6 +174,7 @@ pub fn layout(
             .values()
             .chain(out.groups.values())
             .chain(out.notes.iter())
+            .chain(out.extents.iter())
             .chain(dots.iter()),
     )
     .unwrap_or_default();

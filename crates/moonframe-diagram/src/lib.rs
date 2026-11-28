@@ -19,6 +19,7 @@
 //! Nothing here knows about Moonframe: any gpui-kit app can embed the view,
 //! and a program with no GUI can lay diagrams out.
 
+// keep-sorted start
 pub mod geometry;
 pub mod layout;
 pub mod model;
@@ -26,6 +27,7 @@ pub mod parse;
 #[cfg(feature = "view")]
 pub mod view;
 pub mod write;
+// keep-sorted end
 
 pub use {
     geometry::{Point, Rect, Size},

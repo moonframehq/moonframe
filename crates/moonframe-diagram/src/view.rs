@@ -8,6 +8,7 @@
 //! Layouts of big diagrams run on a background thread; the view keeps the
 //! last one meanwhile, then eases nodes to their new places.
 
+// keep-sorted start
 pub mod camera;
 mod hit;
 mod input;
@@ -15,13 +16,14 @@ mod paint;
 mod scene;
 mod snap;
 pub mod style;
+// keep-sorted end
 
 pub use camera::Camera;
 use {
     crate::{
         geometry::{Point, Rect},
         layout::{self, Layout, Options, Widths},
-        model::{Diagram, NodeKind},
+        model::{Diagram, DiagramKind, NodeKind},
     },
     gpui_kit::{
         component::input::{Input, InputEvent, InputState},
@@ -45,34 +47,31 @@ const EASE: Duration = Duration::from_millis(240);
 /// What the user may do.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
+    // keep-sorted start
+    /// Change it: everything [`Tool`] offers too.
+    Edit,
     /// Look: select, pan, zoom, open a node with a double click.
     #[default]
     View,
-    /// Change it: everything [`Tool`] offers too.
-    Edit,
+    // keep-sorted end
 }
 
 /// What a press on the canvas does in [`Mode::Edit`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Tool {
+    // keep-sorted start
+    Connect,
+    Create(NodeKind),
+    Hand,
     #[default]
     Select,
-    Hand,
-    Create(NodeKind),
-    Connect,
+    // keep-sorted end
 }
 
 /// An edit or a request, for the view's owner to act on.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DiagramEvent {
-    /// The chosen nodes and edges, by id.
-    Select(Vec<String>),
-    /// Nodes dragged to these boxes.
-    Move(Vec<(String, Rect)>),
-    Resize {
-        id: String,
-        rect: Rect,
-    },
+    // keep-sorted start
     Connect {
         from: String,
         to: String,
@@ -89,12 +88,21 @@ pub enum DiagramEvent {
         id: String,
         label: String,
     },
+    /// Nodes dragged to these boxes.
+    Move(Vec<(String, Rect)>),
     /// A node double-clicked in [`Mode::View`].
     Open(String),
-    /// The zoom changed, as a fraction (1.0 is 100 %).
-    Zoom(f32),
+    Resize {
+        id: String,
+        rect: Rect,
+    },
+    /// The chosen nodes and edges, by id.
+    Select(Vec<String>),
     /// The tool changed by itself (back to select after a new node).
     Tool(Tool),
+    /// The zoom changed, as a fraction (1.0 is 100 %).
+    Zoom(f32),
+    // keep-sorted end
 }
 
 /// Nodes easing from where they were to the new layout's places.
@@ -134,6 +142,8 @@ pub struct DiagramView {
     pub(crate) scroll_needs_focus: bool,
     pub(crate) told_zoom: f32,
     layout_task: Option<Task<()>>,
+    /// A layout is under way on a background thread; a fit waits for it.
+    laying_out: bool,
 }
 
 impl EventEmitter<DiagramEvent> for DiagramView {}
@@ -169,6 +179,7 @@ impl DiagramView {
             scroll_needs_focus: false,
             told_zoom: 1.0,
             layout_task: None,
+            laying_out: false,
         }
     }
 
@@ -186,7 +197,17 @@ impl DiagramView {
 
     /// Shows `diagram`, laying it out again from the current layout, so
     /// what stayed keeps its place.
-    pub fn set_diagram(&mut self, diagram: Diagram, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn set_diagram(
+        &mut self,
+        mut diagram: Diagram,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // A participant only a message names is drawn, chosen and hit as
+        // the listed ones are.
+        if diagram.kind == DiagramKind::Sequence {
+            diagram.nodes = diagram.participants();
+        }
         self.measure(&diagram, window, cx);
         let widths = Widths(self.widths.clone());
         let options = self.options.clone();
@@ -199,6 +220,7 @@ impl DiagramView {
             self.apply(out, cx);
             return;
         }
+        self.laying_out = true;
         let work = cx.background_spawn(async move {
             layout::layout(&diagram, &widths, &options, Some(&previous))
         });
@@ -220,6 +242,7 @@ impl DiagramView {
                 start: Instant::now(),
             });
         }
+        self.laying_out = false;
         // The owner's diagram now says where moved nodes are; an edit it
         // turned down would wait for ever, so none is kept.
         self.pending.clear();
@@ -253,10 +276,14 @@ impl DiagramView {
         }
     }
 
+    /// Changing the mode ends the gesture under way; the same mode again,
+    /// as an owner's props repeat it, leaves a drag alone.
     pub fn set_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
-        self.mode = mode;
-        self.gesture = None;
-        cx.notify();
+        if mode != self.mode {
+            self.mode = mode;
+            self.gesture = None;
+            cx.notify();
+        }
     }
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
@@ -297,11 +324,12 @@ impl DiagramView {
         self.zoom_by(zoom / self.camera.zoom, cx);
     }
 
-    /// Shows the whole diagram.
+    /// Shows the whole diagram: the one being laid out, if a layout is
+    /// under way, once it is done.
     pub fn fit(&mut self, cx: &mut Context<Self>) {
         let size = self.bounds.get().size;
         let (w, h) = (f32::from(size.width), f32::from(size.height));
-        if w <= 0.0 || self.layout.nodes.is_empty() {
+        if w <= 0.0 || self.layout.nodes.is_empty() || self.laying_out {
             self.fit_pending = true;
             return;
         }
@@ -323,6 +351,7 @@ impl DiagramView {
             guides: Vec::new(),
             travelled: true,
             pressed,
+            shift: false,
         });
         cx.notify();
     }
@@ -395,7 +424,11 @@ impl DiagramView {
                 InputEvent::PressEnter { .. } | InputEvent::Blur => {
                     let label = state.read(cx).value().to_string();
                     this.editing = None;
-                    this.focus.focus(window, cx);
+                    // Enter gives the keys back to the canvas; a blur leaves
+                    // them with whatever the user clicked.
+                    if matches!(event, InputEvent::PressEnter { .. }) {
+                        this.focus.focus(window, cx);
+                    }
                     cx.emit(DiagramEvent::EditLabel {
                         id: editing.clone(),
                         label,
@@ -413,6 +446,7 @@ impl DiagramView {
 impl Render for DiagramView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.fit_pending
+            && !self.laying_out
             && f32::from(self.bounds.get().size.width) > 0.0
             && !self.layout.nodes.is_empty()
         {
