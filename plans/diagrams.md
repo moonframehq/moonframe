@@ -1,0 +1,210 @@
+# Diagrams
+
+Diagrams in Moonframe that people draw and agents generate: a freeform
+editor, Mermaid and Graphviz fences drawn in any markdown (chat answers
+first), and live diagrams an agent builds and updates while it works.
+All of it is built in Moonframe; Sheprd gets it when it moves onto
+Moonframe's chats.
+
+## Goals
+
+- **Beautiful by default.** Diagrams are drawn with the app's own style
+  (colors, fonts, corners, light and dark), not as a pasted Mermaid image.
+- **Agents describe, Moonframe lays out.** An agent sends nodes and edges,
+  never coordinates. Layout is stable: adding a node does not move the rest.
+- **Live.** A diagram grows as an answer streams in or as an agent patches
+  it; new nodes grow in, a highlighted path carries tokens.
+- **Fast.** 1,000 shapes drag and zoom smoothly; layout runs off the UI
+  thread.
+- **One view everywhere.** Markdown fences, `ui.diagram` in Luau and the live
+  provider all draw through the same Rust view.
+
+## Architecture
+
+```
+mermaid / dot text ─┐
+agent graph (MCP) ──┼─> moonframe-diagram: model -> layout -> view (GPUI)
+.moonframe/diagrams ┘        ^                         │
+Luau document (ui.diagram) ──┘           edits as messages back to Luau
+```
+
+- **`crates/moonframe-diagram`**: the model (nodes, edges, groups, kinds,
+  styles), the parsers, the layout and the GPUI view. It depends only on
+  gpui and gpui-kit, never on the `moonframe` crate, so any gpui-kit app can
+  embed it. Parsing and layout are plain data with no gpui, tested
+  headless. Split into modules by responsibility (`model`, `parse/mermaid/*`,
+  `parse/dot`, `layout/*`, `view/*`).
+- **`ui.diagram`**: a host element in `crates/moonframe` behind a `diagram`
+  cargo feature (as `ui.map` is behind `map`), on in the starter.
+- **`diagrams` native provider**: its own crate. Takes diagrams from agents
+  and files and shares them as `app.diagrams`.
+
+## Phases
+
+### 0. Luau editor (done)
+
+`app/components/diagram.luau` and `examples/diagram`: shapes, drag, resize,
+connectors, selection, pan and zoom, undo, kept across launches. It is the
+behaviour spec for the Rust view: every interaction it has, the view keeps.
+
+The spec, as built:
+
+- **Document is the parent's.** Props `shapes` (`id kind x y w h label?
+  fill?`, world pixels, bottom first), `links` (`id from to label?
+  dashed?`), `selected`, `tool`. The canvas keeps only its view (pan, zoom)
+  and the gesture under way, and sends one message per gesture:
+  `selected`, `moved` (list of `id x y`), `resized`, `created` (`kind x y
+  w h`), `connected` (`from to`), `edited` (`id label`), `deleted` (ids),
+  `duplicate` (ids), `tool`, `zoom`. The parent sends it `zoom_by`,
+  `zoom_to`, `fit`.
+- **Gestures.** Press a shape: select it (shift toggles), drag moves the
+  selection. Press empty space: marquee (shift adds). Corner handles
+  resize, side ports drag out a connector dropped on another shape. A
+  shape tool clicks (default size) or drags (that box) a new shape.
+  Double-click edits the label in place. Hand tool or middle button pans;
+  scroll pans, pinch or ⌘-scroll zooms about the pointer (10 % to 400 %).
+  Keys: delete, escape, ⌘A, ⌘D, arrows nudge (shift ×10), ⌘0, ⌘=, ⌘-.
+  Single-letter tool keys (V H R D O T S C) live in the app's menu: a
+  row's `keys` never take what types text.
+- **Links** route as elbows out of the facing sides; boxes apart on both
+  axes get one bend, into the other's top or bottom. Labels sit on the
+  middle; a label (or a dot, without one) selects the link.
+
+Measured (release build, M-series Mac, `RUST_LOG=moonframe::perf=trace`, a
+60 Hz driver sending what a drag sends to `editor/diagram#main`; medians):
+
+| Shapes on screen | Drag: views per step | Drag: frame build | Pan: views | Pan: frame |
+| --- | --- | --- | --- | --- |
+| 100 (fit) | 3.3 ms | 1.7 ms | 2.8 ms | 1.3 ms |
+| 500 (fit, all visible) | 11.6 ms | 4.8 ms | 9.1 ms | 3.1 ms |
+| 500 at 100 % (about 60 visible, the rest culled) | 3.6 ms | 0.8 ms | 4.2 ms | 0.8 ms |
+| about 1,000 | no longer works | | | |
+
+What it shows:
+
+- Hundreds of shapes on screen at once miss 60 Hz: 500 cost about 16 ms
+  a step (Luau builds every visible node again for each pointer move).
+- **A hard ceiling near 700 shapes.** State and props may hold 10,000
+  values; at about 1,000 shapes the document is too big to be saved and
+  to reach the canvas, which then draws nothing. The canvas instance's
+  Luau memory reached 4.1 of its 8 MiB at 500.
+- Text cannot scale with zoom (sizes are tokens), so labels hide below
+  45 %; corners and strokes don't scale either. Diamonds need a rotated
+  shape Luau can't draw: `pill` stands in.
+- The Rust view must take the document once and edits as messages, not
+  the whole document as props each frame.
+
+Two host fixes came out of measuring: `RUST_LOG` printed nothing for an
+app without log layers of its own (an empty layer list turned every event
+off), and `measure` was not sent again in a headless window that reused an
+id (so a second render drew an empty canvas).
+
+### 1. The model, layout and view
+
+- Model: node `id`, `label`, `sublabel`, `kind` (box, rounded, pill,
+  diamond, circle, cylinder, note, text), `icon`, `tone`, `group`; edge
+  `from`, `to`, `label`, `kind` (arrow, line, dashed, thick), `ends`;
+  groups (nested); optional fixed positions (the editor's), else laid out.
+- Layout: layered (Sugiyama-style: ranks, crossing reduction, coordinate
+  assignment) for flowcharts, top-down or left-right; lanes for sequence
+  diagrams; orthogonal edge routing around nodes with rounded corners.
+  Incremental: a new layout keeps existing nodes' ranks and order where it
+  can. Runs on a background executor; the view animates to the new spots.
+- View: hit-testing, selection (click, shift-click, marquee), drag, resize
+  handles, connecting from a node's edge, pan (drag on empty space, scroll),
+  zoom (pinch, cmd-scroll, fit), snapping guides, keyboard (delete, arrows,
+  cmd-A, cmd-Z handled by Luau). Read-only mode for agent diagrams.
+- Benchmarks in the crate (layout of 100 / 500 / 1,000 nodes; frame time
+  while dragging). Targets: layout of 500 nodes under 30 ms, drag at the
+  display's frame rate with 1,000 shapes.
+
+### 2. `ui.diagram`
+
+- Props: `document` (model as a table), `mode` (`view`, `edit`),
+  `selected`, `highlight` (node and edge ids), `flows` (paths with tokens,
+  as `flow-diagram` has), `fit`, `layout` (`down`, `right`), `to`.
+- Messages back to the mod: `select`, `move`, `resize`, `connect`, `delete`,
+  `edit_label`, `open`, each with ids and values, so Luau owns the document
+  and undo. A view never changes its document on its own.
+- The Luau editor of phase 0 switches its canvas to `ui.diagram` when the
+  feature is built, and keeps its Luau canvas otherwise.
+- Catalogue entry in `crates/moonframe-core/src/catalogue/elements.md`,
+  types in `types/moonframe.d.luau`, `just components`. Rune draws a
+  placeholder with the title; note it in `docs/rune-coverage.md`.
+
+### 3. Mermaid and Graphviz
+
+- Our own Mermaid parser (no Node, no mermaid.js), into the model:
+  `flowchart`/`graph` (all node shapes, edge kinds, labels, subgraphs,
+  `classDef`/`class`/`style` mapped onto tones), `sequenceDiagram`,
+  `stateDiagram-v2`, `classDiagram`, `erDiagram`. Others (gantt, pie,
+  mindmap, timeline, git graph) later, by what agents write most.
+- Graphviz DOT: check whether `layout-rs` parses enough; else a small DOT
+  parser of our own. Layout is always ours, so both look alike.
+- Unsupported syntax: the fence shows as a normal code block, as math does,
+  with a small note why.
+- Writer: model to Mermaid, for "copy as Mermaid" and round trips.
+- Fixtures: a folder of real agent-written diagrams (collect from
+  transcripts) with snapshot tests of parse and layout.
+
+### 4. Fences in markdown
+
+- A markdown plugin, as `crates/moonframe/src/render/markdown/math.rs` is,
+  behind the `diagram` feature: ` ```mermaid ` and ` ```dot ` (and
+  ` ```graphviz `) draw as diagrams in every `ui.markdown`, so
+  `chat-markdown`, `agent-chat`, docs and notes get them at once.
+- Streaming: while the fence is open, keep showing the last version that
+  parsed and lay out again as it grows; never flicker to source and back.
+- In a chat: full width, a height cap, no scroll hijack (pan and zoom only
+  after a click inside); a corner with "Source", "Copy as Mermaid", "Open".
+  Open shows it in a pane in `ui.diagram`'s view mode, with "Edit a copy".
+
+### 5. Live diagrams from agents
+
+- The `diagrams` provider takes diagrams two ways:
+  - **MCP tools**, from a stdio MCP server Moonframe runs
+    (`moonframe mcp diagrams`), passed to the agents it starts:
+    `crates/moonframe-acp/src/run.rs` sends `mcpServers: []` today.
+    Tools: `diagram_show { id, title, mermaid | graph }`,
+    `diagram_patch { id, ops }` (add or remove nodes, edges, groups; set
+    labels and tones), `diagram_highlight { id, nodes, edges, note }`,
+    `diagram_close { id }`. Short tool descriptions so agents use them
+    unprompted when relations matter.
+  - **A watched folder**, `.moonframe/diagrams/*.{mmd,dot,json}` in the
+    project, for agents Moonframe did not start (a terminal Claude, Codex).
+- Shares `app.diagrams`: the open diagrams, each with its source agent,
+  revision and highlight, so mods can show them in a pane or a side panel.
+- Edits the user makes to an agent's diagram stay local unless they press
+  "Send to agent", which sends the new Mermaid as a prompt.
+
+### 6. Chats
+
+- In `agent-chat` and `tool-group`, a `diagram_show` or `diagram_patch`
+  tool call draws as the live diagram instead of a folded row; later
+  patches update that one card in place, so a turn shows one diagram
+  growing, not ten.
+- This is what Sheprd uses once it moves onto Moonframe's chats, with no
+  diagram code of its own.
+
+### 7. Finish
+
+- Export PNG and SVG; copy as Mermaid; light and dark checked against
+  style.luau.
+- Screenshots in each PR (`just screenshot`, `just component-shot diagram`).
+
+## Rules
+
+CLAUDE.md applies: 1,000-line files, new features in their own modules,
+keep-sorted markers, no hard-coded counts, narrow APIs, no AI attribution.
+One PR per phase where it can stand alone (1 and 2 may go together).
+
+## Open questions
+
+- Which Mermaid types after flowchart and sequence? Decide from what agents
+  write in real transcripts.
+- Is the watched folder per project (`.moonframe/diagrams`) or global?
+- Should the user's edits to an agent's diagram be sent back automatically?
+- `ui.diagram` and the 10,000-value limit: a 1,000-shape document can't be
+  a prop. Options: the view keeps the document and Luau gets a handle and
+  edits (Luau stops owning it), or a provider holds big documents and
+  `ui.diagram` names one. Decide in phase 2.
