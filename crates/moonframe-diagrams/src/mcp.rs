@@ -87,6 +87,8 @@ fn tools() -> Value {
 pub struct Server {
     dir: PathBuf,
     agent: Option<String>,
+    /// The app's agent run this server serves, stamped on its diagrams.
+    run: Option<String>,
     shown: HashMap<String, Shown>,
 }
 
@@ -95,8 +97,15 @@ impl Server {
         Self {
             dir: dir.to_owned(),
             agent,
+            run: None,
             shown: HashMap::new(),
         }
+    }
+
+    /// Stamps its diagrams with the agent run `run`.
+    pub fn for_run(mut self, run: Option<String>) -> Self {
+        self.run = run.filter(|r| !r.is_empty());
+        self
     }
 
     /// Serves requests from `input` until it ends.
@@ -188,6 +197,7 @@ impl Server {
                     title: text("title").unwrap_or_else(|| id.clone()),
                     id: id.clone(),
                     agent: self.agent.clone(),
+                    run: self.run.clone(),
                     revision,
                     updated: store::now(),
                     document,

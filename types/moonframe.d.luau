@@ -2586,6 +2586,8 @@ type ProviderDiagramsShown = {
 	highlight: { string },
 	note: string?,
 	agent: string?,
+	-- The `app.acp` run that showed it, when the app started the agent.
+	run: string?,
 	-- The text it came from, `mermaid` or `dot`.
 	language: string?,
 	text: string?,
@@ -2940,6 +2942,7 @@ type UseAgentRunProps = {
 	read tools: number?,
 	read request: boolean?,
 	read to: string?,
+	read diagrams: { any }?,
 }
 type UseAgentRunLook = any
 type UseAheadBehindProps = {
@@ -3357,6 +3360,10 @@ type UseDayStripProps = {
 	read event: string?,
 	read to: string?,
 }
+type UseDiagramCardProps = {
+	read diagram: any,
+	read height: number?,
+}
 type UseDiagramShape = any
 type UseDiagramLink = any
 type UseDiagramProps = {
@@ -3543,6 +3550,7 @@ type UseFeedbackProps = {
 	read change: any,
 	read send: any,
 	read runs: { any }?,
+	read diagrams: { any }?,
 	read expanded: string?,
 	read undo: boolean?,
 	read follow: boolean?,
@@ -5027,6 +5035,7 @@ type UseToolGroupProps = {
 	read open: boolean?,
 	read msg: any,
 	read to: string?,
+	read diagrams: { any }?,
 }
 type UseToolbarButton = any
 type UseToolbarProps = {
@@ -5197,6 +5206,7 @@ type UseProps = {
 	["date-picker"]: UseDatePickerProps,
 	["date-tile"]: UseDateTileProps,
 	["day-strip"]: UseDayStripProps,
+	["diagram-card"]: UseDiagramCardProps,
 	["diagram"]: UseDiagramProps,
 	["dialog"]: UseDialogProps,
 	["dictation"]: UseDictationProps,

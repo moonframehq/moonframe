@@ -87,18 +87,32 @@ const MAX_TEXT: usize = 64 << 10;
 /// its agents, such as `moonframe mcp diagrams`.
 static MCP_SERVERS: Mutex<Vec<Value>> = Mutex::new(Vec::new());
 
-/// Offers `servers` to every session started from now on.
+/// Offers `servers` to every session started from now on; `{run}` and
+/// `{agent}` in their `args` are filled in per session.
 pub fn offer_mcp_servers(servers: Vec<Value>) {
     if let Ok(mut offered) = MCP_SERVERS.lock() {
         *offered = servers;
     }
 }
 
-pub(crate) fn mcp_servers() -> Vec<Value> {
-    MCP_SERVERS
+/// The servers offered to the session of `run`, by `agent`: `{run}` and
+/// `{agent}` in their arguments become those, so a server can tell whose
+/// work it does.
+pub(crate) fn mcp_servers(run: &str, agent: &str) -> Vec<Value> {
+    let mut servers = MCP_SERVERS
         .lock()
         .map(|offered| offered.clone())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    for server in &mut servers {
+        if let Some(Value::Array(args)) = server.get_mut("args") {
+            for arg in args {
+                if let Value::String(text) = arg {
+                    *text = text.replace("{run}", run).replace("{agent}", agent);
+                }
+            }
+        }
+    }
+    servers
 }
 
 pub fn native() -> Box<dyn Native> {

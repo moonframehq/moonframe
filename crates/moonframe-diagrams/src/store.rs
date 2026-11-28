@@ -22,6 +22,8 @@ pub struct Shown {
     pub title: String,
     /// Who shows it, when the server was told (`--agent`).
     pub agent: Option<String>,
+    /// The app's agent run that showed it, when the app started the agent.
+    pub run: Option<String>,
     /// Counts each change, so a view can tell a new version.
     pub revision: u64,
     /// When it last changed, Unix seconds.
@@ -55,6 +57,9 @@ impl Shown {
         if let Some(agent) = &self.agent {
             out["agent"] = agent.clone().into();
         }
+        if let Some(run) = &self.run {
+            out["run"] = run.clone().into();
+        }
         if let Some(note) = &self.note {
             out["note"] = note.clone().into();
         }
@@ -71,6 +76,7 @@ impl Shown {
             title: text("title").unwrap_or_else(|| id.clone()),
             id,
             agent: text("agent"),
+            run: text("run"),
             revision: value.get("revision").and_then(Value::as_u64).unwrap_or(1),
             updated: value.get("updated").and_then(Value::as_u64).unwrap_or(0),
             document: value.get("document").cloned().unwrap_or(Value::Null),

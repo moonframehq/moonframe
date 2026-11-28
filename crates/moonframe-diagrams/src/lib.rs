@@ -19,9 +19,16 @@ pub mod store;
 pub use provider::native;
 
 /// Serves the MCP server on stdin and stdout until stdin ends, writing
-/// diagrams to `dir` (else the default folder) on behalf of `agent`.
-pub fn serve_stdio(dir: Option<std::path::PathBuf>, agent: Option<String>) -> std::io::Result<()> {
+/// diagrams to `dir` (else the default folder) on behalf of `agent`, for
+/// the agent run `run` when the app started it.
+pub fn serve_stdio(
+    dir: Option<std::path::PathBuf>,
+    agent: Option<String>,
+    run: Option<String>,
+) -> std::io::Result<()> {
     let dir = dir.unwrap_or_else(store::default_dir);
     let stdin = std::io::stdin();
-    mcp::Server::new(&dir, agent).serve(stdin.lock(), std::io::stdout().lock())
+    mcp::Server::new(&dir, agent)
+        .for_run(run)
+        .serve(stdin.lock(), std::io::stdout().lock())
 }

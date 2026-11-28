@@ -3,7 +3,7 @@
 //! told the command. Handled before anything else starts, as stdout is the
 //! protocol's.
 //!
-//!   moonframe mcp diagrams [--dir FOLDER] [--agent NAME]
+//!   moonframe mcp diagrams [--dir FOLDER] [--agent NAME] [--run ID]
 
 #[cfg(feature = "diagram")]
 use std::path::PathBuf;
@@ -21,18 +21,19 @@ fn run(words: &[String]) -> ExitCode {
     match words.next().map(String::as_str) {
         #[cfg(feature = "diagram")]
         Some("diagrams") => {
-            let (mut dir, mut agent) = (None, None);
+            let (mut dir, mut agent, mut run) = (None, None, None);
             while let Some(word) = words.next() {
                 match word.as_str() {
                     "--dir" => dir = words.next().map(PathBuf::from),
                     "--agent" => agent = words.next().cloned(),
+                    "--run" => run = words.next().cloned(),
                     other => {
                         eprintln!("moonframe mcp diagrams: unknown option `{other}`");
                         return ExitCode::from(2);
                     },
                 }
             }
-            match moonframe_diagrams::serve_stdio(dir, agent) {
+            match moonframe_diagrams::serve_stdio(dir, agent, run) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("moonframe mcp diagrams: {e}");
@@ -66,7 +67,7 @@ pub(crate) fn offer() {
     moonframe_acp::offer_mcp_servers(vec![serde_json::json!({
         "name": "moonframe-diagrams",
         "command": exe,
-        "args": ["mcp", "diagrams", "--dir", dir],
+        "args": ["mcp", "diagrams", "--dir", dir, "--agent", "{agent}", "--run", "{run}"],
         "env": [],
     })]);
 }
