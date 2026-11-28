@@ -6,8 +6,9 @@
 //! While an answer streams in, the fence grows: each version that parses
 //! is laid out from the one before (so what was there stays put), and one
 //! that does not yet (a line half written) shows the longest earlier
-//! version that did, so it never flickers back to source. Text that never
-//! parses shows as its source, with why.
+//! version that did, so it never flickers back to source. Once the fence
+//! is closed its text is final: text that does not parse shows as its
+//! source, with why.
 
 use {
     gpui_kit::{
@@ -17,7 +18,11 @@ use {
         },
         *,
     },
-    moonframe_diagram::{Diagram, Layout, Options, layout::layout, parse, view, write},
+    moonframe_diagram::{
+        Diagram, Layout, Options,
+        layout::{self, layout},
+        parse, view, write,
+    },
     std::{cell::RefCell, collections::HashMap, sync::Arc},
 };
 
@@ -30,14 +35,20 @@ const MOST_HEIGHT: f32 = 480.0;
 const MOST_INLINE: usize = 300;
 /// The most edges, messages and notes a fence draws, for the same reason.
 const MOST_INLINE_LINES: usize = 600;
+/// The most items its layout may place, stand-ins for long edges
+/// included ([`moonframe_diagram::layout::cost`]): a few edges across
+/// many ranks cost as much as a big diagram.
+const MOST_INLINE_COST: usize = 3_000;
 /// Laid-out fences kept: a few long chats' worth.
 const KEPT: usize = 256;
 
-/// A fence: its language and text.
+/// A fence: its language and text, and whether it is still open (its
+/// closing line not yet written, as while an answer streams in).
 #[derive(Clone)]
 struct Fence {
     language: String,
     source: String,
+    open: bool,
 }
 
 type Laid = Result<(Arc<Diagram>, Arc<Layout>), String>;
@@ -57,14 +68,16 @@ pub(super) fn with(extensions: MarkdownExtensions) -> MarkdownExtensions {
             if !matches!(language.as_str(), "mermaid" | "dot" | "graphviz" | "gv") {
                 return None;
             }
+            let markdown = cx.node_source(node)?.to_owned();
             let fence = Fence {
                 language,
                 source: code.value.clone(),
+                open: !closed(&markdown),
             };
             Some(
                 MarkdownNode::new(BLOCK, fence)
                     .text(code.value.clone())
-                    .markdown(cx.node_source(node)?.to_owned()),
+                    .markdown(markdown),
             )
         })
         .block_renderer(BLOCK, |node, window, cx| {
@@ -75,8 +88,24 @@ pub(super) fn with(extensions: MarkdownExtensions) -> MarkdownExtensions {
         })
 }
 
-/// The fence laid out: this text, else the longest earlier text of it
-/// that was, else why not.
+/// Whether a fence's markdown ends in its closing line: a run of the
+/// opening's backticks or tildes, at least as long, and nothing else.
+fn closed(markdown: &str) -> bool {
+    let mut lines = markdown.trim_end().lines();
+    let (Some(first), Some(last)) = (lines.next(), lines.next_back()) else {
+        return false;
+    };
+    let first = first.trim_start();
+    let Some(mark) = first.chars().next().filter(|c| matches!(c, '`' | '~')) else {
+        return false;
+    };
+    let opening = first.chars().take_while(|&c| c == mark).count();
+    let last = last.trim();
+    last.len() >= opening && last.chars().all(|c| c == mark)
+}
+
+/// The fence laid out: this text, else while the fence is open the
+/// longest earlier text of it that was, else why not.
 fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
     let key = (fence.language.clone(), fence.source.clone());
     if let Some(known) = LAID.with_borrow(|laid| laid.get(&key).cloned()) {
@@ -96,6 +125,10 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
             diagram.nodes.len() + diagram.groups.len(),
             diagram.edges.len() + diagram.messages.len() + diagram.notes.len(),
         )),
+        Ok(diagram) if layout::cost(&diagram) > MOST_INLINE_COST => Err(format!(
+            "its edges cross too many ranks: {} items to place, more than a document draws ({MOST_INLINE_COST})",
+            layout::cost(&diagram),
+        )),
         Ok(diagram) => {
             let options = Options::default();
             let widths = view::measure(&diagram, options.font_size, window, cx);
@@ -108,8 +141,8 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
         },
         // Half written: show what was there, and try again next time.
         Err(problem) => match before {
-            Some(earlier) => return earlier,
-            None => Err(problem.to_string()),
+            Some(earlier) if fence.open => return earlier,
+            _ => Err(problem.to_string()),
         },
     };
     LAID.with_borrow_mut(|laid| {
@@ -222,6 +255,19 @@ mod tests {
                 .push(moonframe_diagram::Node::new(format!("n{i}"), "x"));
         }
         Ok((Arc::new(diagram), Arc::new(Layout::default())))
+    }
+
+    #[test]
+    fn a_fence_is_closed_by_a_run_as_long_as_its_opening() {
+        assert!(super::closed("```mermaid\nflowchart TD\n A-->B\n```"));
+        assert!(super::closed("~~~~dot\ndigraph { a -> b }\n~~~~~\n"));
+        assert!(super::closed("  ```mermaid\nflowchart TD\n  ```"));
+        // Still arriving: no closing line, or one half written.
+        assert!(!super::closed("```mermaid\nflowchart TD\n A-->B"));
+        assert!(!super::closed("````mermaid\nflowchart TD\n```"));
+        assert!(!super::closed("```mermaid\nflowchart TD\n``"));
+        assert!(!super::closed("```mermaid"));
+        assert!(!super::closed("~~~dot\ndigraph {}\n```"));
     }
 
     #[test]
