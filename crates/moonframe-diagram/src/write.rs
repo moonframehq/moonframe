@@ -1,15 +1,77 @@
 //! The model back to Mermaid, for "Copy as Mermaid" and for sending an
 //! edited diagram to an agent: a flow as a `flowchart` (shapes, edge
-//! kinds and heads, labels, subgraphs, fills as `style`), a sequence as a
-//! `sequenceDiagram`. Read back with [`crate::parse::mermaid`], it gives
-//! the same diagram, but for places and a sublabel joined to its label.
+//! kinds and heads, labels, subgraphs, fills as `style`, tones as
+//! classes), a sequence as a `sequenceDiagram`. A flow whose edges carry
+//! UML heads (inheritance, composition, aggregation) and that a class
+//! diagram holds whole, with no groups and only plain boxes, is written
+//! as a `classDiagram`, since a flowchart has no marks for those heads;
+//! any other flow draws them as arrows. Read back with
+//! [`crate::parse::mermaid`], it gives the same diagram, but for places
+//! and a sublabel joined to its label.
 
-use crate::model::{Diagram, DiagramKind, Direction, EdgeKind, Head, MessageKind, Node, NodeKind};
+use {
+    crate::model::{
+        Diagram, DiagramKind, Direction, EdgeKind, Head, MessageKind, Node, NodeKind, Tone,
+    },
+    std::collections::{HashMap, HashSet},
+};
 
 pub fn mermaid(d: &Diagram) -> String {
     match d.kind {
+        DiagramKind::Flow if is_class_diagram(d) => class_diagram(d),
         DiagramKind::Flow => flowchart(d),
         DiagramKind::Sequence => sequence(d),
+    }
+}
+
+/// Whether `d` has heads only a class diagram can mark, and nothing a
+/// class diagram would drop.
+fn is_class_diagram(d: &Diagram) -> bool {
+    let uml = |h: Head| matches!(h, Head::Triangle | Head::Diamond | Head::HollowDiamond);
+    d.edges.iter().any(|e| uml(e.start) || uml(e.end))
+        && d.groups.is_empty()
+        && d.nodes
+            .iter()
+            .all(|n| n.kind == NodeKind::Box && n.fill.is_none() && n.tone.is_none())
+}
+
+/// Each node's and group's Mermaid id, no two alike: names that clean up
+/// the same (`api-gw` and `api_gw`, `end` and `end_`) get a number.
+#[derive(Default)]
+struct Ids {
+    by_name: HashMap<String, String>,
+    taken: HashSet<String>,
+}
+
+impl Ids {
+    fn new(d: &Diagram) -> Self {
+        let mut ids = Self::default();
+        for n in &d.nodes {
+            ids.name(&n.id);
+        }
+        ids
+    }
+
+    /// The id for `name`, made the first time it is asked for.
+    fn name(&mut self, name: &str) -> String {
+        if let Some(id) = self.by_name.get(name) {
+            return id.clone();
+        }
+        let id = self.fresh(name);
+        self.by_name.insert(name.to_owned(), id.clone());
+        id
+    }
+
+    /// An id for `name` that no other has.
+    fn fresh(&mut self, name: &str) -> String {
+        let base = id(name);
+        let mut out = base.clone();
+        let mut n = 2;
+        while !self.taken.insert(out.clone()) {
+            out = format!("{base}_{n}");
+            n += 1;
+        }
+        out
     }
 }
 
@@ -39,7 +101,7 @@ fn quoted(text: &str) -> String {
     format!("\"{}\"", text.replace('"', "#quot;"))
 }
 
-fn node(n: &Node) -> String {
+fn node(n: &Node, id: &str) -> String {
     let (open, close) = match n.kind {
         NodeKind::Box | NodeKind::Text => ("[", "]"),
         NodeKind::Rounded => ("(", ")"),
@@ -53,45 +115,100 @@ fn node(n: &Node) -> String {
     if let Some(sub) = &n.sublabel {
         text = format!("{text}<br/>{sub}");
     }
-    format!("{}{open}{}{close}", id(&n.id), quoted(&text))
+    format!("{id}{open}{}{close}", quoted(&text))
 }
 
-fn flowchart(d: &Diagram) -> String {
-    let direction = match d.direction {
+/// The class a tone is read back from, and a stroke for it in Mermaid.
+fn tone_class(tone: Tone) -> (&'static str, &'static str) {
+    match tone {
+        Tone::Accent => ("accent", "#2563eb"),
+        Tone::Success => ("success", "#059669"),
+        Tone::Warning => ("warning", "#d97706"),
+        Tone::Danger => ("danger", "#dc2626"),
+        Tone::Muted => ("muted", "#6b7280"),
+    }
+}
+
+fn direction(d: &Diagram) -> &'static str {
+    match d.direction {
         Direction::Down => "TD",
         Direction::Up => "BT",
         Direction::Right => "LR",
         Direction::Left => "RL",
-    };
-    let mut out = format!("flowchart {direction}\n");
-    // Groups, innermost inside their parents, each with its nodes.
-    fn group(d: &Diagram, parent: Option<&str>, depth: usize, out: &mut String) {
+    }
+}
+
+/// Groups as subgraphs, each with its nodes and the groups inside it.
+struct Subgraphs<'a> {
+    d: &'a Diagram,
+    /// Each group's parent as an index: the first group of that id.
+    parents: Vec<Option<usize>>,
+    /// Each node's group as an index; `None` at the top level, also when
+    /// the group is unknown.
+    homes: Vec<Option<usize>>,
+    /// Groups already written: a parent loop or repeated id is written
+    /// once, not followed forever.
+    written: Vec<bool>,
+    ids: Vec<String>,
+}
+
+impl<'a> Subgraphs<'a> {
+    fn new(d: &'a Diagram, ids: &mut Ids) -> Self {
+        let mut first: HashMap<&str, usize> = HashMap::new();
+        for (i, g) in d.groups.iter().enumerate() {
+            first.entry(g.id.as_str()).or_insert(i);
+        }
+        let index = |name: &Option<String>| name.as_deref().and_then(|g| first.get(g).copied());
+        Self {
+            d,
+            parents: d.groups.iter().map(|g| index(&g.parent)).collect(),
+            homes: d.nodes.iter().map(|n| index(&n.group)).collect(),
+            written: vec![false; d.groups.len()],
+            ids: d.groups.iter().map(|g| ids.fresh(&g.id)).collect(),
+        }
+    }
+
+    /// Everything in `parent` (the top level for `None`), then any group
+    /// a loop of parents kept out of reach, at the top level.
+    fn write(&mut self, nodes: &[String], out: &mut String) {
+        self.inside(None, nodes, 1, out);
+        while let Some(g) = self.written.iter().position(|w| !w) {
+            self.group(g, nodes, 1, out);
+        }
+    }
+
+    fn inside(&mut self, parent: Option<usize>, nodes: &[String], depth: usize, out: &mut String) {
         let pad = "    ".repeat(depth);
-        for n in d.nodes.iter().filter(|n| n.group.as_deref() == parent) {
-            out.push_str(&format!("{pad}{}\n", node(n)));
+        for (i, n) in self.d.nodes.iter().enumerate() {
+            if self.homes[i] == parent {
+                out.push_str(&format!("{pad}{}\n", node(n, &nodes[i])));
+            }
         }
-        for g in d.groups.iter().filter(|g| g.parent.as_deref() == parent) {
-            out.push_str(&format!(
-                "{pad}subgraph {}[{}]\n",
-                id(&g.id),
-                quoted(&g.label)
-            ));
-            group(d, Some(&g.id), depth + 1, out);
-            out.push_str(&format!("{pad}end\n"));
+        for g in 0..self.d.groups.len() {
+            if !self.written[g] && self.parents[g] == parent {
+                self.group(g, nodes, depth, out);
+            }
         }
     }
-    // Nodes whose group is unknown go at the top level.
-    let known = |g: &Option<String>| {
-        g.as_ref()
-            .is_none_or(|g| d.groups.iter().any(|h| &h.id == g))
-    };
-    let mut top = d.clone();
-    for n in &mut top.nodes {
-        if !known(&n.group) {
-            n.group = None;
-        }
+
+    fn group(&mut self, g: usize, nodes: &[String], depth: usize, out: &mut String) {
+        self.written[g] = true;
+        let pad = "    ".repeat(depth);
+        out.push_str(&format!(
+            "{pad}subgraph {}[{}]\n",
+            self.ids[g],
+            quoted(&self.d.groups[g].label)
+        ));
+        self.inside(Some(g), nodes, depth + 1, out);
+        out.push_str(&format!("{pad}end\n"));
     }
-    group(&top, None, 1, &mut out);
+}
+
+fn flowchart(d: &Diagram) -> String {
+    let mut out = format!("flowchart {}\n", direction(d));
+    let mut ids = Ids::new(d);
+    let nodes: Vec<String> = d.nodes.iter().map(|n| ids.name(&n.id)).collect();
+    Subgraphs::new(d, &mut ids).write(&nodes, &mut out);
     for e in &d.edges {
         let line = match e.kind {
             EdgeKind::Solid => "--",
@@ -126,15 +243,88 @@ fn flowchart(d: &Diagram) -> String {
             .unwrap_or_default();
         out.push_str(&format!(
             "    {} {arrow}{label} {}\n",
-            id(&e.from),
-            id(&e.to)
+            ids.name(&e.from),
+            ids.name(&e.to)
         ));
     }
-    for n in d.nodes.iter().filter(|n| n.fill.is_some()) {
+    for (n, id) in d.nodes.iter().zip(&nodes) {
+        if let Some(fill) = &n.fill {
+            out.push_str(&format!("    style {id} fill:{fill}\n"));
+        }
+    }
+    for tone in [
+        Tone::Accent,
+        Tone::Success,
+        Tone::Warning,
+        Tone::Danger,
+        Tone::Muted,
+    ] {
+        let toned: Vec<&str> = d
+            .nodes
+            .iter()
+            .zip(&nodes)
+            .filter(|(n, _)| n.tone == Some(tone))
+            .map(|(_, id)| id.as_str())
+            .collect();
+        if !toned.is_empty() {
+            let (class, stroke) = tone_class(tone);
+            out.push_str(&format!("    classDef {class} stroke:{stroke}\n"));
+            out.push_str(&format!("    class {} {class}\n", toned.join(",")));
+        }
+    }
+    out
+}
+
+/// A flow of plain boxes with UML heads: classes, their members (the
+/// sublabel), and relations marked at either end.
+fn class_diagram(d: &Diagram) -> String {
+    // A class diagram says `TB` where a flowchart says `TD`.
+    let dir = match d.direction {
+        Direction::Down => "TB",
+        _ => direction(d),
+    };
+    let mut out = format!("classDiagram\n    direction {dir}\n");
+    let mut ids = Ids::new(d);
+    for n in &d.nodes {
+        let id = ids.name(&n.id);
+        if n.label == n.id {
+            out.push_str(&format!("    class {id}\n"));
+        } else {
+            out.push_str(&format!("    class {id}[{}]\n", quoted(&n.label)));
+        }
+        for member in n.sublabel.iter().flat_map(|s| s.split(", ")) {
+            out.push_str(&format!("    {id} : {member}\n"));
+        }
+    }
+    for e in &d.edges {
+        let start = match e.start {
+            Head::None => "",
+            Head::Triangle => "<|",
+            Head::Diamond => "*",
+            Head::HollowDiamond => "o",
+            _ => "<",
+        };
+        let end = match e.end {
+            Head::None => "",
+            Head::Triangle => "|>",
+            Head::Diamond => "*",
+            Head::HollowDiamond => "o",
+            _ => ">",
+        };
+        let line = match e.kind {
+            EdgeKind::Dashed | EdgeKind::Dotted | EdgeKind::Invisible => "..",
+            EdgeKind::Solid | EdgeKind::Thick => "--",
+        };
+        let label = e
+            .label
+            .as_deref()
+            .filter(|l| !l.is_empty())
+            .map(|l| format!(" : {l}"))
+            .unwrap_or_default();
         out.push_str(&format!(
-            "    style {} fill:{}\n",
-            id(&n.id),
-            n.fill.as_deref().unwrap_or_default()
+            "    {} {start}{line}{end} {}{label}\n",
+            ids.name(&e.from),
+            ids.name(&e.to)
         ));
     }
     out
@@ -142,6 +332,8 @@ fn flowchart(d: &Diagram) -> String {
 
 fn sequence(d: &Diagram) -> String {
     let mut out = "sequenceDiagram\n".to_owned();
+    let mut ids = Ids::new(d);
+    let mut id = |name: &str| ids.name(name);
     for n in &d.nodes {
         let word = if n.kind == NodeKind::Pill {
             "actor"

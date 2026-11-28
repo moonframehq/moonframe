@@ -1,33 +1,33 @@
 //! `classDiagram`: classes with their members (in a `{ }` block or as
 //! `A : +field` lines, shown under the name), and relations (`<|--`
 //! inheritance, `*--` composition, `o--` aggregation, `-->` association,
-//! `..>` dependency, `..|>` realization, `--` and `..` links) with labels
-//! and cardinalities.
+//! `..>` dependency, `..|>` realization, `--` and `..` links, marked at
+//! one end or both) with labels and cardinalities, and a shown name
+//! (`class A["Name"]`).
 
 use {
-    super::Line,
+    super::{Line, split_outside_quotes},
     crate::{
         model::{Diagram, Edge, EdgeKind, Head, Node},
         parse::{Unsupported, label},
     },
 };
 
-/// Relations, longest first, with the head each end gets.
-const RELATIONS: &[(&str, Head, Head, EdgeKind)] = &[
-    ("<|--", Head::Triangle, Head::None, EdgeKind::Solid),
-    ("--|>", Head::None, Head::Triangle, EdgeKind::Solid),
-    ("<|..", Head::Triangle, Head::None, EdgeKind::Dashed),
-    ("..|>", Head::None, Head::Triangle, EdgeKind::Dashed),
-    ("*--", Head::Diamond, Head::None, EdgeKind::Solid),
-    ("--*", Head::None, Head::Diamond, EdgeKind::Solid),
-    ("o--", Head::HollowDiamond, Head::None, EdgeKind::Solid),
-    ("--o", Head::None, Head::HollowDiamond, EdgeKind::Solid),
-    ("<--", Head::Arrow, Head::None, EdgeKind::Solid),
-    ("-->", Head::None, Head::Arrow, EdgeKind::Solid),
-    ("<..", Head::Open, Head::None, EdgeKind::Dashed),
-    ("..>", Head::None, Head::Open, EdgeKind::Dashed),
-    ("--", Head::None, Head::None, EdgeKind::Solid),
-    ("..", Head::None, Head::None, EdgeKind::Dashed),
+/// A relation's marks at its start, longest first, and the heads they draw.
+const STARTS: &[(&str, Head)] = &[
+    ("<|", Head::Triangle),
+    ("<", Head::Arrow),
+    ("*", Head::Diamond),
+    ("o", Head::HollowDiamond),
+    ("", Head::None),
+];
+/// A relation's marks at its end.
+const ENDS: &[(&str, Head)] = &[
+    ("|>", Head::Triangle),
+    (">", Head::Arrow),
+    ("*", Head::Diamond),
+    ("o", Head::HollowDiamond),
+    ("", Head::None),
 ];
 
 /// The most members shown under a class's name.
@@ -36,9 +36,10 @@ const MEMBERS: usize = 4;
 pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
     let mut d = Diagram::default();
     let mut members: Vec<(String, Vec<String>)> = Vec::new();
-    let mut inside: Option<String> = None;
+    // The class whose `{ }` members are being read, and the line it opened on.
+    let mut inside: Option<(usize, String)> = None;
     for &(number, line) in lines {
-        if let Some(class) = &inside {
+        if let Some((_, class)) = &inside {
             if line == "}" {
                 inside = None;
             } else if !line.starts_with("<<") {
@@ -57,23 +58,31 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
         }
         if let Some(rest) = line.strip_prefix("class ") {
             let opens = rest.trim_end().ends_with('{');
-            let name = class_name(rest.trim_end_matches('{'));
+            let rest = rest.trim_end().trim_end_matches('{').trim_end();
+            let name = class_name(rest);
             known(&mut d, &name);
+            // `class A["Shown name"]`.
+            if let Some(shown) = rest.split_once('[').and_then(|(_, l)| l.strip_suffix(']'))
+                && let Some(node) = d.nodes.iter_mut().find(|n| n.id == name)
+            {
+                node.label = label(shown);
+            }
             if opens {
-                inside = Some(name);
+                inside = Some((number, name));
             }
             continue;
         }
-        if let Some(found) = RELATIONS
-            .iter()
-            .filter_map(|r| line.find(r.0).map(|at| (at, r)))
-            .min_by_key(|(at, r)| (*at, std::cmp::Reverse(r.0.len())))
+        let (head, text) =
+            split_outside_quotes(line, ":").map_or((line, None), |(h, t)| (h, Some(label(t))));
+        if let Some(Relation {
+            at,
+            to: after,
+            start,
+            end,
+            kind,
+        }) = relation(head)
         {
-            let (at, &(token, start, end, kind)) = found;
-            let (left, rest) = (&line[..at], &line[at + token.len()..]);
-            let (right, text) = rest
-                .split_once(':')
-                .map_or((rest, None), |(r, t)| (r, Some(label(t))));
+            let (left, right) = (&head[..at], &head[after..]);
             let (from, to) = (
                 class_name(&strip_cardinality(left)),
                 class_name(&strip_cardinality(right)),
@@ -100,6 +109,12 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
             continue;
         }
         return Err(Unsupported::at(number, format!("cannot read `{line}`")));
+    }
+    if let Some((number, class)) = inside {
+        return Err(Unsupported::at(
+            number,
+            format!("the `{{` after class `{class}` is never closed"),
+        ));
     }
     for (class, list) in members {
         if let Some(node) = d.nodes.iter_mut().find(|n| n.id == class) {
@@ -149,4 +164,65 @@ fn strip_cardinality(text: &str) -> String {
         }
     }
     out
+}
+
+/// A relation in a line: the byte range of its token, its heads and line.
+struct Relation {
+    at: usize,
+    to: usize,
+    start: Head,
+    end: Head,
+    kind: EdgeKind,
+}
+
+/// The first relation outside quotes, so a `"0..1"` cardinality is not
+/// read as a dashed link: a start mark, `--` or `..`, an end mark. An
+/// `o` mark stands apart from a name, so `Foo--Bar` is a plain link.
+fn relation(text: &str) -> Option<Relation> {
+    let apart = |c: Option<char>| c.is_none_or(|c| c.is_whitespace() || c == '"');
+    let mut quoted = false;
+    for (i, c) in text.char_indices() {
+        if c == '"' {
+            quoted = !quoted;
+        }
+        if quoted || c == '"' {
+            continue;
+        }
+        for &(mark, start) in STARTS {
+            if mark == "o" && !apart(text[..i].chars().next_back()) {
+                continue;
+            }
+            let Some(rest) = text[i..].strip_prefix(mark) else {
+                continue;
+            };
+            let kind = if rest.starts_with("--") {
+                EdgeKind::Solid
+            } else if rest.starts_with("..") {
+                EdgeKind::Dashed
+            } else {
+                continue;
+            };
+            let rest = &rest[2..];
+            let &(end_mark, end) = ENDS
+                .iter()
+                .find(|(m, _)| {
+                    rest.strip_prefix(m)
+                        .is_some_and(|after| *m != "o" || apart(after.chars().next()))
+                })
+                .unwrap_or(&("", Head::None));
+            // An arrow on a dashed line is an open one: a dependency.
+            let open = |h| match (h, kind) {
+                (Head::Arrow, EdgeKind::Dashed) => Head::Open,
+                (h, _) => h,
+            };
+            return Some(Relation {
+                at: i,
+                to: i + mark.len() + 2 + end_mark.len(),
+                start: open(start),
+                end: open(end),
+                kind,
+            });
+        }
+    }
+    None
 }
