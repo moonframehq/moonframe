@@ -1107,7 +1107,9 @@ export type DocumentProps = {
 	-- after an edit; give it back as `html` and nothing reloads. Grown past
 	-- the 8 MB `html` takes, it comes with `error` instead.
 	change: Data,
-	-- While editable: sent with `html` as the document loses the keyboard.
+	-- While editable: sent with `html` as the document loses the keyboard,
+	-- and `edited`, whether it was typed into since the last `done` (or
+	-- since it loaded): skip saving a blur that changed nothing.
 	done: Data,
 	[number]: string,
 }
