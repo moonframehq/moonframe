@@ -110,13 +110,43 @@ pub(crate) fn label(raw: &str) -> String {
         }
     }
     out.push_str(rest);
-    let out = out
-        .replace("#quot;", "\"")
-        .replace("#amp;", "&")
-        .replace("#lt;", "<")
-        .replace("#gt;", ">")
-        .replace("#35;", "#")
-        .replace("**", "")
-        .replace("\\n", " ");
+    let out = decode(&out.replace("**", "").replace("\\n", " "));
     out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Mermaid's entities, named (`#quot;`, `#amp;`, `#lt;`, `#gt;`) or by
+/// number (`#35;`), decoded in one pass: what one decodes to is not read
+/// again, so `#35;lt;` is `#lt;`, not `<`.
+fn decode(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('#') {
+        out.push_str(&rest[..at]);
+        let tail = &rest[at + 1..];
+        let entity = tail.find(';').filter(|&end| end <= 7).and_then(|end| {
+            let decoded = match &tail[..end] {
+                "quot" => '"',
+                "amp" => '&',
+                "lt" => '<',
+                "gt" => '>',
+                number if !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()) => {
+                    char::from_u32(number.parse().ok()?)?
+                },
+                _ => return None,
+            };
+            Some((decoded, end))
+        });
+        match entity {
+            Some((decoded, end)) => {
+                out.push(decoded);
+                rest = &tail[end + 1..];
+            },
+            None => {
+                out.push('#');
+                rest = tail;
+            },
+        }
+    }
+    out.push_str(rest);
+    out
 }

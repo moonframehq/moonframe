@@ -96,9 +96,26 @@ fn id(text: &str) -> String {
     }
 }
 
-/// A label, quoted, with what would end the quotes spelled as entities.
+/// A label, quoted, read back as written.
 fn quoted(text: &str) -> String {
-    format!("\"{}\"", text.replace('"', "#quot;"))
+    format!("\"{}\"", escaped(text))
+}
+
+/// Text the parser reads back as written: what it would take for the end
+/// of the quotes, a tag, an entity, markdown or a line's end is spelled
+/// as an entity.
+fn escaped(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("#quot;"),
+            '<' => out.push_str("#lt;"),
+            '>' => out.push_str("#gt;"),
+            '#' | '*' | '\\' | '`' | '\n' | '\r' => out.push_str(&format!("#{};", u32::from(c))),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn node(n: &Node, id: &str) -> String {
@@ -319,7 +336,7 @@ fn class_diagram(d: &Diagram) -> String {
             .label
             .as_deref()
             .filter(|l| !l.is_empty())
-            .map(|l| format!(" : {l}"))
+            .map(|l| format!(" : {}", escaped(l)))
             .unwrap_or_default();
         out.push_str(&format!(
             "    {} {start}{line}{end} {}{label}\n",
@@ -340,10 +357,11 @@ fn sequence(d: &Diagram) -> String {
         } else {
             "participant"
         };
-        if n.label == n.id {
-            out.push_str(&format!("    {word} {}\n", id(&n.id)));
+        let written = id(&n.id);
+        if n.label == written {
+            out.push_str(&format!("    {word} {written}\n"));
         } else {
-            out.push_str(&format!("    {word} {} as {}\n", id(&n.id), n.label));
+            out.push_str(&format!("    {word} {written} as {}\n", escaped(&n.label)));
         }
     }
     let mut notes = d.notes.iter().peekable();
@@ -353,7 +371,7 @@ fn sequence(d: &Diagram) -> String {
             out.push_str(&format!(
                 "    Note over {}: {}\n",
                 over.join(","),
-                note.text
+                escaped(&note.text)
             ));
         }
         let arrow = match m.kind {
@@ -365,7 +383,7 @@ fn sequence(d: &Diagram) -> String {
             "    {}{arrow}{}: {}\n",
             id(&m.from),
             id(&m.to),
-            m.label
+            escaped(&m.label)
         ));
     }
     for note in notes {
@@ -373,7 +391,7 @@ fn sequence(d: &Diagram) -> String {
         out.push_str(&format!(
             "    Note over {}: {}\n",
             over.join(","),
-            note.text
+            escaped(&note.text)
         ));
     }
     out

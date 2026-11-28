@@ -9,11 +9,19 @@ use {
         model::{Diagram, Edge, Group, Head, Node, NodeKind},
         parse::{Unsupported, label},
     },
+    std::collections::{HashMap, HashSet},
 };
+
+/// Starts a start or end dot's id until [`name_dots`] gives it one no
+/// state has: a state may be named `start` or `end`, even after the
+/// transition that made the dot.
+const DOT: &str = "\u{0}";
 
 pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
     let mut d = Diagram::default();
     let mut open: Vec<String> = Vec::new();
+    // The line each composite in `open` opened on.
+    let mut opened: Vec<usize> = Vec::new();
     let mut in_note = false;
     for &(number, line) in lines {
         if in_note {
@@ -25,7 +33,10 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
             continue;
         }
         if line == "}" {
-            open.pop();
+            if open.pop().is_none() {
+                return Err(Unsupported::at(number, "a `}` with no state open"));
+            }
+            opened.pop();
             continue;
         }
         if line == "--"
@@ -66,6 +77,7 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
                     tone: None,
                 });
                 open.push(id);
+                opened.push(number);
             } else {
                 let node = state(&mut d, &id, &open);
                 if rest.contains("<<choice>>") {
@@ -85,7 +97,7 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
             None => (line, None),
         };
         if let Some((from, to)) = head.split_once("-->") {
-            let scope = open.last().map_or(String::new(), |g| format!("{g}-"));
+            let scope = open.last().map_or(DOT.to_owned(), |g| format!("{DOT}{g}-"));
             let from = endpoint(&mut d, from.trim(), &format!("{scope}start"), &open);
             let to = endpoint(&mut d, to.trim(), &format!("{scope}end"), &open);
             let id = format!("e{}", d.edges.len());
@@ -104,7 +116,14 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
             return Err(Unsupported::at(number, format!("cannot read `{line}`")));
         }
     }
+    if let (Some(state), Some(&number)) = (open.last(), opened.last()) {
+        return Err(Unsupported::at(
+            number,
+            format!("`state {state} {{` is never closed"),
+        ));
+    }
     into_composites(&mut d);
+    name_dots(&mut d);
     Ok(d)
 }
 
@@ -118,7 +137,7 @@ fn into_composites(d: &mut Diagram) {
             continue;
         }
         let open = [group.clone()];
-        let (start, end) = (format!("{group}-start"), format!("{group}-end"));
+        let (start, end) = (format!("{DOT}{group}-start"), format!("{DOT}{group}-end"));
         for edge in &mut d.edges {
             if edge.to == group {
                 edge.to.clone_from(&start);
@@ -161,4 +180,34 @@ fn endpoint(d: &mut Diagram, text: &str, dot: &str, open: &[String]) -> String {
     }
     state(d, text, open);
     text.to_owned()
+}
+
+/// Each dot its id without the [`DOT`] mark, made unlike any state's or
+/// composite's by `_` added as often as needed.
+fn name_dots(d: &mut Diagram) {
+    let mut taken: HashSet<String> = d
+        .nodes
+        .iter()
+        .map(|n| n.id.clone())
+        .chain(d.groups.iter().map(|g| g.id.clone()))
+        .collect();
+    let mut names: HashMap<String, String> = HashMap::new();
+    for node in &mut d.nodes {
+        let Some(want) = node.id.strip_prefix(DOT) else {
+            continue;
+        };
+        let mut name = want.to_owned();
+        while taken.contains(&name) {
+            name.push('_');
+        }
+        taken.insert(name.clone());
+        names.insert(std::mem::replace(&mut node.id, name.clone()), name);
+    }
+    for edge in &mut d.edges {
+        for end in [&mut edge.from, &mut edge.to] {
+            if let Some(name) = names.get(end.as_str()) {
+                end.clone_from(name);
+            }
+        }
+    }
 }
