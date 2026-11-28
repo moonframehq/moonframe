@@ -1,4 +1,4 @@
-Flow Down
+Flow Right
 node Shape "Shape" box sub="+area() float, +perimeter() float"
 node Circle "Circle" box sub="+float radius"
 node Square "Square" box sub="+float side"

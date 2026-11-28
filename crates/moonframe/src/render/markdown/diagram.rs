@@ -10,7 +10,10 @@
 //! is closed its text is final: text that does not parse shows as its
 //! source, with why.
 
+mod cache;
+
 use {
+    cache::{Cache, Kind, Laid},
     gpui_kit::{
         component::{
             ActiveTheme as _,
@@ -19,11 +22,11 @@ use {
         *,
     },
     moonframe_diagram::{
-        Diagram, Layout, Options,
+        Diagram, Options,
         layout::{self, layout},
         parse, view, write,
     },
-    std::{cell::RefCell, collections::HashMap, sync::Arc},
+    std::{cell::RefCell, sync::Arc},
 };
 
 const BLOCK: &str = "moonframe-diagram";
@@ -39,8 +42,6 @@ const MOST_INLINE_LINES: usize = 600;
 /// included ([`moonframe_diagram::layout::cost`]): a few edges across
 /// many ranks cost as much as a big diagram.
 const MOST_INLINE_COST: usize = 3_000;
-/// Laid-out fences kept: a few long chats' worth.
-const KEPT: usize = 256;
 
 /// A fence: its language and text, and whether it is still open (its
 /// closing line not yet written, as while an answer streams in).
@@ -51,15 +52,9 @@ struct Fence {
     open: bool,
 }
 
-type Laid = Result<(Arc<Diagram>, Arc<Layout>), String>;
-
-/// What a fence's layout hangs on besides its text: the font its labels
-/// are measured in (the theme's, which can change), and its language.
-type Kind = (SharedString, String);
-
 thread_local! {
-    /// Each fence's text laid out (or why not), by kind and text.
-    static LAID: RefCell<HashMap<(Kind, String), Laid>> = RefCell::new(HashMap::new());
+    /// Each fence's text laid out (or why not).
+    static LAID: RefCell<Cache> = RefCell::new(Cache::default());
 }
 
 pub(super) fn with(extensions: MarkdownExtensions) -> MarkdownExtensions {
@@ -112,11 +107,10 @@ fn closed(markdown: &str) -> bool {
 /// longest earlier text of it that was, else why not.
 fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
     let kind: Kind = (cx.theme().font_family.clone(), fence.language.clone());
-    let key = (kind, fence.source.clone());
-    if let Some(known) = LAID.with_borrow(|laid| laid.get(&key).cloned()) {
+    if let Some(known) = LAID.with_borrow_mut(|laid| laid.get(&kind, &fence.source)) {
         return known;
     }
-    let before = LAID.with_borrow(|laid| earlier(laid, &key.0, &fence.source));
+    let before = LAID.with_borrow_mut(|laid| laid.earlier(&kind, &fence.source));
     let parsed = parse::fenced(&fence.language, &fence.source).unwrap_or_else(|| {
         Err(parse::Unsupported {
             line: 0,
@@ -150,12 +144,7 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
             _ => Err(problem.to_string()),
         },
     };
-    LAID.with_borrow_mut(|laid| {
-        if laid.len() >= KEPT {
-            laid.clear();
-        }
-        laid.insert(key, result.clone());
-    });
+    LAID.with_borrow_mut(|laid| laid.insert(kind, fence.source.clone(), result.clone()));
     result
 }
 
@@ -163,17 +152,6 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
 fn too_big(diagram: &Diagram) -> bool {
     diagram.nodes.len() + diagram.groups.len() > MOST_INLINE
         || diagram.edges.len() + diagram.messages.len() + diagram.notes.len() > MOST_INLINE_LINES
-}
-
-/// The longest text of this `kind` laid out before that `source` grew
-/// from, as a streaming fence does.
-fn earlier(laid: &HashMap<(Kind, String), Laid>, kind: &Kind, source: &str) -> Option<Laid> {
-    laid.iter()
-        .filter(|((k, text), result)| {
-            k == kind && result.is_ok() && source.starts_with(text.as_str())
-        })
-        .max_by_key(|((_, text), _)| text.len())
-        .map(|(_, result)| result.clone())
 }
 
 fn draw(fence: &Fence, window: &mut Window, cx: &mut App) -> AnyElement {
@@ -246,21 +224,7 @@ fn draw(fence: &Fence, window: &mut Window, cx: &mut App) -> AnyElement {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
-    use {
-        super::{Laid, earlier},
-        moonframe_diagram::{Diagram, Layout},
-        std::{collections::HashMap, sync::Arc},
-    };
-
-    fn ok(nodes: usize) -> Laid {
-        let mut diagram = Diagram::default();
-        for i in 0..nodes {
-            diagram
-                .nodes
-                .push(moonframe_diagram::Node::new(format!("n{i}"), "x"));
-        }
-        Ok((Arc::new(diagram), Arc::new(Layout::default())))
-    }
+    use moonframe_diagram::Diagram;
 
     #[test]
     fn a_fence_is_closed_by_a_run_as_long_as_its_opening() {
@@ -283,30 +247,5 @@ mod tests {
         }
         assert!(super::too_big(&diagram));
         assert!(!super::too_big(&Diagram::default()));
-    }
-
-    #[test]
-    fn a_growing_fence_shows_the_longest_version_it_grew_from() {
-        let mut laid = HashMap::new();
-        let kind = |font: &str, language: &str| (font.to_owned().into(), language.to_owned());
-        let key = |s: &str| (kind("Inter", "mermaid"), s.to_owned());
-        laid.insert(key("flowchart TD\n A-->B"), ok(2));
-        laid.insert(key("flowchart TD\n A-->B\n B-->C"), ok(3));
-        laid.insert(
-            key("flowchart TD\n A-->B\n B-->C\n C-->["),
-            Err("half".into()),
-        );
-        laid.insert(key("flowchart LR\n X-->Y"), ok(9));
-        let found = earlier(
-            &laid,
-            &kind("Inter", "mermaid"),
-            "flowchart TD\n A-->B\n B-->C\n C-->[Do",
-        )
-        .unwrap();
-        assert_eq!(found.unwrap().0.nodes.len(), 3);
-        assert!(earlier(&laid, &kind("Inter", "dot"), "flowchart TD\n A-->B").is_none());
-        assert!(earlier(&laid, &kind("Inter", "mermaid"), "sequenceDiagram").is_none());
-        // Measured in another font, the boxes would be the wrong size.
-        assert!(earlier(&laid, &kind("Menlo", "mermaid"), "flowchart TD\n A-->B").is_none());
     }
 }

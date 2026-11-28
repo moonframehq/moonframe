@@ -133,8 +133,11 @@ struct Parser {
     at: usize,
     directed: bool,
     diagram: Diagram,
-    /// Each node's attributes as given so far, merged over the defaults.
+    /// Each node's index in the diagram.
     nodes: HashMap<String, usize>,
+    /// Each node's attributes as given so far, merged over the defaults
+    /// it was made with, by index.
+    given: Vec<Attributes>,
     clusters: usize,
     /// How many `{ }` blocks the statement being read is inside.
     depth: usize,
@@ -147,6 +150,7 @@ pub fn parse(text: &str) -> Result<Diagram, Unsupported> {
         directed: true,
         diagram: Diagram::default(),
         nodes: HashMap::new(),
+        given: Vec::new(),
         clusters: 0,
         depth: 0,
     };
@@ -170,6 +174,12 @@ pub fn parse(text: &str) -> Result<Diagram, Unsupported> {
     }
     p.expect('{')?;
     p.statements(&Scope::default())?;
+    if p.peek().is_some() {
+        return Err(Unsupported::at(
+            p.line(),
+            "text after the graph's closing `}`",
+        ));
+    }
     super::within_limits(p.diagram)
 }
 
@@ -395,9 +405,7 @@ impl Parser {
         }
         if ends.len() == 1 {
             for id in &ends[0] {
-                let mut attributes = scope.node.clone();
-                attributes.extend(given.clone());
-                self.node(id, &attributes, scope, true);
+                self.node(id, Some(&given), scope);
                 named.push(id.clone());
             }
             return Ok(named);
@@ -414,8 +422,8 @@ impl Parser {
         for pair in ends.windows(2) {
             for a in &pair[0] {
                 for b in &pair[1] {
-                    self.node(a, &scope.node, scope, false);
-                    self.node(b, &scope.node, scope, false);
+                    self.node(a, None, scope);
+                    self.node(b, None, scope);
                     self.edge(a, b, &attributes);
                 }
             }
@@ -423,22 +431,28 @@ impl Parser {
         Ok(ends.concat())
     }
 
-    /// The node `id`; `declared` when this statement is its own (so its
-    /// attributes count), else it is only made if new.
-    fn node(&mut self, id: &str, attributes: &Attributes, scope: &Scope, declared: bool) {
+    /// The node `id`, made with the scope's defaults the first time it is
+    /// named; `given` when this statement is its own, adding to what it
+    /// was given before, so a later statement keeps earlier choices.
+    fn node(&mut self, id: &str, given: Option<&Attributes>, scope: &Scope) {
         let index = match self.nodes.get(id) {
-            Some(_) if !declared => return,
+            Some(_) if given.is_none() => return,
             Some(&i) => i,
             None => {
                 let mut node = Node::new(id, id);
                 node.kind = NodeKind::Pill;
                 node.group = scope.group.clone();
                 self.diagram.nodes.push(node);
+                self.given.push(scope.node.clone());
                 self.nodes
                     .insert(id.to_owned(), self.diagram.nodes.len() - 1);
                 self.diagram.nodes.len() - 1
             },
         };
+        if let Some(given) = given {
+            self.given[index].extend(given.clone());
+        }
+        let attributes = &self.given[index];
         let node = &mut self.diagram.nodes[index];
         if let Some(text) = attributes.get("label") {
             node.label = if text == "\\N" {
