@@ -53,9 +53,13 @@ struct Fence {
 
 type Laid = Result<(Arc<Diagram>, Arc<Layout>), String>;
 
+/// What a fence's layout hangs on besides its text: the font its labels
+/// are measured in (the theme's, which can change), and its language.
+type Kind = (SharedString, String);
+
 thread_local! {
-    /// Each fence's text laid out (or why not), by language and text.
-    static LAID: RefCell<HashMap<(String, String), Laid>> = RefCell::new(HashMap::new());
+    /// Each fence's text laid out (or why not), by kind and text.
+    static LAID: RefCell<HashMap<(Kind, String), Laid>> = RefCell::new(HashMap::new());
 }
 
 pub(super) fn with(extensions: MarkdownExtensions) -> MarkdownExtensions {
@@ -107,11 +111,12 @@ fn closed(markdown: &str) -> bool {
 /// The fence laid out: this text, else while the fence is open the
 /// longest earlier text of it that was, else why not.
 fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
-    let key = (fence.language.clone(), fence.source.clone());
+    let kind: Kind = (cx.theme().font_family.clone(), fence.language.clone());
+    let key = (kind, fence.source.clone());
     if let Some(known) = LAID.with_borrow(|laid| laid.get(&key).cloned()) {
         return known;
     }
-    let before = LAID.with_borrow(|laid| earlier(laid, &fence.language, &fence.source));
+    let before = LAID.with_borrow(|laid| earlier(laid, &key.0, &fence.source));
     let parsed = parse::fenced(&fence.language, &fence.source).unwrap_or_else(|| {
         Err(parse::Unsupported {
             line: 0,
@@ -160,12 +165,12 @@ fn too_big(diagram: &Diagram) -> bool {
         || diagram.edges.len() + diagram.messages.len() + diagram.notes.len() > MOST_INLINE_LINES
 }
 
-/// The longest text laid out before in `language` that `source` grew
+/// The longest text of this `kind` laid out before that `source` grew
 /// from, as a streaming fence does.
-fn earlier(laid: &HashMap<(String, String), Laid>, language: &str, source: &str) -> Option<Laid> {
+fn earlier(laid: &HashMap<(Kind, String), Laid>, kind: &Kind, source: &str) -> Option<Laid> {
     laid.iter()
-        .filter(|((lang, text), result)| {
-            lang == language && result.is_ok() && source.starts_with(text.as_str())
+        .filter(|((k, text), result)| {
+            k == kind && result.is_ok() && source.starts_with(text.as_str())
         })
         .max_by_key(|((_, text), _)| text.len())
         .map(|(_, result)| result.clone())
@@ -283,7 +288,8 @@ mod tests {
     #[test]
     fn a_growing_fence_shows_the_longest_version_it_grew_from() {
         let mut laid = HashMap::new();
-        let key = |s: &str| ("mermaid".to_owned(), s.to_owned());
+        let kind = |font: &str, language: &str| (font.to_owned().into(), language.to_owned());
+        let key = |s: &str| (kind("Inter", "mermaid"), s.to_owned());
         laid.insert(key("flowchart TD\n A-->B"), ok(2));
         laid.insert(key("flowchart TD\n A-->B\n B-->C"), ok(3));
         laid.insert(
@@ -291,9 +297,16 @@ mod tests {
             Err("half".into()),
         );
         laid.insert(key("flowchart LR\n X-->Y"), ok(9));
-        let found = earlier(&laid, "mermaid", "flowchart TD\n A-->B\n B-->C\n C-->[Do").unwrap();
+        let found = earlier(
+            &laid,
+            &kind("Inter", "mermaid"),
+            "flowchart TD\n A-->B\n B-->C\n C-->[Do",
+        )
+        .unwrap();
         assert_eq!(found.unwrap().0.nodes.len(), 3);
-        assert!(earlier(&laid, "dot", "flowchart TD\n A-->B").is_none());
-        assert!(earlier(&laid, "mermaid", "sequenceDiagram").is_none());
+        assert!(earlier(&laid, &kind("Inter", "dot"), "flowchart TD\n A-->B").is_none());
+        assert!(earlier(&laid, &kind("Inter", "mermaid"), "sequenceDiagram").is_none());
+        // Measured in another font, the boxes would be the wrong size.
+        assert!(earlier(&laid, &kind("Menlo", "mermaid"), "flowchart TD\n A-->B").is_none());
     }
 }
