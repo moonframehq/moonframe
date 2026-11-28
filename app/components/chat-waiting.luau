@@ -71,7 +71,7 @@ local function permission_card(permission: any, props: Props): any
 		ui.row {
 			gap = "small",
 			align = "center",
-			ui.icon { name = if guest then "user-round" else "shield", size = "small", class = "chat-waiting-permission-icon" },
+			ui.icon { name = if guest then "user" else "shield", size = "small", class = "chat-waiting-permission-icon" },
 			ui.text {
 				if guest then `{guest}, a guest, asks to send` else permission.title,
 				weight = "medium",

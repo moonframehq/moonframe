@@ -288,7 +288,7 @@ local function user_row(row: any): any
 			gap = "small",
 			align = "center",
 			hug = true,
-			ui.icon { name = "user-round", size = "small" },
+			ui.icon { name = "user", size = "small" },
 			ui.text { `{row.guest} · guest`, size = "small" },
 		})
 	end
