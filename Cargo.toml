@@ -175,7 +175,7 @@ url = "2.5"
 # The ids of pi threads, which pi takes as session ids (moonframe-pi).
 uuid          = { features = ["v4"], version = "1" }
 wasmtime      = "50"
-wasmtime-wasi = "50"
+wasmtime-wasi = "51"
 # The native web views behind `ui.browser` (WebKit, WebView2): a fork of
 # wry that renders under GPUI.
 wry = { default-features = false, package = "lb-wry", version = "=0.53.3" }
