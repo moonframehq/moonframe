@@ -3024,9 +3024,11 @@ A whole mod using it, with state: `app/components/demos/timeline.luau`.
 
 | Prop | Meaning |
 | --- | --- |
-| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, files, steps } or { type = "thought", gist, text } } } |
+| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, output_key?, files, steps } or { type = "thought", gist, text } } } |
+| `inspect` | enable clicking a detail to send { inspect, page, fetch } or { close_output = true } |
 | `msg` | message a click on the header sends (the mod flips `open`) |
 | `open` | show its calls |
+| `output` | the expanded detail { key, page, text?, more? } |
 | `to` | mod to send it to, if not the drawing one |
 
 **Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`

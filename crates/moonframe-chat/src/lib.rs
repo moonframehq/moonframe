@@ -36,8 +36,13 @@
 //! moonframe-chat-view's `ChatView`): whole for the chat in focus, its last
 //! rows for the others. With `[settings] raw = true` a chat also carries
 //! herdr's own `transcript` (see `project`).
+//!
+//! A starter can read a page of its own chat’s tool result with
+//! `{ tool_output = output_key, chat, page = 0 }`. The reply carries
+//! `text` and `more`. Each page holds up to 4096 Unicode characters.
 
 // keep-sorted start
+mod output;
 mod program;
 mod project;
 // keep-sorted end
@@ -281,6 +286,9 @@ impl Native for Chats {
                 answer["ok"] = json!(true);
             }
             send(host, from, &answer);
+            if action == "tool_output" {
+                return;
+            }
         }
         lock(&self.state).dirty = true;
         self.publish(host);
@@ -312,6 +320,7 @@ impl Chats {
             return None;
         }
         let action = [
+            "tool_output",
             "start",
             "prompt",
             "cancel",
@@ -337,6 +346,22 @@ impl Chats {
         }
         let owner = owner(from);
         let result = match action {
+            "tool_output" => {
+                let state = lock(&self.state);
+                state
+                    .chat(text("chat").unwrap_or_default())
+                    .filter(|chat| chat.owner == owner)
+                    .ok_or_else(|| "no such chat".to_owned())
+                    .and_then(|chat| {
+                        let page = message.get("page").and_then(Value::as_u64).unwrap_or(0);
+                        output::page(
+                            chat,
+                            text("tool_output").unwrap_or_default(),
+                            usize::try_from(page).unwrap_or(usize::MAX),
+                        )
+                        .map(Some)
+                    })
+            },
             "start" => self
                 .start_chat(host, owner, message)
                 .map(|chat| Some(json!({ "chat": chat }))),
