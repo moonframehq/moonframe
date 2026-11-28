@@ -55,21 +55,25 @@ impl Diagram {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DiagramKind {
+    // keep-sorted start
     /// Boxes and arrows: flowcharts, state and class diagrams, graphs.
     #[default]
     Flow,
     /// Participants side by side and the messages between them in order.
     Sequence,
+    // keep-sorted end
 }
 
 /// Which way a flow's ranks run: `Down` puts each rank under the last.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Direction {
+    // keep-sorted start
     #[default]
     Down,
-    Up,
-    Right,
     Left,
+    Right,
+    Up,
+    // keep-sorted end
 }
 
 impl Direction {
@@ -108,71 +112,61 @@ impl Node {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum NodeKind {
-    #[default]
-    Box,
-    Rounded,
-    Pill,
-    Diamond,
-    Circle,
-    Cylinder,
-    Note,
-    /// Words alone, no outline.
-    Text,
+/// Declares [`NodeKind`] once: each kind with its name and the other names
+/// it is read from, generating the enum, `ALL`, `name` and `from_name`.
+macro_rules! node_kinds {
+    ($($(#[$attr:meta])* $kind:ident = $name:literal $(| $alias:literal)*,)+) => {
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+        pub enum NodeKind {
+            $($(#[$attr])* $kind,)+
+        }
+
+        impl NodeKind {
+            /// Every kind, in a picker's order.
+            pub const ALL: &[Self] = &[$(Self::$kind,)+];
+
+            pub fn name(self) -> &'static str {
+                match self {
+                    $(Self::$kind => $name,)+
+                }
+            }
+
+            /// The kind a name gives, also the Luau editor's names
+            /// (`ellipse`, `sticky`) and Mermaid's (`stadium`, `rhombus`).
+            pub fn from_name(name: &str) -> Option<Self> {
+                Some(match name {
+                    $($name $(| $alias)* => Self::$kind,)+
+                    _ => return None,
+                })
+            }
+        }
+    };
 }
 
-impl NodeKind {
-    /// Every kind, for a picker.
-    pub const ALL: &[Self] = &[
-        Self::Box,
-        Self::Rounded,
-        Self::Pill,
-        Self::Diamond,
-        Self::Circle,
-        Self::Cylinder,
-        Self::Note,
-        Self::Text,
-    ];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Box => "box",
-            Self::Rounded => "rounded",
-            Self::Pill => "pill",
-            Self::Diamond => "diamond",
-            Self::Circle => "circle",
-            Self::Cylinder => "cylinder",
-            Self::Note => "note",
-            Self::Text => "text",
-        }
-    }
-
-    /// The kind a name gives, also the Luau editor's names (`ellipse`,
-    /// `sticky`).
-    pub fn from_name(name: &str) -> Option<Self> {
-        Some(match name {
-            "box" | "rect" => Self::Box,
-            "rounded" => Self::Rounded,
-            "pill" | "stadium" => Self::Pill,
-            "diamond" | "decision" | "rhombus" => Self::Diamond,
-            "circle" | "ellipse" => Self::Circle,
-            "cylinder" | "database" => Self::Cylinder,
-            "note" | "sticky" => Self::Note,
-            "text" => Self::Text,
-            _ => return None,
-        })
-    }
+// In a picker's order, which users see: not sorted.
+node_kinds! {
+    #[default]
+    Box = "box" | "rect",
+    Rounded = "rounded",
+    Pill = "pill" | "stadium",
+    Diamond = "diamond" | "decision" | "rhombus",
+    Circle = "circle" | "ellipse",
+    Cylinder = "cylinder" | "database",
+    Note = "note" | "sticky",
+    /// Words alone, no outline.
+    Text = "text",
 }
 
 /// A meaning a node or edge carries, drawn in the theme's color for it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tone {
+    // keep-sorted start
     Accent,
-    Success,
-    Warning,
     Danger,
     Muted,
+    Success,
+    Warning,
+    // keep-sorted end
 }
 
 impl Tone {
@@ -215,30 +209,34 @@ impl Edge {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum EdgeKind {
-    #[default]
-    Solid,
+    // keep-sorted start
     Dashed,
     Dotted,
-    Thick,
     /// Laid out as an edge, drawn as nothing: keeps two nodes near.
     Invisible,
+    #[default]
+    Solid,
+    Thick,
+    // keep-sorted end
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Head {
-    #[default]
-    None,
+    // keep-sorted start
     Arrow,
-    /// An open arrow, as a reply or an async message.
-    Open,
     Circle,
     Cross,
-    /// A hollow triangle: inheritance.
-    Triangle,
     /// A filled diamond: composition.
     Diamond,
     /// A hollow diamond: aggregation.
     HollowDiamond,
+    #[default]
+    None,
+    /// An open arrow, as a reply or an async message.
+    Open,
+    /// A hollow triangle: inheritance.
+    Triangle,
+    // keep-sorted end
 }
 
 /// A box drawn around nodes, maybe inside another group.
@@ -262,13 +260,15 @@ pub struct Message {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MessageKind {
-    /// A call: a solid line, a filled head.
-    #[default]
-    Sync,
+    // keep-sorted start
     /// A solid line, an open head.
     Async,
     /// A return: a dashed line.
     Reply,
+    /// A call: a solid line, a filled head.
+    #[default]
+    Sync,
+    // keep-sorted end
 }
 
 /// A note in a sequence diagram, over one or more participants, before the
@@ -278,4 +278,18 @@ pub struct Note {
     pub over: Vec<String>,
     pub text: String,
     pub before: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_kind_is_read_back_from_its_name() {
+        for &kind in NodeKind::ALL {
+            assert_eq!(NodeKind::from_name(kind.name()), Some(kind));
+        }
+        assert_eq!(NodeKind::from_name("ellipse"), Some(NodeKind::Circle));
+        assert_eq!(NodeKind::from_name("hexagon"), None);
+    }
 }
