@@ -345,6 +345,33 @@ fn a_failed_save_is_answered_kept_and_tried_again() {
 }
 
 #[test]
+fn a_note_with_an_unwritten_edit_is_not_moved_away() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("Vault");
+    let (mut provider, host, seen) = started(&root);
+    let path = "notes/Blocked.md";
+    fs::create_dir_all(root.join(path)).unwrap();
+    save(&mut provider, &host, "library", path, "Kept.\n", None);
+    after_typing(&mut provider, &host);
+    // The retry would bring the note back at its old place.
+    for action in [
+        json!({ "trash": path }),
+        json!({ "rename": { "from": path, "to": "notes/Elsewhere" } }),
+    ] {
+        ask(&mut provider, &host, "library", action);
+        let refused = last(&seen, "library", |msg| {
+            msg["ok"] == false && msg["action"].is_null()
+        })
+        .unwrap();
+        assert!(
+            refused["error"].as_str().unwrap().contains("not saved yet"),
+            "{refused}"
+        );
+    }
+    assert!(provider.unsaved(path));
+}
+
+#[test]
 fn todays_views_move_on_at_midnight() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("Vault");

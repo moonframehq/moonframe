@@ -150,6 +150,23 @@ impl Provider {
     }
 }
 
+/// The note an action takes away from its place: renamed from, or trashed.
+pub(super) fn moves_away(message: &Value) -> Option<String> {
+    let path = match (message.get("rename"), message.get("trash")) {
+        (Some(rename), _) => rename.get("from"),
+        (None, Some(trash)) => Some(trash),
+        (None, None) => None,
+    };
+    path.and_then(Value::as_str).map(str::to_string)
+}
+
+impl Provider {
+    /// Whether an edit of `path`, from any editor, still waits to be written.
+    pub(super) fn unsaved(&self, path: &str) -> bool {
+        self.pending.keys().any(|(_, pending)| pending == path)
+    }
+}
+
 fn failed(pending: &Pending, path: &str, error: &str) -> Value {
     json!({
         "reply": pending.reply,

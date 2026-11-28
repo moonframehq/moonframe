@@ -21,6 +21,9 @@ type State = {
 	-- The first row of the list's window: a vault's notes come a page at a
 	-- time, moved as the list scrolls.
 	offset: number,
+	-- The rows the list last showed, checked again as each page comes: a
+	-- scroll past a page still on its way moves the window once it lands.
+	seen: { first: number, last: number }?,
 	views: { [string]: any },
 }
 
@@ -384,6 +387,7 @@ return mod {
 		state.enhancing = nil
 		state.notice = nil
 		state.offset = 0
+		state.seen = nil
 		return state, watches(state, true)
 	end,
 
@@ -427,6 +431,16 @@ return mod {
 				data.text = current.text
 			end
 			state.views[msg.view] = data
+			-- The page came: if the list scrolled on meanwhile, move again.
+			local moves: { any } = {}
+			local seen = state.seen
+			if msg.view == "list" and seen then
+				local start = window(data, state.offset, seen.first, seen.last)
+				if start then
+					state.offset = start
+					moves = { list_watch(state) }
+				end
+			end
 			if msg.view == "resolve" and data then
 				-- Asked once: stop it, or later changes would open it again.
 				local stop: any = { to = "provider:notes", msg = { unwatch = "resolve" } }
@@ -439,7 +453,12 @@ return mod {
 				return state, { stop, create }
 			end
 			if msg.view == "list" and not state.open and data and data.rows and data.rows[1] then
-				return open(state, data.rows[1].path)
+				local _, sends = open(state, data.rows[1].path)
+				table.move(moves, 1, #moves, #sends + 1, sends)
+				return state, sends
+			end
+			if #moves > 0 then
+				return state, moves
 			end
 			return
 		end
@@ -465,6 +484,7 @@ return mod {
 			return
 		end
 		if msg.page then
+			state.seen = { first = msg.first or 1, last = msg.last or 1 }
 			local start = window(state.views.list, state.offset, msg.first or 1, msg.last or 1)
 			if start then
 				state.offset = start
@@ -477,6 +497,7 @@ return mod {
 			state.tag = nil
 			state.query = ""
 			state.offset = 0
+			state.seen = nil
 			if msg.section == "inbox" then
 				return open(state, "inbox.md")
 			elseif msg.section == "today" then
@@ -486,10 +507,12 @@ return mod {
 		elseif msg.tag then
 			state.tag = if state.tag == msg.tag then nil else msg.tag
 			state.offset = 0
+			state.seen = nil
 			return state, watches(state)
 		elseif msg.query then
 			state.query = if msg.clear then "" else msg.value or ""
 			state.offset = 0
+			state.seen = nil
 			return state, watches(state)
 		elseif msg.open then
 			return open(state, msg.open)

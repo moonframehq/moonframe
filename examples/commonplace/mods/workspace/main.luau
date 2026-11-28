@@ -22,6 +22,9 @@ type State = {
 	pages: number,
 	-- The first row of the search results' window, moved as they scroll.
 	offset: number,
+	-- The rows the list last showed, checked again as each page comes: a
+	-- scroll past a page still on its way moves the window once it lands.
+	seen: { first: number, last: number }?,
 	views: { [string]: any },
 }
 
@@ -471,6 +474,7 @@ return mod {
 		state.notice = nil
 		state.pages = 1
 		state.offset = 0
+		state.seen = nil
 		return state, watches(state, true)
 	end,
 
@@ -501,6 +505,15 @@ return mod {
 				data.text = current.text
 			end
 			state.views[msg.view] = data
+			-- The page came: if the list scrolled on meanwhile, move again.
+			local seen = state.seen
+			if msg.view == "search" and seen then
+				local start = window(data, state.offset, seen.first, seen.last)
+				if start then
+					state.offset = start
+					return state, { search_watch(state) }
+				end
+			end
 			-- Nothing open yet: start on the note changed last.
 			if msg.view == "all" and not state.open and data and data.rows then
 				local newest
@@ -548,6 +561,7 @@ return mod {
 			return
 		end
 		if msg.page then
+			state.seen = { first = msg.first or 1, last = msg.last or 1 }
 			local start = window(state.views.search, state.offset, msg.first or 1, msg.last or 1)
 			if start then
 				state.offset = start
@@ -581,6 +595,7 @@ return mod {
 		elseif msg.query then
 			state.query = if msg.clear then "" else msg.value or ""
 			state.offset = 0
+			state.seen = nil
 			return state, watches(state)
 		elseif msg.create then
 			return state, { { to = "provider:notes", msg = { create = { path = `wiki/{msg.create}.md`, text = "" }, id = "create-link" } } }

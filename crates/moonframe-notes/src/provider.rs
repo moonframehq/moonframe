@@ -443,6 +443,16 @@ impl Provider {
         }
         // Everything else changes files now: write waiting edits first.
         self.flush(host, true);
+        // An edit that could not be written would come back as the note
+        // once writing works: a note still holding one is not moved away.
+        if let Some(path) = save::moves_away(&message).filter(|path| self.unsaved(path)) {
+            send(
+                host,
+                from,
+                json!({ "reply": reply, "ok": false, "path": path, "error": format!("{path} has an edit not saved yet; try again once it is") }),
+            );
+            return;
+        }
         let today = self.today();
         let Some(vault) = &mut self.vault else {
             send(

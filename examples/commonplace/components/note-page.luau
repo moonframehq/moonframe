@@ -90,10 +90,12 @@ type State = {
 }
 
 -- The note's whole text with `draft` as the block. A new block left empty
--- changes nothing; a block the note had, emptied, is deleted.
+-- changes nothing; a block the note had, emptied, is deleted. Text found
+-- after a new block (added elsewhere once it was saved) stays.
 local function compose(state: State, draft: string): string
 	if state.created then
-		return if draft == "" then state.before else ending(state.before) .. draft
+		local head = if draft == "" then state.before else ending(state.before) .. draft
+		return head .. state.after
 	end
 	return state.before .. draft .. state.after
 end
