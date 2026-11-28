@@ -46,6 +46,7 @@ pub(super) fn begin_frame(window: WindowId) -> u64 {
 /// Starts `window`'s frame count over: a window opened anew under an id
 /// one had before (headless renders, one app after another), so what it
 /// draws counts as drawn anew and is measured again.
+#[cfg(feature = "capture")]
 pub(crate) fn forget_window(window: WindowId) {
     FRAMES.with_borrow_mut(|frames| frames.remove(&window));
 }
