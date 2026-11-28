@@ -139,7 +139,8 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   once it is drawn; `scroll_to = { key = "row-7", seq = n }` asks again
   for the same key with each new `seq`. `scroll_to = { y = state.y, seq =
   n }` (and `x`) scrolls back to how far `measure` told it was, as far as
-  the content goes: a reader reopened where it was left. All are the GPUI
+  the content goes: a reader reopened where it was left. With a `seq`, only
+  a new `seq` asks again, so keep `measure`'s `y` in state as it comes. All are the GPUI
   window's, so far.
 
 - **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,
@@ -2883,7 +2884,7 @@ system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.
 | `measure` | with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too; empty, `first` and `last` are 0); a body past 200 rows is a `ui.list`, which takes `range` instead |
 | `reorder` | rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way |
 | `rows` | list of maps: `id` plus a value per column key; a value may be a string, a number or an element |
-| `scroll_to` | with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes, or `{ y = state.y, seq = n }` scrolls back to the `y` `measure` told |
+| `scroll_to` | with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes, or `{ y = state.y, seq = n }` scrolls back to the `y` `measure` told (past 200 rows, the `y` its `ui.list`'s `range` told) |
 | `selected` | id of the selected row |
 | `sort` | key of the sorted column (shows an arrow) |
 | `sortable` | false makes no header clickable (a column can also set `sortable = false`) |

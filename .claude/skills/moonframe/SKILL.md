@@ -1543,8 +1543,10 @@ Text-like elements take their main value positionally:
   card in the list, once it is drawn), and `{ key = "row-7", seq = n }` the
   same, asked again with each new `seq` (a link opened twice), and `{ y =
   state.y, seq = n }` (and `x`) scrolls back to how far `measure` told it
-  was (keep `msg.y` in state): a reader reopened where it was left, once
-  the host forgot the scroll of a stack it no longer drew.
+  was (keep `msg.y` in state as it comes: with a `seq`, only a new `seq`
+  asks again, and the stack's first `measure` already tells the `y` it was
+  put back to): a reader reopened where it was left, once the host forgot
+  the scroll of a stack it no longer drew.
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed. The rows, columns
   and panels inside a row or column that scrolls along its axis keep it

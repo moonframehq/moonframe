@@ -124,7 +124,8 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   once it is drawn; `scroll_to = { key = "row-7", seq = n }` asks again
   for the same key with each new `seq`. `scroll_to = { y = state.y, seq =
   n }` (and `x`) scrolls back to how far `measure` told it was, as far as
-  the content goes: a reader reopened where it was left. All are the GPUI
+  the content goes: a reader reopened where it was left. With a `seq`, only
+  a new `seq` asks again, so keep `measure`'s `y` in state as it comes. All are the GPUI
   window's, so far.
 
 - **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,

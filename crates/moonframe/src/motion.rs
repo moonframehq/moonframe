@@ -6,7 +6,7 @@
 use {
     crate::render::Pending,
     gpui_kit::{Bounds, Hsla, Pixels, Rgba, ScrollHandle, Size},
-    moonframe_core::{Curve, Node, ScrollTo, Transition, TransitionKind},
+    moonframe_core::{Curve, Data, Node, ScrollTo, Transition, TransitionKind},
     std::{
         cell::{Cell, RefCell},
         collections::HashMap,
@@ -324,6 +324,21 @@ impl Track {
     }
 }
 
+/// Whether `asked` is the request `before` was, so it is not acted on
+/// again: a place with a `seq` is asked again only by a new `seq`, so a
+/// mod keeping `measure`'s `y` in what it gives back never moves the stack
+/// itself; anything else, when anything in it changes.
+fn same_request(before: Option<&ScrollTo>, asked: Option<&ScrollTo>) -> bool {
+    match (before, asked) {
+        (Some(ScrollTo::At { seq: was, .. }), Some(ScrollTo::At { seq, .. }))
+            if *seq != Data::Nil =>
+        {
+            was == seq
+        },
+        _ => before == asked,
+    }
+}
+
 impl Motion {
     /// Starts a frame: what keyed containers drew in the last one, which
     /// the new frame compares against and records anew.
@@ -373,11 +388,20 @@ impl Motion {
         let (previous, pending) = self
             .scroll_targets
             .get_or(path, Instant::now(), || (None, None));
-        if previous.as_ref() != target {
+        if !same_request(previous.as_ref(), target) {
             *pending = match target {
                 Some(ScrollTo::Child(index)) => Some(Rc::new(Pending::child(index - 1))),
                 Some(ScrollTo::Key { key, .. }) => Some(Rc::new(Pending::key(key.clone()))),
-                Some(ScrollTo::At { x, y, .. }) => Some(Rc::new(Pending::at(*x, *y))),
+                Some(ScrollTo::At { x, y, .. }) => {
+                    // Where it goes from its first layout on, so a `measure`
+                    // of the stack never tells where it was before.
+                    let now = handle.offset();
+                    handle.set_offset(gpui_kit::point(
+                        x.map_or(now.x, |x| -gpui_kit::px(x)),
+                        y.map_or(now.y, |y| -gpui_kit::px(y)),
+                    ));
+                    Some(Rc::new(Pending::at(*x, *y)))
+                },
                 None => None,
             };
             *previous = target.cloned();
@@ -469,6 +493,30 @@ fn time_at(curve: &Curve, progress: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use {super::*, moonframe_core::Curve};
+
+    #[test]
+    fn a_place_with_a_seq_is_asked_again_only_by_a_new_seq() {
+        let at = |y: f32, seq: i64| ScrollTo::At {
+            x: None,
+            y: Some(y),
+            seq: Data::Integer(seq),
+        };
+        // `measure`'s y kept in what the mod gives back: not a request.
+        assert!(same_request(Some(&at(240., 1)), Some(&at(0., 1))));
+        assert!(!same_request(Some(&at(240., 1)), Some(&at(240., 2))));
+        // Without a seq, the place itself is the request.
+        let bare = |y: f32| ScrollTo::At {
+            x: None,
+            y: Some(y),
+            seq: Data::Nil,
+        };
+        assert!(!same_request(Some(&bare(240.)), Some(&bare(0.))));
+        assert!(same_request(
+            Some(&ScrollTo::Child(3)),
+            Some(&ScrollTo::Child(3))
+        ));
+        assert!(!same_request(None, Some(&ScrollTo::Child(3))));
+    }
 
     /// Mid-move by `expected`, give or take float rounding.
     fn moving(shown: Shown, expected: f32) {

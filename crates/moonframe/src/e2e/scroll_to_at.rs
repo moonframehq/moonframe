@@ -58,3 +58,49 @@ fn a_column_goes_back_to_the_y_it_told(cx: &mut TestAppContext) {
     window.click("far");
     assert_eq!(last(&mut window), "y=700");
 }
+
+/// The pattern the docs give: `measure`'s `y` kept as it comes, given back
+/// with the `seq` of the opening. A new key draws a new column, as one the
+/// host forgot.
+const REOPENED: &str = r##"
+return mod {
+	init = function()
+		return { log = "", opened = 1, y = 0 }
+	end,
+	update = function(state, msg)
+		if msg == "reopen" then
+			state.opened += 1
+			logged(state, "reopened")
+		else
+			state.y = msg.y
+			logged(state, `y={msg.y}`)
+		end
+	end,
+	view = function(state)
+		local rows = {}
+		for i = 1, 20 do
+			table.insert(rows, ui.row { height = 40, ui.text { `row {i}` } })
+		end
+		return shell(state, ui.column {
+			ui.row { class = "reopen", msg = "reopen", ui.text { "Reopen" } },
+			ui.column { class = "reader", key = `reader-{state.opened}`, height = 100, gap = "none",
+				scroll = true, measure = "read", scroll_to = { y = state.y, seq = state.opened },
+				table.unpack(rows) },
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_reader_reopens_where_measure_told_it_was(cx: &mut TestAppContext) {
+    let mut window = open(cx, REOPENED);
+    window.wheel("reader", 240.0);
+    assert_eq!(last(&mut window), "y=240");
+    window.click("reopen");
+    window.settle();
+    let log = window.log();
+    let reopened = log.split("|reopened").nth(1).unwrap_or_default();
+    // Its first measure already tells where it was: nothing undoes it.
+    assert_eq!(reopened, "|y=240", "{log}");
+    assert_eq!(last(&mut window), "y=240");
+}
