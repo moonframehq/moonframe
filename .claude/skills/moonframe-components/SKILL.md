@@ -109,7 +109,7 @@ and `preview` to false. Preview cards are noninteractive and stay inside the com
 | --- | --- | --- |
 | `ui.button { "Label", ... }` | an action with a label and/or an icon (`icon` alone is an icon-only button) | `label`, `icon`, `variant`, `small`, `disabled`, `msg`/`to` or `command`, extras |
 | `ui.item { "Label", ... }` | a plain selectable list row | `label`, `detail`, `badge`, `selected`, `msg`/`to` or `command`, extras |
-| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `secret` (a password: drawn as bullets and never copied or cut, while `change` and `submit` still carry the text; one line), `paste` (sent with `files`, their paths, when files or a picture are pasted into it; a picture is saved to the image cache first and also comes as `image = { path, width, height }`; text pastes as usual), `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `caret` (`"start"`, `"end"` or a byte offset: where the caret goes when the field takes a new `value` or this changes, as after a recalled line), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
+| `ui.input { id = "title", value = state.title, change = "type" }` | a text field the host edits (`multiline` for a text area); what the user typed stays across renders, `value` replaces it when the mod passes a new one. A writing field with `prose` (markdown styled as typed), `dim = "sentence"` or `"paragraph"` (focus mode: the rest fades) and `typewriter` (the caret's line stays in the middle), as `prose-editor` draws it. A code editor with `code = "luau"` (any language: colored as typed, with line numbers; read only with `disabled`, not dimmed) | `id`, `value`, `placeholder`, `change` (each edit, with `value` and `caret`, the bytes before the caret), `select` (selection movement, also with `value`, `caret` and `selected`, the bytes selected), `submit` (Enter, or ⌘↩ when multiline), `enter = "submit"` (multiline: Enter submits and ⇧↩ makes a new line, a chat's composer), `history` (earlier entries, oldest first: ↑ on the first line recalls the one before, ↓ on the last line the one after, then back to the draft; each recall sends `change`), `blur` (with `value`, as it loses focus: save a title edited in place), `keys`, `capture` (every chord pressed, with `keys` added, instead of editing: records a shortcut), `to`, `multiline`, `rows`, `max_rows` (grows with its lines up to it), `focus`, `disabled`, `mono`, `secret` (a password: drawn as bullets and never copied or cut, while `change` and `submit` still carry the text; one line), `paste` (sent with `files`, their paths, when files or a picture are pasted into it; a picture is saved to the image cache first and also comes as `image = { path, width, height }`; text pastes as usual), `width`, `grow`, `browser`, `prose`, `dim`, `typewriter`, `code`, `line` (a code editor's caret goes there), `caret` (`"start"`, `"end"` or a byte offset: where the caret goes when the field takes a new `value` or this changes, as after a recalled line), `scrolled` (multiline: sent as the text scrolls, with `fraction`, 0 at the top to 1 with the last line at the bottom), `scroll_at = { fraction, seq }` (multiline: scrolls there when it changes, without sending `scrolled`); a source and its `ui.markdown` preview follow each other with the two |
 
 ### Overlays
 
@@ -355,6 +355,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`segmented`](#segmented) | Controls | A setting with 2 to 4 short, mutually exclusive values (Light / Dark / System, All / Mine). For more or longer options use `dropdown`; for a vertical list with descriptions use `radio-group`; for switching documents or views use `tabs`; for actions rather than a choice use `button-group`. |
 | [`t3-composer`](#t3-composer) | Controls | Draw inside the mod enabled as the T3 writer. Handle project, draft, picker and cancel messages locally and observe app.t3.results[id] for delivery. |
 | [`toolbar`](#toolbar) | Controls | A row of small quiet buttons above a panel or list. For icon-only buttons use `icon-button`; for one-of-many choices use `segmented`. |
+| [`agent-chat`](#agent-chat) | Data | Give an app a chat with Claude, Codex, OpenCode, pi or Gemini on the `chat` provider (crates/moonframe-chat) in a few lines; the mod must be in providers/chat's `starters`. For one run of an agent the app starts itself use `agent-run`; for a static message use `chat-message`; for a send box alone use `composer`. |
 | [`audio-meter`](#audio-meter) | Data | Sound levels while recording or playing, from values an engine published. For a fraction that isn't sound use `vertical-bar` or `meter`. |
 | [`avatar`](#avatar) | Data | Stand for a person, space, project or agent by its name: comment authors, workspace switchers, people lists. Use `comment-card` for an authored message (it draws one), `status-dot` for a state alone. |
 | [`avatar-stack`](#avatar-stack) | Data | Who is in a group, in a card or a row (38 investors, 3 reviewers), when their names matter less than how many. For one person use `avatar`; for a list of people use `list` or `table`. |
@@ -411,6 +412,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`threshold-line`](#threshold-line) | Data | A metric against its target or limit in a dashboard card: % within SLA against 95%, latency against 2s, lag against 5 minutes. For a line without a target use `ui.line`; for tiny bars use `sparkline`; for bars against a floor use `forecast-chart`. |
 | [`tick-meter`](#tick-meter) | Data | A resource's utilization in a dense, technical dashboard (CPU, GPU, memory, a queue's depth), where a striped instrument reads better than a smooth bar. For a compact bar with its percentage use `meter`; for a quota with a reset use `usage-bar`; for task progress use `progress`. |
 | [`timeline`](#timeline) | Data | Events in order: checkpoints, commits, deploys, an agent's steps. For a flat selectable list use `list`; for comments use `comment-card`; for a table of runs use `table`. |
+| [`tool-group`](#tool-group) | Data | Inside a chat with a coding agent, for each `tools` row of `app.chat`'s view (`agent-chat` draws them). For one agent run's whole progress use `agent-run`; for a plain fold use `collapsible`. |
 | [`usage-bar`](#usage-bar) | Data | A rate limit or quota with a reset (an AI plan's weekly or 5-hour window, an API budget), in a usage sheet or settings page. For a plain fraction use `meter`; for task progress use `progress`; for a single big number use `stat-tile`. |
 | [`vectorscope`](#vectorscope) | Data | Judging colour balance and saturation from points an engine measured and published (up to 480, thinned out; more are left out). For levels across the picture use `waveform`; for tones use `histogram`. |
 | [`vertical-bar`](#vertical-bar) | Data | A fraction in a row with no room for a horizontal bar: a host's CPU or memory beside its name in a sidebar, a queue's depth in a tab. For a bar with room to spread use `meter`; for a history use `sparkline`. |
@@ -1325,6 +1327,51 @@ toolbar { buttons = { { label = "New", msg = "new" }, { label = "Refresh", msg =
 A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 
 ### Data
+
+#### `agent-chat`
+
+**Agent Chat.** A whole conversation with a coding agent through herdr-acp: transcript with folded tool runs, permission questions, queue, Stop and Resume, mode/model/effort pickers and a multiline composer with history, / commands and attachments.
+
+**When:** Give an app a chat with Claude, Codex, OpenCode, pi or Gemini on the `chat` provider (crates/moonframe-chat) in a few lines; the mod must be in providers/chat's `starters`. For one run of an agent the app starts itself use `agent-run`; for a static message use `chat-message`; for a send box alone use `composer`.
+
+| Prop | Meaning |
+| --- | --- |
+| `agent` | the agent a new chat starts (default `app.chat.default`); the composer offers the others |
+| `chat` | the `app.chat` chat to draw; without it the first prompt starts one, and `started` says which |
+| `context` | text put before every prompt for the agent (what the user is looking at); never shown in the user's bubble |
+| `cwd` | the folder a new chat starts in (default the provider's) |
+| `id` | the instance's id (one per chat drawn) |
+| `link` | sent to the mod with `url` when a link in an answer is clicked |
+| `placeholder` | the composer's grey text |
+| `started` | sent to the mod with `chat` set to the id of a chat it started |
+| `suggestions` | chips on the empty chat: strings, or { label, prompt } |
+| `title` | the empty chat's heading (default "Ask the agent") |
+| `to` | where its commands go (default "provider:chat"; "parent" sends them to the mod, as a demo does) |
+| `view` | stands in for the `app.chat` chat { id, status, error?, session?, view }, for a preview or demo |
+
+**Styles:** `.agent-chat` `.agent-chat-bottom` `.agent-chat-composer` `.agent-chat-context` `.agent-chat-empty-icon` `.agent-chat-ended` `.agent-chat-error` `.agent-chat-field` `.agent-chat-file` `.agent-chat-notice` `.agent-chat-notice:error` `.agent-chat-notice:warning` `.agent-chat-permission` `.agent-chat-permission-icon` `.agent-chat-permission-tool` `.agent-chat-plan` `.agent-chat-plan-done` `.agent-chat-plan-running` `.agent-chat-queued` `.agent-chat-transcript` `.agent-chat-turn` `.agent-chat-turn:cancelled` `.agent-chat-turn:failed` `.agent-chat-user` `.agent-chat-working`
+
+```lua
+local agent_chat = use "agent-chat"
+
+-- in view: a chat on the mod's state.chat, started by the first prompt
+agent_chat {
+	id = "assistant",
+	chat = state.chat,
+	agent = "claude",
+	context = `The user is reading: {state.subject}`,
+	placeholder = "Ask about this message…",
+	suggestions = { "Summarize it", "Draft a reply" },
+	started = "chat-started",
+}
+
+-- in update: keep the chat it started
+if msg.msg == "chat-started" then
+	state.chat = msg.chat
+end
+```
+
+A whole mod using it, with state: `app/components/demos/agent-chat.luau`.
 
 #### `audio-meter`
 
@@ -2968,6 +3015,27 @@ local timeline = use "timeline"
 ```
 
 A whole mod using it, with state: `app/components/demos/timeline.luau`.
+
+#### `tool-group`
+
+**Tool Group.** A run of an agent's tool calls folded to one line with its status and changed lines; open, each call with its output's end and its files.
+
+**When:** Inside a chat with a coding agent, for each `tools` row of `app.chat`'s view (`agent-chat` draws them). For one agent run's whole progress use `agent-run`; for a plain fold use `collapsible`.
+
+| Prop | Meaning |
+| --- | --- |
+| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, files, steps } or { type = "thought", gist, text } } } |
+| `msg` | message a click on the header sends (the mod flips `open`) |
+| `open` | show its calls |
+| `to` | mod to send it to, if not the drawing one |
+
+**Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`
+
+```lua
+local tool_group = use "tool-group"
+
+tool_group { group = { count = 3, failed = 0, files = { { added = 12, new = false, path = "src/lib.rs", removed = 3 } }, items = { { gist = "Looking at the parser first", text = "", type = "thought" }, { files = {  }, id = "a", kind = "read", status = "done", steps = 0, title = "Read src/parse.rs", type = "tool" }, { detail = "test result: ok. 14 passed", files = {  }, id = "b", kind = "execute", status = "done", steps = 0, title = "cargo test parse", type = "tool" }, { files = { { added = 12, new = false, path = "src/lib.rs", removed = 3 } }, id = "c", kind = "edit", status = "done", steps = 0, title = "Edit src/lib.rs", type = "tool" } }, key = "e2", more = 0, status = "done", title = "Read 2 files, edited 1 file" }, open = true }
+```
 
 #### `usage-bar`
 

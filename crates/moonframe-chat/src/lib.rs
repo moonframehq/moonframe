@@ -7,14 +7,18 @@
 //! launch attaches to it again and gets only what it missed. A chat whose
 //! program ended keeps its agent session's id, so it can be resumed.
 //!
-//! Messages (only from mods in provider.toml's `[settings] starters`; a chat
-//! obeys only the mod that started it). Each may carry an `id`, which its
-//! answer `{ reply = id, action, ok, error? }` carries back:
-//! - `{ start = "<agent>", cwd?, load? }` starts a chat in `cwd` (else the
-//!   app's repository), continuing the agent's session `load` if given;
-//!   answered with `chat`.
-//! - `{ prompt = "<text>", chat, files? }` sends a prompt, or queues it
-//!   behind the running turn; `files` are absolute paths sent with it.
+//! Messages (only from mods in provider.toml's `[settings] starters`, or
+//! component instances they drew; a chat obeys only the mod that started
+//! it). Each may carry an `id`, which its answer `{ reply = id, action, ok,
+//! error? }` carries back to the sender:
+//! - `{ start = "<agent>", cwd?, load?, context? }` starts a chat in `cwd`
+//!   (else the app's repository), continuing the agent's session `load` if
+//!   given; answered with `chat`. `context` goes before its first prompt.
+//! - `{ prompt = "<text>", chat, files?, context? }` sends a prompt, or
+//!   queues it behind the running turn; `files` are absolute paths sent
+//!   with it. `context`, a frame the app puts before the prompt (what the
+//!   user is looking at), reaches the agent and is left out of the view.
+//!   A prompt to a chat still starting waits for it to attach.
 //! - `{ cancel = chat }`, `{ answer = chat, permission, option }`,
 //!   `{ mode = "<id>", chat }`, `{ setting = "<id>", value, chat }` (a
 //!   choice's id, or a boolean), `{ unqueue = "<queued id>", chat }`,
@@ -25,10 +29,13 @@
 //!   is shared whole; the others share their last few entries.
 //! - Anything else looks for agents again and publishes.
 //!
-//! `app.chat` is `{ available, reason?, program, agents, chats }`; a chat is
-//! `{ id, owner, agent, cwd, created, status, error?, session?, transcript? }`
-//! with `status` `"starting" "live" "reconnecting" "ended" "failed"` and
-//! `transcript` herdr's (see `project`).
+//! `app.chat` is `{ available, reason?, warning?, program, agents, default,
+//! cwd, chats }`; a chat is `{ id, owner, agent, cwd, created, status,
+//! error?, session?, view? }` with `status` `"starting" "live"
+//! "reconnecting" "ended" "failed"` and `view` what a view draws (see
+//! moonframe-chat-view's `ChatView`): whole for the chat in focus, its last
+//! rows for the others. With `[settings] raw = true` a chat also carries
+//! herdr's own `transcript` (see `project`).
 
 // keep-sorted start
 mod program;
@@ -62,6 +69,11 @@ use std::os::unix::net::UnixStream;
 const MAX_CHATS: usize = 24;
 /// The longest prompt a mod may send.
 const MAX_PROMPT: usize = 256 * 1024;
+/// Commands a chat holds until it attaches. Commands go out on Unix alone.
+#[cfg(unix)]
+const MAX_HELD: usize = 8;
+/// The longest context a mod may put before a prompt.
+const MAX_CONTEXT: usize = 64 * 1024;
 
 /// Makes the provider, for the app's registry.
 pub fn native() -> Box<dyn Native> {
@@ -89,10 +101,14 @@ pub(crate) struct Chat {
     pub(crate) endpoint: Option<EndpointId>,
     pub(crate) session: Option<String>,
     pub(crate) phase: Phase,
+    /// The context `start` gave, put before the first prompt.
+    pub(crate) context: Option<String>,
     pub(crate) transcript: Option<Transcript>,
     pub(crate) cursor: Option<Cursor>,
     #[cfg(unix)]
     pub(crate) writer: Option<UnixStream>,
+    /// Commands sent before it attached, sent as it does.
+    pub(crate) held: Vec<(CommandId, Command)>,
     pub(crate) closing: bool,
 }
 
@@ -102,7 +118,8 @@ pub(crate) struct Chat {
 pub(crate) struct Pending {
     /// The chat it went to: answered with an error if it goes first.
     pub(crate) chat: String,
-    pub(crate) owner: String,
+    /// Who sent it, and so gets the answer: a mod or an instance it drew.
+    pub(crate) to: String,
     pub(crate) reply: Value,
     pub(crate) action: &'static str,
 }
@@ -142,7 +159,7 @@ impl State {
                 let answer = json!({
                     "reply": pending.reply, "action": pending.action, "ok": false, "error": why,
                 });
-                send(host, &pending.owner, &answer);
+                send(host, &pending.to, &answer);
             }
         }
     }
@@ -169,6 +186,12 @@ pub struct Chats {
     state: Shared,
     starters: Mods,
     program: Option<PathBuf>,
+    /// A `program` setting that named no file, passed over for the search.
+    missing: Option<PathBuf>,
+    /// Look only where the settings say: no search path, no installed apps.
+    isolated: bool,
+    /// Share herdr's own transcript beside the view.
+    raw: bool,
     /// The folders agents are looked for in.
     path: OsString,
     /// Where a chat without `cwd` starts.
@@ -184,15 +207,36 @@ impl Native for Chats {
         let settings = to_json(host.settings());
         self.starters = Mods::from_settings(host.settings(), "starters");
         let home = std::env::var_os("HOME").map(PathBuf::from);
-        self.path = moonframe_providers::program::search_path(
-            std::env::var_os("PATH").as_deref(),
-            home.as_deref(),
-        );
+        self.path = if self.isolated {
+            OsString::new()
+        } else {
+            moonframe_providers::program::search_path(
+                std::env::var_os("PATH").as_deref(),
+                home.as_deref(),
+            )
+        };
         let setting = settings
             .get("program")
             .and_then(Value::as_str)
+            .filter(|path| !path.is_empty())
             .map(|path| expand(path, home.as_deref()));
-        self.program = program::find(setting.as_deref(), &self.path, home.as_deref());
+        let bundled = if self.isolated {
+            Vec::new()
+        } else {
+            program::bundled(home.as_deref())
+        };
+        let found = program::find(setting.as_deref(), &self.path, &bundled);
+        if let Some(missing) = &found.missing {
+            tracing::warn!(
+                "chat: `program` {} is not a file; looking for herdr-acp instead",
+                missing.display()
+            );
+        }
+        (self.program, self.missing) = (found.program, found.missing);
+        self.raw = settings
+            .get("raw")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         self.cwd = match settings.get("cwd").and_then(Value::as_str) {
             Some(cwd) => expand(cwd, home.as_deref()),
             None => repository(host.dir()).unwrap_or_else(|| home.clone().unwrap_or_default()),
@@ -237,7 +281,7 @@ impl Native for Chats {
             if answer.get("ok").is_none() {
                 answer["ok"] = json!(true);
             }
-            send(host, owner(from), &answer);
+            send(host, from, &answer);
         }
         lock(&self.state).dirty = true;
         self.publish(host);
@@ -304,10 +348,26 @@ impl Chats {
                     "cancel" | "answer" => text(action),
                     _ => text("chat"),
                 };
-                match command(action, message) {
+                let id = chat.unwrap_or_default();
+                // A prompt without a context of its own takes its start's.
+                let own = match action {
+                    "prompt" => context_of(message),
+                    _ => Ok(None),
+                };
+                let context = own.map(|own| own.or_else(|| self.start_context(owner, id)));
+                match context.and_then(|context| command(action, message, context.as_deref())) {
                     Ok(command) => {
                         let reply = message.get("id").cloned().unwrap_or_else(|| json!(action));
-                        self.command(owner, chat.unwrap_or_default(), command, reply, action)
+                        let sent = self.command(from, id, command, reply, action);
+                        // The start's context belongs to the first prompt sent,
+                        // even one that brought its own instead.
+                        if action == "prompt"
+                            && sent.is_ok()
+                            && let Some(chat) = lock(&self.state).chat_mut(id)
+                        {
+                            chat.context = None;
+                        }
+                        sent
                     },
                     Err(error) => Err(error),
                 }
@@ -346,6 +406,7 @@ impl Chats {
             .get("load")
             .and_then(Value::as_str)
             .map(str::to_owned);
+        let context = context_of(message)?;
         self.serial += 1;
         let id = format!("{}-{}", now_ms(), self.serial);
         {
@@ -360,10 +421,12 @@ impl Chats {
                 endpoint: None,
                 session: load.clone(),
                 phase: Phase::Starting,
+                context,
                 transcript: None,
                 cursor: None,
                 #[cfg(unix)]
                 writer: None,
+                held: Vec::new(),
                 closing: false,
             });
             trim(&mut state);
@@ -428,7 +491,9 @@ impl Chats {
                         attach(shared, host, id, endpoint);
                     },
                     Err(error) => {
-                        chat.phase = Phase::Failed(error);
+                        chat.phase = Phase::Failed(error.clone());
+                        chat.held.clear();
+                        state.settle(&host, &id, &error);
                         state.dirty = true;
                     },
                 }
@@ -475,10 +540,12 @@ impl Chats {
         Ok(Some(json!({ "chat": id })))
     }
 
+    /// Sends `command` from `from` to chat `id`, or holds it while the
+    /// chat is still starting; answered when the program acknowledges it.
     #[cfg(unix)]
     fn command(
         &self,
-        owner: &str,
+        from: &str,
         id: &str,
         command: Command,
         reply: Value,
@@ -487,20 +554,26 @@ impl Chats {
         let mut state = lock(&self.state);
         let chat = state
             .chat_mut(id)
-            .filter(|chat| chat.owner == owner)
+            .filter(|chat| chat.owner == owner(from))
             .ok_or_else(|| "no such chat".to_owned())?;
-        let writer = chat
-            .writer
-            .as_mut()
-            .ok_or_else(|| "the chat is not attached yet".to_owned())?;
         let command_id = CommandId::random();
-        if !link::command(writer, command_id, command) {
-            return Err("the chat's program did not take it".to_owned());
+        match chat.writer.as_mut() {
+            Some(writer) => {
+                if !link::command(writer, command_id, command) {
+                    return Err("the chat's program did not take it".to_owned());
+                }
+            },
+            None if matches!(chat.phase, Phase::Starting | Phase::Reconnecting) => {
+                if chat.held.len() >= MAX_HELD {
+                    return Err("the chat is still starting".to_owned());
+                }
+                chat.held.push((command_id, command));
+            },
+            None => return Err("the chat is not running".to_owned()),
         }
-        let owner = owner.to_owned();
         state.pending.insert(command_id, Pending {
             chat: id.to_owned(),
-            owner,
+            to: from.to_owned(),
             reply,
             action,
         });
@@ -511,13 +584,22 @@ impl Chats {
     #[cfg(not(unix))]
     fn command(
         &self,
-        _owner: &str,
+        _from: &str,
         _id: &str,
         _command: Command,
         _reply: Value,
         _action: &'static str,
     ) -> Result<Option<Value>, String> {
         Err("chats need a Unix system for now".to_owned())
+    }
+
+    /// The context `start` gave chat `id`, while its first prompt is unsent.
+    fn start_context(&self, owner: &str, id: &str) -> Option<String> {
+        let state = lock(&self.state);
+        state
+            .chat(id)
+            .filter(|chat| chat.owner == owner)
+            .and_then(|chat| chat.context.clone())
     }
 
     fn look_for_agents(&self) {
@@ -549,34 +631,7 @@ impl Chats {
         let chats: Vec<Value> = state
             .chats
             .iter()
-            .map(|chat| {
-                let entries = if focus.as_deref() == Some(&chat.id) {
-                    project::FULL_ENTRIES
-                } else {
-                    project::SHORT_ENTRIES
-                };
-                let (status, error) = match &chat.phase {
-                    Phase::Starting => ("starting", None),
-                    Phase::Live => ("live", None),
-                    Phase::Reconnecting => ("reconnecting", None),
-                    Phase::Ended(why) => ("ended", Some(why.clone())),
-                    Phase::Failed(why) => ("failed", Some(why.clone())),
-                };
-                json!({
-                    "id": chat.id,
-                    "owner": chat.owner,
-                    "agent": chat.agent,
-                    "cwd": chat.cwd,
-                    "created": chat.created,
-                    "status": status,
-                    "error": error,
-                    "session": chat.session,
-                    "transcript": chat
-                        .transcript
-                        .as_ref()
-                        .map(|transcript| project::transcript(transcript, entries)),
-                })
-            })
+            .map(|chat| project::chat(chat, focus.as_deref() == Some(&chat.id), self.raw))
             .collect();
         let program = self.program.as_ref().map(|path| path.display().to_string());
         let mut published = json!({
@@ -588,8 +643,16 @@ impl Chats {
             "chats": chats,
         });
         if self.program.is_none() {
-            published["reason"] =
-                json!("herdr-acp was not found: install Herdr, or set `program` in providers/chat");
+            published["reason"] = json!(
+                "herdr-acp was not found: install Sheprd or Herdr, or set `program` in \
+                 providers/chat"
+            );
+        }
+        if let Some(missing) = &self.missing {
+            published["warning"] = json!(format!(
+                "`program` {} is not a file; herdr-acp was looked for instead",
+                missing.display()
+            ));
         }
         drop(state);
         host.publish_json(&published);
@@ -673,10 +736,12 @@ impl Chats {
                 } else {
                     Phase::Ended("the chat ended while the app was closed".to_owned())
                 },
+                context: None,
                 transcript: None,
                 cursor: None,
                 #[cfg(unix)]
                 writer: None,
+                held: Vec::new(),
                 closing: false,
             });
         }
@@ -727,7 +792,7 @@ fn trim(state: &mut State) {
 }
 
 /// The herdr command a message asks for.
-fn command(action: &str, message: &Value) -> Result<Command, String> {
+fn command(action: &str, message: &Value, context: Option<&str>) -> Result<Command, String> {
     let text = |key: &str| message.get(key).and_then(Value::as_str);
     Ok(match action {
         "prompt" => {
@@ -738,6 +803,10 @@ fn command(action: &str, message: &Value) -> Result<Command, String> {
             if text.len() > MAX_PROMPT {
                 return Err(format!("a prompt is at most {MAX_PROMPT} bytes"));
             }
+            let text = match context {
+                Some(context) => moonframe_chat_view::frame(context, text),
+                None => text.to_owned(),
+            };
             let attachments = message
                 .get("files")
                 .and_then(Value::as_array)
@@ -748,10 +817,7 @@ fn command(action: &str, message: &Value) -> Result<Command, String> {
                     path: path.to_owned(),
                 })
                 .collect();
-            Command::Prompt {
-                text: text.to_owned(),
-                attachments,
-            }
+            Command::Prompt { text, attachments }
         },
         "cancel" => Command::Cancel,
         "answer" => Command::Answer {
@@ -786,6 +852,18 @@ fn command(action: &str, message: &Value) -> Result<Command, String> {
         },
         _ => return Err(format!("unknown action `{action}`")),
     })
+}
+
+/// A message's `context`, at most [`MAX_CONTEXT`] bytes.
+fn context_of(message: &Value) -> Result<Option<String>, String> {
+    match message.get("context") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(context)) if context.len() > MAX_CONTEXT => {
+            Err(format!("a context is at most {MAX_CONTEXT} bytes"))
+        },
+        Some(Value::String(context)) => Ok(Some(context.clone()).filter(|c| !c.trim().is_empty())),
+        Some(_) => Err("a context is text".to_owned()),
+    }
 }
 
 fn now_ms() -> u64 {

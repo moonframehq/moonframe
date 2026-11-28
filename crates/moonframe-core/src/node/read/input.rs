@@ -14,6 +14,8 @@ impl Build for Input {
         "change",
         "select",
         "submit",
+        "enter",
+        "history",
         "blur",
         "keys",
         "capture",
@@ -103,6 +105,25 @@ impl Build for Input {
                 )));
             },
         };
+        let enter_submits = match fields.get::<String>("enter")?.as_deref() {
+            None | Some("newline") => false,
+            Some("submit") if multiline => true,
+            Some("submit") => {
+                return Err(fields
+                    .cx()
+                    .key("enter")
+                    .fail("a one-line field always submits on Enter; `enter` goes with `multiline = true`"));
+            },
+            Some(other) => {
+                return Err(fields.cx().key("enter").fail(format!(
+                    "`{other}` is not what Enter does; use \"submit\" or \"newline\""
+                )));
+            },
+        };
+        let history = fields
+            .get::<History>("history")?
+            .map(|history| history.0)
+            .unwrap_or_default();
         let change = fields.get::<Data>("change")?;
         let select = fields.get::<Data>("select")?;
         let submit = fields.get::<Data>("submit")?;
@@ -146,6 +167,8 @@ impl Build for Input {
             change,
             select,
             submit,
+            enter_submits,
+            history,
             blur,
             keys,
             capture,
@@ -396,6 +419,31 @@ impl Read for ScrollAt {
             // As a double: an f32 runs out of whole numbers past 2^24.
             seq: fields.get::<f64>("seq")?.unwrap_or(0.0) as i64,
         })
+    }
+}
+
+/// An input's `history`: earlier entries, oldest first, the newest
+/// [`Input::MAX_HISTORY`] of them kept.
+struct History(Vec<String>);
+
+impl Read for History {
+    fn read(value: &Value, cx: &Cx) -> Result<Self, Error> {
+        let Value::Table(table) = value else {
+            return Err(cx.fail("expected a list of earlier entries, oldest first"));
+        };
+        let mut entries = Vec::new();
+        let mut bytes = 0usize;
+        for (index, entry) in table.sequence_values::<Value>().enumerate() {
+            let entry = String::read(&entry?, &cx.index(index + 1))?;
+            bytes = bytes.saturating_add(entry.len());
+            if bytes > MAX_DOCUMENT {
+                return Err(cx.fail(format!("more than {MAX_DOCUMENT} bytes of history")));
+            }
+            entries.push(entry);
+        }
+        let older = entries.len().saturating_sub(Input::MAX_HISTORY);
+        entries.drain(..older);
+        Ok(Self(entries))
     }
 }
 
