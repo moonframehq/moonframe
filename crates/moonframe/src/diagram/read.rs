@@ -12,9 +12,11 @@ use {
 };
 
 pub(super) enum Camera {
+    // keep-sorted start
     Fit,
     ZoomBy(f32),
     ZoomTo(f32),
+    // keep-sorted end
 }
 
 pub(super) struct Props {

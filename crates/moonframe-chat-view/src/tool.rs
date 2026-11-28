@@ -40,7 +40,7 @@ pub(crate) fn running(status: ToolStatus) -> bool {
 
 /// `tool` as its line shows it; `steps` are the calls a sub-agent made
 /// under it, oldest first.
-pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
+pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits, key: String) -> ToolView {
     let mut files = Vec::new();
     let mut output = None;
     for item in &tool.content {
@@ -48,7 +48,8 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
             ToolContent::Diff { new, old, path } => {
                 files.push(change(path, old.as_deref(), new, limits));
             },
-            ToolContent::Text { text } => output = Some(text.as_str()),
+            ToolContent::Text { text } if !text.trim().is_empty() => output = Some(text.as_str()),
+            ToolContent::Text { .. } => {},
             ToolContent::Image { .. } | ToolContent::Terminal { .. } => {},
         }
     }
@@ -72,6 +73,9 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
         .find(|step| running(step.status))
         .map(|step| text::head(&step.title, 300));
     ToolView {
+        output_key: output
+            .filter(|_| !running(tool.status) && running_step.is_none())
+            .map(|_| key),
         id: text::head(&tool.call_id, 256),
         kind: kind_name(tool.kind),
         title: title(tool, limits),

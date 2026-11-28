@@ -525,3 +525,32 @@ fn failed_and_read_only_chats_take_no_prompts() {
     chat.read_only = true;
     assert!(!prepare(&chat, &Limits::FULL).accepts);
 }
+
+#[test]
+fn output_key_is_exposed_only_after_a_tool_finishes() {
+    let make = |id: &str, status| {
+        let mut call = tool(id, ToolKind::Execute, "cargo test", status);
+        call.content.push(ToolContent::Text {
+            text: "line 1\nline 2".to_owned(),
+        });
+        EntryKind::Tool(call)
+    };
+    let view = prepare(
+        &transcript(vec![
+            make("p", ToolStatus::Pending),
+            make("r", ToolStatus::InProgress),
+            make("d", ToolStatus::Completed),
+            make("f", ToolStatus::Failed),
+        ]),
+        &Limits::FULL,
+    );
+    let keys: Vec<Option<&str>> = group(&view.rows[0])
+        .items
+        .iter()
+        .map(|item| match item {
+            ToolItem::Tool(tool) => tool.output_key.as_deref(),
+            ToolItem::Thought { .. } => None,
+        })
+        .collect();
+    assert_eq!(keys, [None, None, Some("e3"), Some("e4")]);
+}

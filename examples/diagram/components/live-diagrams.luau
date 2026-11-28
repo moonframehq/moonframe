@@ -34,7 +34,11 @@ return component {
 				rows,
 				ui.row {
 					class = "live-diagram",
-					key = (string.gsub(d.key, "[^%w_-]", "-")),
+					-- Each character a key may not hold as its hex code, `-` too,
+					-- so two names never meet.
+					key = (string.gsub(d.key, "[^%w_]", function(c)
+						return string.format("-%02x", string.byte(c))
+					end)),
 					selected = d.key == props.shown,
 					align = "center",
 					msg = { live = d.key },

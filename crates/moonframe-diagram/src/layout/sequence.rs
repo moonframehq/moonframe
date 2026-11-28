@@ -7,7 +7,7 @@ use {
     super::{Layout, Measure, Options, Route},
     crate::{
         geometry::{Point, Rect},
-        model::{Diagram, Node},
+        model::{Diagram, Node, Note},
     },
     std::collections::HashMap,
 };
@@ -19,15 +19,7 @@ const LOOP_OUT: f32 = 36.0;
 
 pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options) -> Layout {
     let mut out = Layout::default();
-    // Participants: those listed, then any a message names that wasn't.
-    let mut people: Vec<Node> = diagram.nodes.clone();
-    for m in &diagram.messages {
-        for id in [&m.from, &m.to] {
-            if !people.iter().any(|p| &p.id == id) {
-                people.push(Node::new(id.clone(), id.clone()));
-            }
-        }
-    }
+    let people: Vec<Node> = diagram.participants();
     let index: HashMap<&str, usize> = people
         .iter()
         .enumerate()
@@ -78,11 +70,21 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
     }
 
     // Rows: notes before the message they precede, then the message.
+    // Notes go by `before`, as listed among equals, and keep their index,
+    // which painting pairs with their text.
     let mut y = head_h + ROW * 0.75;
-    let mut notes = diagram.notes.iter().peekable();
+    let mut order: Vec<usize> = (0..diagram.notes.len()).collect();
+    order.sort_by_key(|&n| diagram.notes[n].before);
+    let mut notes = order.into_iter().peekable();
+    let mut note_rects = vec![Rect::default(); diagram.notes.len()];
+    let mut place = |n: usize, y: f32| {
+        let (rect, next) = place_note(&diagram.notes[n], &index, &x, measure, options, y);
+        note_rects[n] = rect;
+        next
+    };
     for (i, m) in diagram.messages.iter().enumerate() {
-        while let Some(note) = notes.next_if(|n| n.before <= i) {
-            y = place_note(note, &index, &x, measure, options, y, &mut out);
+        while let Some(n) = notes.next_if(|&n| diagram.notes[n].before <= i) {
+            y = place(n, y);
         }
         let (Some(&a), Some(&b)) = (index.get(m.from.as_str()), index.get(m.to.as_str())) else {
             continue;
@@ -96,23 +98,29 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
             ];
             // Its label beside the loop, not over it.
             let half = measure.width(&m.label, size * 0.9) / 2.0;
+            let label = Point::new(x[a] + LOOP_OUT + 8.0 + half, y + ROW * 0.25);
+            out.extents.push(label_box(label, half, size));
             out.messages.push(Route {
-                label: Some(Point::new(x[a] + LOOP_OUT + 8.0 + half, y + ROW * 0.25)),
+                label: Some(label),
                 points,
             });
             y += ROW * 1.5;
         } else {
             let points = vec![Point::new(x[a], y), Point::new(x[b], y)];
+            let half = measure.width(&m.label, size * 0.9) / 2.0;
+            let label = Point::new((x[a] + x[b]) / 2.0, y - size * 0.8);
+            out.extents.push(label_box(label, half, size));
             out.messages.push(Route {
-                label: Some(Point::new((x[a] + x[b]) / 2.0, y - size * 0.8)),
+                label: Some(label),
                 points,
             });
             y += ROW;
         }
     }
-    for note in notes {
-        y = place_note(note, &index, &x, measure, options, y, &mut out);
+    for n in notes {
+        y = place(n, y);
     }
+    out.notes = note_rects;
     for (i, p) in people.iter().enumerate() {
         out.lifelines
             .push((p.id.clone(), Point::new(x[i], head_h), Point::new(x[i], y)));
@@ -120,17 +128,23 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
     out
 }
 
-/// A note's box over its participants at `y`; returns where the next row
+/// The box a message's label takes, `half` its width either side of
+/// `center`, on one line of `size` text drawn a little smaller.
+fn label_box(center: Point, half: f32, size: f32) -> Rect {
+    let h = size * 0.9 * 1.4;
+    Rect::new(center.x - half, center.y - h / 2.0, half * 2.0, h)
+}
+
+/// A note's box over its participants at `y`, and where the next row
 /// starts.
 fn place_note(
-    note: &crate::model::Note,
+    note: &Note,
     index: &HashMap<&str, usize>,
     x: &[f32],
     measure: &dyn Measure,
     options: &Options,
     y: f32,
-    out: &mut Layout,
-) -> f32 {
+) -> (Rect, f32) {
     let lanes: Vec<usize> = note
         .over
         .iter()
@@ -146,7 +160,6 @@ fn place_note(
     let text = measure.width(&note.text, options.font_size * 0.9) + options.padding.w * 2.0;
     let w = text.max(hi - lo + 40.0);
     let h = options.font_size * 1.4 + options.padding.h * 2.0;
-    out.notes
-        .push(Rect::new((lo + hi) / 2.0 - w / 2.0, y - h / 2.0, w, h));
-    y + h + ROW * 0.4
+    let rect = Rect::new((lo + hi) / 2.0 - w / 2.0, y - h / 2.0, w, h);
+    (rect, y + h + ROW * 0.4)
 }

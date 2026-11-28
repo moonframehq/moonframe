@@ -16,54 +16,175 @@ pub(crate) fn empty() -> Map<String, Value> {
 }
 
 /// A planner to look at instead (`DAYBOOK_SAMPLE`): a day of tasks and
-/// events around today, an inbox, tags, folders and a few notes.
+/// events around today, an inbox, habits, tags, folders and rich notes.
 pub(crate) fn sample(today: NaiveDate) -> Map<String, Value> {
     let today_text = day(today, None, 0);
     let near = |offset| day(today, Some(&today_text), offset);
     let mut items: Vec<Value> = Vec::new();
-    let mut item = |mut fields: Value| {
-        fields["id"] = json!(format!("i{}", items.len() + 1));
+    let mut item = |mut fields: Value| -> String {
+        let id = format!("i{}", items.len() + 1);
+        fields["id"] = json!(id);
         items.push(fields);
+        id
     };
-    item(json!({"kind": "task", "title": "Water the plants", "date": today_text, "done": true}));
-    item(
-        json!({"kind": "task", "title": "Finish the quarterly review", "date": today_text,
-        "time": "17:00", "state": "progress", "tags": ["Work"]}),
-    );
-    item(
-        json!({"kind": "task", "title": "Call Sam about the offsite", "date": today_text,
-        "time": "16:00", "state": "important", "tags": ["Work"]}),
-    );
-    item(
-        json!({"kind": "task", "title": "Morning run", "date": today_text, "time": "07:30",
-        "habit": true, "tags": ["Health"]}),
-    );
-    item(json!({"kind": "event", "title": "Dinner with Lea", "date": today_text, "time": "19:00"}));
-    item(
-        json!({"kind": "event", "title": "Design critique", "date": today_text, "time": "10:00",
-        "tags": ["Work"]}),
-    );
-    item(
-        json!({"kind": "task", "title": "Book the train to Porto", "date": near(-1),
-        "state": "important", "tags": ["Home"]}),
-    );
-    item(json!({"kind": "task", "title": "Sketch the onboarding flow", "tags": ["Ideas"]}));
-    item(json!({"kind": "task", "title": "Read the research notes"}));
-    item(
-        json!({"kind": "event", "title": "Team standup", "date": near(1), "time": "09:30",
-        "tags": ["Work"]}),
-    );
-    item(json!({"kind": "task", "title": "Renew the passport", "date": near(3), "tags": ["Home"]}));
-    item(
-        json!({"kind": "event", "title": "Climbing", "date": near(4), "time": "18:30",
-        "tags": ["Health"]}),
-    );
-    item(
-        json!({"kind": "note", "title": "Getting started", "emoji": "\u{2b50}", "favorite": true}),
-    );
-    item(json!({"kind": "note", "title": "Trip to Porto", "emoji": "\u{1f9f3}"}));
-    item(json!({"kind": "note", "title": "Launch plan", "emoji": "\u{1f680}"}));
-    item(json!({"kind": "note", "title": "App ideas", "emoji": "\u{1f4a1}"}));
+
+    // Rich notes first so tasks/events can link to their ids.
+    let note_start = item(json!({
+        "kind": "note",
+        "title": "Getting started",
+        "emoji": "\u{2b50}",
+        "favorite": true,
+        "folder": "Personal",
+        "cover": "ocean",
+        "tags": ["Ideas"],
+        "created": "Oct 18, 2026",
+        "edited": "Edited today",
+        "body": "# Welcome to Daybook\n\nKeep your **tasks**, **events**, **habits**, and **notes** in one calm place.\n\n- Click any task to open its inspector on the right\n- Switch **Upcoming** between Board columns and List\n- Switch **Calendar** between 3-day, Week, and Month views\n- Open the **AI Assistant** from the top right sparkles button",
+    }));
+    let note_porto = item(json!({
+        "kind": "note",
+        "title": "Trip to Porto",
+        "emoji": "\u{1f9f3}",
+        "folder": "Personal",
+        "cover": "sunset",
+        "tags": ["Ideas"],
+        "created": "Oct 21, 2026",
+        "edited": "Edited now",
+        "body": "## Itinerary\n\n- **Day 1**: Arrive at Campanha, walk down to Ribeira for sunset dinner.\n- **Day 2**: Livraria Lello in the morning, port tasting across the river in Vila Nova de Gaia.\n- **Day 3**: Tram out to Foz do Douro and coffee by the lighthouse.",
+    }));
+    let note_launch = item(json!({
+        "kind": "note",
+        "title": "Launch plan",
+        "emoji": "\u{1f680}",
+        "folder": "Work",
+        "cover": "aurora",
+        "tags": ["Work"],
+        "created": "Oct 24, 2026",
+        "edited": "Edited 2h ago",
+        "body": "## Milestones\n\nFinal checks before the public beta goes live.\n\n- Confirm changelog copy with design\n- Record 45-second walkthrough clip\n- Post release thread and monitor telemetry",
+    }));
+    let _note_ideas = item(json!({
+        "kind": "note",
+        "title": "App ideas",
+        "emoji": "\u{1f4a1}",
+        "folder": "Personal",
+        "cover": "plum",
+        "tags": ["Ideas"],
+        "created": "Oct 12, 2026",
+        "edited": "Edited 3d ago",
+        "body": "## Sparks\n\n- Offline-first reading queue with highlight sync\n- Ambient focus timer tied to daily habits\n- Keyboard-first trip planner with map pins",
+    }));
+
+    // Today's tasks, habits, and events.
+    item(json!({
+        "kind": "task", "title": "Water the plants", "date": today_text,
+        "done": true, "folder": "Personal", "tags": ["Home"],
+    }));
+    item(json!({
+        "kind": "task", "title": "Finish the quarterly review", "date": today_text,
+        "time": "17:00", "duration": 60, "state": "progress", "folder": "Work", "tags": ["Work"],
+        "body": "Pull final Q3 retention numbers and highlight the onboarding lift.",
+        "subtasks": [
+            {"id": "s1", "title": "Export revenue cohort table", "done": true},
+            {"id": "s2", "title": "Draft executive summary", "done": false},
+            {"id": "s3", "title": "Share deck with leadership", "done": false},
+        ],
+    }));
+    item(json!({
+        "kind": "task", "title": "Call Sam about the offsite", "date": today_text,
+        "time": "16:00", "duration": 45, "state": "important", "folder": "Work", "tags": ["Work"],
+        "body": "Confirm venue dates, dietary needs, and travel stipends.",
+    }));
+    item(json!({
+        "kind": "task", "title": "Morning run", "date": today_text, "time": "07:30",
+        "duration": 45, "habit": true, "streak": 5, "goal": 5, "progress": 3,
+        "progress_date": today_text, "folder": "Personal", "tags": ["Health"],
+        "done_dates": [near(-5), near(-4), near(-3), near(-2), near(-1)],
+        "body": "5 km easy pace along the waterfront.",
+    }));
+    item(json!({
+        "kind": "task", "title": "Pushups x100", "date": today_text, "time": "08:30",
+        "duration": 30, "habit": true, "streak": 4, "goal": 100, "progress": 40,
+        "progress_date": today_text, "folder": "Personal", "tags": ["Health"],
+        "done_dates": [near(-4), near(-3), near(-2), near(-1)],
+        "body": "Split into 4 sets of 25 across the morning.",
+    }));
+    item(json!({
+        "kind": "task", "title": "Read 20 pages", "date": today_text,
+        "habit": true, "streak": 6, "goal": 20, "progress": 20, "progress_date": today_text,
+        "done": true, "folder": "Personal", "tags": ["Health"],
+        "done_dates": [near(-5), near(-4), near(-3), near(-2), near(-1), today_text],
+    }));
+    item(json!({
+        "kind": "event", "title": "Design critique", "date": today_text,
+        "time": "10:00", "duration": 90, "folder": "Work", "tags": ["Work"],
+        "body": "Walk through the new calendar time-blocking prototype.",
+    }));
+    item(json!({
+        "kind": "event", "title": "Dinner with Lea", "date": today_text,
+        "time": "19:00", "duration": 90, "folder": "Personal",
+    }));
+
+    // Overdue & Inbox items.
+    item(json!({
+        "kind": "task", "title": "Book the train to Porto", "date": near(-1),
+        "state": "important", "folder": "Personal", "tags": ["Home"],
+        "note_id": note_porto,
+    }));
+    item(json!({
+        "kind": "task", "title": "Sketch the onboarding flow", "folder": "Work",
+        "tags": ["Ideas"], "note_id": note_start,
+    }));
+    item(json!({
+        "kind": "task", "title": "Read the research notes", "folder": "Work",
+    }));
+
+    // Upcoming days (+1 to +5) including note-linked tasks & events.
+    item(json!({
+        "kind": "event", "title": "Team standup", "date": near(1), "time": "09:30",
+        "duration": 45, "folder": "Work", "tags": ["Work"],
+    }));
+    item(json!({
+        "kind": "task", "title": "Renew car insurance", "date": near(1), "time": "15:00",
+        "duration": 45, "state": "important", "folder": "Personal", "tags": ["Home"],
+    }));
+    item(json!({
+        "kind": "event", "title": "Team lunch", "date": near(2), "time": "12:30",
+        "duration": 60, "folder": "Work", "tags": ["Work"],
+    }));
+    item(json!({
+        "kind": "task", "title": "Write release notes", "date": near(2), "time": "14:00",
+        "duration": 60, "folder": "Work", "tags": ["Work"], "note_id": note_launch,
+    }));
+    item(json!({
+        "kind": "task", "title": "Prepare launch slides", "date": near(3), "time": "11:00",
+        "duration": 60, "folder": "Work", "tags": ["Work"], "note_id": note_launch,
+    }));
+    item(json!({
+        "kind": "task", "title": "Renew the passport", "date": near(3),
+        "folder": "Personal", "tags": ["Home"],
+    }));
+    item(json!({
+        "kind": "task", "title": "Check in online", "date": near(4),
+        "folder": "Personal", "tags": ["Ideas"], "note_id": note_porto,
+    }));
+    item(json!({
+        "kind": "task", "title": "Pack camera + charger", "date": near(4),
+        "folder": "Personal", "note_id": note_porto,
+    }));
+    item(json!({
+        "kind": "task", "title": "Buy travel insurance", "date": near(2),
+        "done": true, "folder": "Personal", "note_id": note_porto,
+    }));
+    item(json!({
+        "kind": "event", "title": "Climbing", "date": near(4), "time": "18:30",
+        "duration": 90, "folder": "Personal", "tags": ["Health"],
+    }));
+    item(json!({
+        "kind": "event", "title": "Porto flight departure", "date": near(5), "time": "08:40",
+        "duration": 120, "folder": "Personal", "note_id": note_porto,
+    }));
+
     let next = items.len() + 1;
     let store = json!({
         "tags": [
