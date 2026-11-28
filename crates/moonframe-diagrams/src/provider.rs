@@ -81,8 +81,21 @@ impl Native for Diagrams {
     }
 }
 
+/// The project's `.moonframe/diagrams`, unless it (or `.moonframe`) is a
+/// link, or leads out of the project.
 fn project_folder(project: Option<PathBuf>) -> Option<PathBuf> {
-    project.map(|p| p.join(".moonframe").join("diagrams"))
+    let project = project?;
+    let dir = project.join(".moonframe").join("diagrams");
+    let linked = |p: &Path| std::fs::symlink_metadata(p).is_ok_and(|m| m.file_type().is_symlink());
+    if linked(&project.join(".moonframe")) || linked(&dir) {
+        return None;
+    }
+    match (project.canonicalize(), dir.canonicalize()) {
+        (Ok(root), Ok(inside)) if inside.starts_with(&root) => Some(dir),
+        // Not there yet: watched for when it comes.
+        (Ok(_), Err(_)) => Some(dir),
+        _ => None,
+    }
 }
 
 impl Diagrams {
@@ -128,9 +141,14 @@ impl Diagrams {
             let Some(language) = language(&file) else {
                 continue;
             };
-            let Ok(meta) = std::fs::metadata(&file) else {
+            // Only a file of the folder's own: a link could lead anywhere
+            // (a key in the home folder) and its text would be shared.
+            let Ok(meta) = std::fs::symlink_metadata(&file) else {
                 continue;
             };
+            if !meta.file_type().is_file() {
+                continue;
+            }
             let modified = meta.modified().unwrap_or(UNIX_EPOCH);
             if let Some((when, len, entry)) = self.read.get(&file)
                 && *when == modified
@@ -264,6 +282,36 @@ mod tests {
             Data::String(folder.to_string_lossy().into_owned()),
         )]);
         Handle::new("diagrams", Path::new("."), settings, events)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn links_are_not_followed() {
+        let project = tempfile::tempdir().unwrap();
+        let secret = tempfile::tempdir().unwrap();
+        std::fs::write(
+            secret.path().join("key"),
+            "flowchart TD\n secret --> leaked",
+        )
+        .unwrap();
+        let dir = project.path().join(".moonframe").join("diagrams");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::os::unix::fs::symlink(secret.path().join("key"), dir.join("key.mmd")).unwrap();
+        std::fs::write(dir.join("own.mmd"), "graph TD; a-->b").unwrap();
+        let mut provider = Diagrams::default();
+        let found = provider.scan(&dir, From::Project);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0]["id"], "own");
+        // A diagrams folder that is a link out of the project is not read.
+        let linked = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(linked.path().join(".moonframe")).unwrap();
+        std::os::unix::fs::symlink(
+            secret.path(),
+            linked.path().join(".moonframe").join("diagrams"),
+        )
+        .unwrap();
+        assert_eq!(project_folder(Some(linked.path().to_owned())), None);
+        assert!(project_folder(Some(project.path().to_owned())).is_some());
     }
 
     #[test]
