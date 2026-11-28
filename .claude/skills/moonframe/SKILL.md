@@ -586,7 +586,7 @@ ui.document {
 	select = "select",                -- { msg = "select", text, x, y, width, height }
 	editable = state.editing,
 	change = "change",                -- { msg = "change", html }: keep it, give it back as html
-	done = "done",                    -- { msg = "done", html } as it loses the keyboard
+	done = "done",                    -- { msg = "done", html, edited } as it loses the keyboard
 }
 ```
 
@@ -613,7 +613,11 @@ ui.document {
   as `html` half a second after an edit: save it, and pass it back as
   `html`; the same HTML loads nothing, so the caret stays. New HTML from
   the mod loads in its place, and the HTML from before an edit loads again
-  (a reset). `done` is sent as it loses the keyboard. An edit that grows
+  (a reset). `done` is sent as it loses the keyboard, with `edited`: whether
+  it was typed into since the last `done` (or since it loaded), so a mod
+  that saves on `done` skips a blur that changed nothing (the HTML it
+  reports is the page's own writing of it, which differs from the HTML
+  given even untouched). An edit that grows
   the document past the 8 MB `html` takes comes with `error` instead of
   `html`.
 - **Lifetime, size, input and what lies over it** are a browser's (see
