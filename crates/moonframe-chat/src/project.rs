@@ -70,8 +70,12 @@ const MAX_TOOL_TEXT: usize = 4 * 1024;
 const MAX_COMMANDS: usize = 200;
 
 /// Whether `chat`'s view shows a clock that moves: a turn or background
-/// work running.
+/// work running in a chat still attached. A chat whose program ended keeps
+/// its last transcript, which may say a turn runs; nothing runs there.
 pub(crate) fn ticking(chat: &Chat) -> bool {
+    if chat.phase != Phase::Live {
+        return false;
+    }
     chat.transcript.as_ref().is_some_and(|transcript| {
         transcript.status == herdr_chat_protocol::Status::Working
             || transcript
