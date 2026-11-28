@@ -21,7 +21,7 @@ pub fn parse(text: &str) -> Result<Diagram, Unsupported> {
         return Err(Unsupported::at(0, "the diagram is empty"));
     };
     let kind = first.split_whitespace().next().unwrap_or_default();
-    match kind {
+    let parsed = match kind {
         "flowchart" | "flowchart-elk" | "graph" => flowchart::parse(&lines),
         "sequenceDiagram" => sequence::parse(&lines[1..]),
         "stateDiagram" | "stateDiagram-v2" => state::parse(&lines[1..]),
@@ -31,7 +31,8 @@ pub fn parse(text: &str) -> Result<Diagram, Unsupported> {
             number,
             format!("`{other}` diagrams are not drawn yet"),
         )),
-    }
+    };
+    parsed.and_then(super::within_limits)
 }
 
 /// The lines that say something: no front matter, directive or comment.

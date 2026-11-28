@@ -121,7 +121,7 @@ impl Builder {
                     return Ok(());
                 };
                 for id in ids.split(',') {
-                    let node = self.node_index(id);
+                    let node = self.node_index(number, id)?;
                     self.classed.push((node, class.to_owned()));
                 }
             },
@@ -129,7 +129,7 @@ impl Builder {
                 let mut parts = s.split_whitespace().skip(1);
                 if let Some(id) = parts.next() {
                     let given = look(&parts.collect::<Vec<_>>().join(" "), "");
-                    let node = self.node_index(id);
+                    let node = self.node_index(number, id)?;
                     self.diagram.nodes[node].fill = given.fill;
                 }
             },
@@ -169,17 +169,21 @@ impl Builder {
         Ok(())
     }
 
-    /// The node `id`, made the first time it is named.
-    fn node_index(&mut self, id: &str) -> usize {
+    /// The node `id`, made the first time it is named, unless the diagram
+    /// already has as many as it may.
+    fn node_index(&mut self, number: usize, id: &str) -> Result<usize, Unsupported> {
         if let Some(&i) = self.index.get(id) {
-            return i;
+            return Ok(i);
+        }
+        if self.diagram.nodes.len() >= crate::parse::MOST_NODES {
+            return Err(Unsupported::too_big(number));
         }
         let mut node = Node::new(id, id);
         node.group = self.open.last().cloned();
         self.diagram.nodes.push(node);
         let i = self.diagram.nodes.len() - 1;
         self.index.insert(id.to_owned(), i);
-        i
+        Ok(i)
     }
 
     /// `a --> b -->|x| c & d`: nodes, then edges between each group of
@@ -200,9 +204,7 @@ impl Builder {
             };
             c.skip_spaces();
             let next = self.nodes(&mut c, number)?;
-            if self.diagram.edges.len() + previous.len() * next.len() > crate::parse::MOST_EDGES
-                || self.diagram.nodes.len() > crate::parse::MOST_NODES
-            {
+            if self.diagram.edges.len() + previous.len() * next.len() > crate::parse::MOST_EDGES {
                 return Err(Unsupported::too_big(number));
             }
             for &a in &previous {
@@ -251,7 +253,7 @@ impl Builder {
                 format!("expected a node at `{}`", c.rest()),
             ));
         }
-        let index = self.node_index(id);
+        let index = self.node_index(number, id)?;
         // Mermaid 11's `A@{ shape: ..., label: ... }`: the label alone.
         if c.eat("@{") {
             let body = c.until("}").unwrap_or_default();

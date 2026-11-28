@@ -170,7 +170,7 @@ pub fn parse(text: &str) -> Result<Diagram, Unsupported> {
     }
     p.expect('{')?;
     p.statements(&Scope::default())?;
-    Ok(p.diagram)
+    super::within_limits(p.diagram)
 }
 
 /// What a `{ }` block gives the statements in it.
@@ -420,7 +420,6 @@ impl Parser {
         let index = match self.nodes.get(id) {
             Some(_) if !declared => return,
             Some(&i) => i,
-            None if self.diagram.nodes.len() >= super::MOST_NODES => return,
             None => {
                 let mut node = Node::new(id, id);
                 node.kind = NodeKind::Pill;

@@ -221,3 +221,19 @@ fn hostile_text_is_refused_not_obeyed() {
     let side = many.join(" & ");
     assert!(mermaid::parse(&format!("flowchart TD\n{side} --> {side} --> {side}")).is_err());
 }
+
+#[test]
+fn nodes_alone_count_toward_the_limit() {
+    let names: Vec<String> = (0..MOST_NODES + 1).map(|i| format!("n{i}")).collect();
+    let text = format!("flowchart TD\n{}", names.join(" & "));
+    assert!(mermaid::parse(&text).is_err());
+    let styles: String = names
+        .iter()
+        .map(|n| format!("style {n} fill:#fff\n"))
+        .collect();
+    assert!(mermaid::parse(&format!("flowchart TD\n{styles}")).is_err());
+    let messages: String = (0..MOST_EDGES + 1).map(|_| "A->>B: hi\n").collect();
+    assert!(mermaid::parse(&format!("sequenceDiagram\n{messages}")).is_err());
+    let dot_nodes: String = names.iter().map(|n| format!("{n};")).collect();
+    assert!(dot::parse(&format!("digraph {{ {dot_nodes} }}")).is_err());
+}

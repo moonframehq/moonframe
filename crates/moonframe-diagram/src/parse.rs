@@ -68,6 +68,16 @@ pub fn fenced(language: &str, text: &str) -> Option<Result<Diagram, Unsupported>
     }
 }
 
+/// `diagram`, unless it is bigger than a diagram may be: every parser's
+/// last word, whatever kind of diagram it read.
+pub(crate) fn within_limits(diagram: Diagram) -> Result<Diagram, Unsupported> {
+    let edges = diagram.edges.len() + diagram.messages.len() + diagram.notes.len();
+    if diagram.nodes.len() + diagram.groups.len() > MOST_NODES || edges > MOST_EDGES {
+        return Err(Unsupported::too_big(0));
+    }
+    Ok(diagram)
+}
+
 /// A label as written, made plain: quotes off, `<br>` as a space,
 /// Mermaid's markdown strings (`` "`**bold**`" ``) as their words, and its
 /// `#quot;` style entities decoded.
