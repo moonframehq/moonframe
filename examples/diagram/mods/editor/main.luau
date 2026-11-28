@@ -8,6 +8,7 @@ local diagram = use "diagram"
 local button_group = use "button-group"
 local icon_button = use "icon-button"
 local inspector = use "diagram-inspector"
+local live_diagrams = use "live-diagrams"
 
 type Shape = { id: string, kind: string, x: number, y: number, w: number, h: number, label: string?, fill: string? }
 type Link = { id: string, from: string, to: string, label: string?, dashed: boolean? }
@@ -24,6 +25,9 @@ type State = {
 	-- zooming is a message to it, else a `camera` prop.
 	luau: boolean,
 	camera: { [string]: any }?,
+	-- The agent's (or project's) diagram on show instead of the document,
+	-- by its key in `app.diagrams`.
+	live: string?,
 	undo: { Doc },
 	redo: { Doc },
 }
@@ -323,7 +327,7 @@ local KIND_ICON: { [string]: string } = {
 }
 
 -- Shapes topmost first, as a stack of layers reads.
-local function layers(state: State): any
+local function layers(state: State, app: any): any
 	local rows: { Shape } = {}
 	for i = #state.doc.shapes, 1, -1 do
 		table.insert(rows, state.doc.shapes[i])
@@ -365,6 +369,51 @@ local function layers(state: State): any
 			ui.spacer(),
 			ui.text { `{#state.doc.links}`, class = "editor-count" },
 		},
+		app.diagrams and #app.diagrams.diagrams > 0 and ui.row {
+			class = "editor-heading-row",
+			ui.text { "FROM AGENTS", class = "editor-heading" },
+			ui.spacer(),
+			ui.text { `{#app.diagrams.diagrams}`, class = "editor-count" },
+		},
+		app.diagrams and live_diagrams { diagrams = app.diagrams.diagrams, shown = state.live },
+	}
+end
+
+-- The picked diagram of `app.diagrams`, if it is still there.
+local function live(state: State, app: any): any
+	if not state.live or not app.diagrams then
+		return nil
+	end
+	for _, d in app.diagrams.diagrams do
+		if d.key == state.live then
+			return d
+		end
+	end
+	return nil
+end
+
+-- An agent's diagram: what it says over it, then the diagram, read-only.
+local function live_view(d: any, app: any): any
+	local body = if d.error
+		then ui.text { `Not drawn: {d.error}`, tone = "danger" }
+		elseif not d.document then ui.text { "Too big to share: open its file.", tone = "muted" }
+		elseif not app.capabilities.diagram then ui.text { "Drawing it needs the `diagram` feature.", tone = "muted" }
+		else ui.diagram { id = "live", document = d.document, highlight = d.highlight, camera = { fit = true, seq = d.key } }
+	return ui.column {
+		grow = true,
+		gap = "none",
+		ui.row {
+			class = "editor-live-bar",
+			align = "center",
+			ui.icon { name = (if d.from == "agent" then "sparkles" else "file-text") :: any, size = "small", tone = "accent" },
+			ui.text { d.title, weight = "medium" },
+			d.agent and ui.text { `from {d.agent}`, tone = "muted", size = "small" },
+			d.note and ui.text { d.note, tone = "accent", size = "small", truncate = true },
+			ui.spacer(),
+			d.from == "agent" and ui.button { "Close", small = true, variant = "ghost", msg = { close_live = d.id } },
+			ui.button { "Back to my diagram", small = true, variant = "ghost", msg = { live = false } },
+		},
+		ui.column { grow = true, gap = "none", body },
 	}
 end
 
@@ -379,6 +428,7 @@ return mod {
 		[".editor-layer"] = { padding = { 4, 8 }, gap = 8, radius = 6, margin = { 0, 2 } },
 		[".editor-layer:hover"] = { background = "list-hover" },
 		[".editor-layer:selected"] = { background = "accent/15", color = "accent" },
+		[".editor-live-bar"] = { padding = { 6, 12 }, gap = 8, background = "accent/8", border = "bottom", border_color = "border" },
 	},
 
 	init = function(previous: State?): State
@@ -394,6 +444,7 @@ return mod {
 		state.zoom = if type(state.zoom) == "number" then state.zoom else 1
 		state.luau = false
 		state.camera = nil
+		state.live = nil
 		-- History lives for the session only.
 		state.undo, state.redo = {}, {}
 		return state
@@ -449,6 +500,11 @@ return mod {
 			state.camera = { zoom_by = msg.zoom_by, zoom = msg.zoom_to, fit = msg.fit, seq = seq }
 		elseif msg.selected then
 			state.selected = msg.selected
+		elseif msg.live ~= nil then
+			state.live = msg.live or nil
+		elseif msg.close_live then
+			state.live = nil
+			return state, { { to = "provider:diagrams", msg = { close = msg.close_live } } }
 		elseif msg.pick then
 			state.selected = { msg.pick }
 		elseif msg.stress then
@@ -480,13 +536,16 @@ return mod {
 				grow = true,
 				gap = "none",
 				align = "stretch",
-				layers(state),
+				layers(state, app),
 				ui.column {
 					grow = true,
 					gap = "none",
+					-- An agent's diagram, read-only, while one is picked.
+					if live(state, app)
+						then live_view(live(state, app), app)
 					-- The Rust view where the build has it, else the Luau canvas:
 					-- the same props, the same messages back.
-					if app.capabilities.diagram
+					elseif app.capabilities.diagram
 						then ui.diagram {
 							id = "main",
 							shapes = state.doc.shapes,
