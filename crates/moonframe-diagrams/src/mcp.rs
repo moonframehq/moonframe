@@ -12,7 +12,6 @@ use {
     },
     serde_json::{Value, json},
     std::{
-        collections::HashMap,
         io::{BufRead, Write},
         path::{Path, PathBuf},
     },
@@ -83,11 +82,11 @@ fn tools() -> Value {
     ])
 }
 
-/// The server's state: the diagrams it shows, by id.
+/// The server's state: where its diagrams go and for whom. What it shows
+/// is the folder's: the app closes a diagram by removing its file.
 pub struct Server {
     dir: PathBuf,
     agent: Option<String>,
-    shown: HashMap<String, Shown>,
 }
 
 impl Server {
@@ -95,7 +94,6 @@ impl Server {
         Self {
             dir: dir.to_owned(),
             agent,
-            shown: HashMap::new(),
         }
     }
 
@@ -162,7 +160,7 @@ impl Server {
         Some(json!({ "jsonrpc": "2.0", "id": id, "result": result }))
     }
 
-    fn call(&mut self, tool: &str, args: &Value) -> Result<String, String> {
+    fn call(&self, tool: &str, args: &Value) -> Result<String, String> {
         let id = store::safe_id(args.get("id").and_then(Value::as_str).unwrap_or_default())?;
         let text = |key: &str| args.get(key).and_then(Value::as_str).map(str::to_owned);
         match tool {
@@ -195,7 +193,7 @@ impl Server {
                     note: None,
                     source,
                 };
-                self.save(shown)?;
+                self.save(&shown)?;
                 Ok(format!("Showing `{id}` ({nodes} nodes) to the user."))
             },
             "diagram_patch" => {
@@ -207,7 +205,7 @@ impl Server {
                 shown.updated = store::now();
                 // Patched, it no longer matches the text it came from.
                 shown.source = None;
-                self.save(shown)?;
+                self.save(&shown)?;
                 Ok(format!("`{id}`: {summary}."))
             },
             "diagram_highlight" => {
@@ -229,7 +227,7 @@ impl Server {
                 shown.revision += 1;
                 shown.updated = store::now();
                 let count = shown.highlight.len();
-                self.save(shown)?;
+                self.save(&shown)?;
                 Ok(if count == 0 {
                     format!("`{id}`: highlight cleared.")
                 } else {
@@ -237,7 +235,6 @@ impl Server {
                 })
             },
             "diagram_close" => {
-                self.shown.remove(&id);
                 store::remove(&self.dir, &id).map_err(|e| e.to_string())?;
                 Ok(format!("`{id}` closed."))
             },
@@ -245,19 +242,14 @@ impl Server {
         }
     }
 
-    /// The diagram `id` as shown last: this server's, else the file (a
-    /// server started again after the agent restarted).
+    /// The diagram `id` as its file has it now: none once the user closed
+    /// it, and one a server before this one showed.
     fn known(&self, id: &str) -> Option<Shown> {
-        self.shown
-            .get(id)
-            .cloned()
-            .or_else(|| store::read(&store::path(&self.dir, id)).ok())
+        store::read(&store::path(&self.dir, id)).ok()
     }
 
-    fn save(&mut self, shown: Shown) -> Result<(), String> {
-        store::write(&self.dir, &shown).map_err(|e| format!("cannot write the diagram: {e}"))?;
-        self.shown.insert(shown.id.clone(), shown);
-        Ok(())
+    fn save(&self, shown: &Shown) -> Result<(), String> {
+        store::write(&self.dir, shown).map_err(|e| format!("cannot write the diagram: {e}"))
     }
 }
 
@@ -289,7 +281,20 @@ mod tests {
         let list = server
             .answer(r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#)
             .unwrap();
-        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 4);
+        let names: Vec<&str> = list["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap())
+            .collect();
+        for tool in [
+            "diagram_show",
+            "diagram_patch",
+            "diagram_highlight",
+            "diagram_close",
+        ] {
+            assert!(names.contains(&tool), "{tool} in {names:?}");
+        }
 
         let shown = call(
             &mut server,
@@ -331,6 +336,35 @@ mod tests {
 
         call(&mut again, 6, "diagram_close", json!({ "id": "arch" }));
         assert!(!store::path(dir.path(), "arch").exists());
+    }
+
+    #[test]
+    fn a_diagram_the_user_closed_stays_closed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut server = Server::new(dir.path(), None);
+        call(
+            &mut server,
+            1,
+            "diagram_show",
+            json!({ "id": "arch", "mermaid": "graph TD; a-->b" }),
+        );
+        // The app's Close removes the file, not the server's memory.
+        store::remove(dir.path(), "arch").unwrap();
+        for (n, tool, args) in [
+            (
+                2,
+                "diagram_patch",
+                json!({ "id": "arch", "remove_nodes": ["b"] }),
+            ),
+            (
+                3,
+                "diagram_highlight",
+                json!({ "id": "arch", "nodes": ["a"] }),
+            ),
+        ] {
+            assert_eq!(call(&mut server, n, tool, args)["isError"], true, "{tool}");
+            assert!(!store::path(dir.path(), "arch").exists(), "{tool}");
+        }
     }
 
     #[test]
