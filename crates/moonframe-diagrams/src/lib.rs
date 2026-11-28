@@ -20,7 +20,7 @@ pub use provider::native;
 
 /// Serves the MCP server on stdin and stdout until stdin ends, writing
 /// diagrams to `dir` (else the default folder) on behalf of `agent`, for
-/// the agent run `run` when the app started it.
+/// the agent run `run` when the app started it (else its own session).
 pub fn serve_stdio(
     dir: Option<std::path::PathBuf>,
     agent: Option<String>,

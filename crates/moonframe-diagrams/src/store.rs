@@ -23,7 +23,8 @@ pub struct Shown {
     pub title: String,
     /// Who shows it, when the server was told (`--agent`).
     pub agent: Option<String>,
-    /// The app's agent run that showed it, when the app started the agent.
+    /// The run that last wrote it: the app's agent run when the app
+    /// started the agent, else the session of the server that wrote it.
     pub run: Option<String>,
     /// Counts each change, so a view can tell a new version.
     pub revision: u64,

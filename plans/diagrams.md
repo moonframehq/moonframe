@@ -376,8 +376,11 @@ As built:
   go.
 - `tool-group` (and so `agent-chat`) takes `diagrams`: a `diagram_*`
   call's answer names its diagram (`` Showing `plan` ... ``), so each
-  draws as one card, open or folded, and those rows leave the list. This
-  needs no run id, so it works for any agent given the server.
+  draws as one card, open or folded, and those rows leave the list. A
+  server the app gave no run stamps its diagrams with its own session and
+  every answer ends `[run ID]`, so a chat draws a diagram only while its
+  own session last wrote it, never another chat's of the same id; this
+  works for any agent given the server.
 - `tool-group` lost a `state` no rule styled, which redrew it each frame.
 - Not yet: herdr-acp (`agent-chat`'s agents) takes no MCP servers, so
   its agents get the tools only when the user adds `moonframe mcp

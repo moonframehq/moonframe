@@ -301,8 +301,8 @@ local function card_owners(rows: { any }, first: number): { [string]: string }
 	for index = first, #rows do
 		local row = rows[index]
 		if row.type == "tools" then
-			for _, id in row.diagrams or {} do
-				owners[id] = owners[id] or row.key
+			for _, shown in row.diagrams or {} do
+				owners[shown.id] = owners[shown.id] or row.key
 			end
 		end
 	end

@@ -342,13 +342,13 @@ fn a_group_keeps_the_diagrams_its_calls_showed_past_its_trim() {
             "d1",
             "mcp__moonframe-diagrams__diagram_show",
             ToolStatus::Completed,
-            "Showing `plan` (3 nodes) to the user.",
+            "Showing `plan` (3 nodes) to the user.\n[run session-1]",
         ),
         answer(
             "d2",
             "diagram_patch",
             ToolStatus::Completed,
-            "`plan`: added 1 node.",
+            "`plan`: added 1 node.\n[run session-1]",
         ),
         answer(
             "d3",
@@ -377,7 +377,14 @@ fn a_group_keeps_the_diagrams_its_calls_showed_past_its_trim() {
     let view = prepare(&transcript(calls), &limits);
     let tools = group(&view.rows[0]);
     assert_eq!(tools.items.len(), 3);
-    assert_eq!(tools.diagrams, ["plan", "flow"]);
+    let shown = |id: &str, run: Option<&str>| DiagramRef {
+        id: id.to_owned(),
+        run: run.map(str::to_owned),
+    };
+    assert_eq!(tools.diagrams, [
+        shown("plan", Some("session-1")),
+        shown("flow", None)
+    ]);
 }
 
 #[test]

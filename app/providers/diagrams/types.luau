@@ -22,7 +22,8 @@ export type Shown = {
 	highlight: { string },
 	note: string?,
 	agent: string?,
-	-- The `app.acp` run that showed it, when the app started the agent.
+	-- The run that last wrote it: the `app.acp` run when the app started
+	-- the agent, else the agent session's own.
 	run: string?,
 	-- The text it came from, `mermaid` or `dot`.
 	language: string?,
