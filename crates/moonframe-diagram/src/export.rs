@@ -7,7 +7,7 @@ use {
     crate::{
         geometry::{Point, Rect},
         layout::Layout,
-        model::{Diagram, EdgeKind, Head, MessageKind, NodeKind, Tone},
+        model::{Diagram, DiagramKind, EdgeKind, Head, MessageKind, NodeKind, Tone},
     },
     std::fmt::Write as _,
 };
@@ -259,7 +259,16 @@ pub fn svg(
             );
         }
     }
-    for node in &diagram.nodes {
+    // A sequence's participants named only in messages have header boxes
+    // too, as the layout gives them.
+    let participants;
+    let nodes = if diagram.kind == DiagramKind::Sequence {
+        participants = diagram.participants();
+        &participants
+    } else {
+        &diagram.nodes
+    };
+    for node in nodes {
         let Some(r) = layout.nodes.get(&node.id) else {
             continue;
         };
@@ -843,6 +852,15 @@ mod tests {
         let shift_y = MARGIN - drawn_bounds(&d, &out, &mut approx).y;
         let gap = Point::new(xy[0], xy[1]).distance(Point::new(tip.x + shift, tip.y + shift_y));
         assert!(gap > 5.0, "the line stops short of the triangle: {gap}");
+    }
+
+    #[test]
+    fn a_participant_named_only_in_a_message_has_its_header() {
+        let mut d = parse::mermaid::parse("sequenceDiagram\n Alice->>Bob: hi").unwrap();
+        d.nodes.clear();
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let svg = svg_of(&d, &out, &Colors::light());
+        assert!(svg.contains(">Alice<") && svg.contains(">Bob<"), "{svg}");
     }
 
     fn svg_of(d: &Diagram, out: &Layout, colors: &Colors) -> String {
