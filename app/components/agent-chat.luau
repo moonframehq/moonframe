@@ -546,7 +546,7 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 			view and picker("model", view.model, state),
 			view and picker("effort", view.effort, state),
 			view and view.auto_accept and ui.button { "Auto-accept", icon = "zap", small = true, variant = "ghost", msg = { auto_accept = false }, tooltip = "Asks before acting again" },
-			ui.spacer {},
+			ui.spacer(),
 			ui.row {
 				class = "agent-chat-actions",
 				gap = "small",
