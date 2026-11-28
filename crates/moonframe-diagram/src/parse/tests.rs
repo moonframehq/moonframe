@@ -485,3 +485,13 @@ fn sequence_blocks_open_and_close_in_pairs() {
     let err = mermaid::parse("erDiagram\n  A ||--o{ B : has\n  }").unwrap_err();
     assert_eq!(err.line, 3);
 }
+
+#[test]
+fn a_long_label_of_hashes_or_tags_is_read_quickly() {
+    let text = format!("\"{};\"", "#".repeat(200_000));
+    let started = std::time::Instant::now();
+    assert_eq!(label(&text).len(), 200_001);
+    let text = "<a".repeat(100_000);
+    assert_eq!(label(&text), text);
+    assert!(started.elapsed() < std::time::Duration::from_secs(1));
+}
