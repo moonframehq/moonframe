@@ -134,6 +134,9 @@ pub struct Layout {
     pub notes: Vec<Rect>,
     /// A sequence diagram's lifelines: participant, top, bottom.
     pub lifelines: Vec<(String, Point, Point)>,
+    /// Text drawn outside every box (a sequence's message labels), counted
+    /// in the bounds.
+    pub(crate) extents: Vec<Rect>,
     /// Everything drawn.
     pub bounds: Rect,
     /// Each laid-out node's rank and place in it, for the next layout.
@@ -169,6 +172,7 @@ pub fn layout(
             .values()
             .chain(out.groups.values())
             .chain(out.notes.iter())
+            .chain(out.extents.iter())
             .chain(dots.iter()),
     )
     .unwrap_or_default();

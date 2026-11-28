@@ -32,6 +32,20 @@ impl Diagram {
         self.edges.iter().find(|edge| edge.id == id)
     }
 
+    /// A sequence diagram's participants, left to right: its nodes, then
+    /// any a message names that no node is, labelled with its id.
+    pub fn participants(&self) -> Vec<Node> {
+        let mut people = self.nodes.clone();
+        for m in &self.messages {
+            for id in [&m.from, &m.to] {
+                if !people.iter().any(|p| &p.id == id) {
+                    people.push(Node::new(id.clone(), id.clone()));
+                }
+            }
+        }
+        people
+    }
+
     /// Whether every node has a place of its own: an editor's document,
     /// whose nodes are never moved by a layout.
     pub fn placed(&self) -> bool {
