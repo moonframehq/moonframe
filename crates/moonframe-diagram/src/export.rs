@@ -97,14 +97,38 @@ fn escape(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// How text is drawn: its color, size and weight.
+#[derive(Clone, Copy)]
+struct Ink<'a> {
+    color: &'a str,
+    size: f32,
+    bold: bool,
+}
+
+impl<'a> Ink<'a> {
+    fn new(color: &'a str, size: f32) -> Self {
+        Self {
+            color,
+            size,
+            bold: false,
+        }
+    }
+
+    fn bold(self) -> Self {
+        Self { bold: true, ..self }
+    }
+}
+
 /// `diagram` laid out as `layout`, as an SVG document; `highlight` ids in
-/// the accent.
+/// the accent. `measure` gives a line's width at a size in `font`, so
+/// labels wrap and shorten to their boxes as the view's do.
 pub fn svg(
     diagram: &Diagram,
     layout: &Layout,
     colors: &Colors,
     font: &str,
     highlight: &[String],
+    measure: &mut dyn FnMut(&str, f32) -> f32,
 ) -> String {
     let b = layout.bounds;
     let (w, h) = (b.w + MARGIN * 2.0, b.h + MARGIN * 2.0);
@@ -172,11 +196,11 @@ pub fn svg(
         if let Some(label) = route.label {
             text(
                 &mut out,
+                measure,
                 &message.label,
                 at(label),
-                &colors.text,
-                12.0,
-                false,
+                f32::INFINITY,
+                Ink::new(&colors.text, 12.0),
             );
         }
     }
@@ -212,7 +236,7 @@ pub fn svg(
             (route.label, edge.label.as_deref().filter(|l| !l.is_empty()))
         {
             let p = at(p);
-            let wide = label.chars().count() as f32 * 12.0 * 0.56 + 10.0;
+            let wide = measure(label, 12.0) + 10.0;
             let _ = write!(
                 labels,
                 r#"<rect x="{:.1}" y="{:.1}" width="{wide:.1}" height="18" rx="9" fill="{}"/>"#,
@@ -220,17 +244,18 @@ pub fn svg(
                 p.y - 9.0,
                 colors.background
             );
+            let quiet = if color == colors.edge {
+                &colors.quiet
+            } else {
+                color
+            };
             text(
                 &mut labels,
+                measure,
                 label,
                 p,
-                if color == colors.edge {
-                    &colors.quiet
-                } else {
-                    color
-                },
-                12.0,
-                false,
+                f32::INFINITY,
+                Ink::new(quiet, 12.0),
             );
         }
     }
@@ -246,31 +271,55 @@ pub fn svg(
             (stroke, 1.0)
         };
         shape(&mut out, node.kind, r, &fill, &stroke, width);
-        let center = if node.kind == NodeKind::Note {
-            Point::new(r.center().x, r.y + 20.0)
+        // As the view draws it: the label in the middle (a diamond's in
+        // its middle half; a note's from the top), the sublabel under it.
+        let room = match node.kind {
+            NodeKind::Diamond => r.w * 0.6,
+            NodeKind::Circle => r.w * 0.8,
+            _ => r.w - 12.0,
+        };
+        let note = node.kind == NodeKind::Note;
+        let pad = 10.0;
+        let middle = if note {
+            Point::new(r.center().x, r.y + pad)
         } else {
             r.center()
         };
+        let tall = match node.kind {
+            NodeKind::Diamond => r.h * 0.55,
+            _ => r.h - pad * 2.0,
+        };
+        let ink = Ink::new(&ink, FONT).bold();
         match &node.sublabel {
             Some(sub) => {
+                let line = FONT * 1.3;
                 text(
                     &mut out,
+                    measure,
                     &node.label,
-                    Point::new(center.x, center.y - 9.0),
-                    &ink,
-                    FONT,
-                    true,
+                    Point::new(middle.x, middle.y - line * 0.45),
+                    room,
+                    ink,
                 );
                 text(
                     &mut out,
+                    measure,
                     sub,
-                    Point::new(center.x, center.y + 10.0),
-                    &colors.quiet,
-                    12.0,
-                    false,
+                    Point::new(middle.x, middle.y + line * 0.55),
+                    room,
+                    Ink::new(&colors.quiet, FONT * 0.86),
                 );
             },
-            None => text(&mut out, &node.label, center, &ink, FONT, true),
+            None => paragraph(
+                &mut out,
+                measure,
+                &node.label,
+                middle,
+                note,
+                room,
+                tall,
+                ink,
+            ),
         }
     }
     for (note, r) in diagram.notes.iter().zip(&layout.notes) {
@@ -278,11 +327,11 @@ pub fn svg(
         shape(&mut out, NodeKind::Note, r, &colors.note, &colors.note, 1.0);
         text(
             &mut out,
+            measure,
             &note.text,
             r.center(),
-            &colors.note_text,
-            13.0,
-            false,
+            r.w - 10.0,
+            Ink::new(&colors.note_text, FONT * 0.9),
         );
     }
     out.push_str(&labels);
@@ -297,11 +346,13 @@ fn node_colors(
     colors: &Colors,
 ) -> (String, String, String) {
     if let Some(fill) = fill.filter(|f| crate::model::is_hex_color(f)) {
-        return (
-            fill.to_owned(),
-            colors.outline.clone(),
-            "#18181b".to_owned(),
-        );
+        // As in the view: dark text on a light fill, light on a dark one.
+        let ink = if lightness(fill) > 0.6 {
+            "#1f1f1f"
+        } else {
+            "#f5f5f5"
+        };
+        return (fill.to_owned(), colors.outline.clone(), ink.to_owned());
     }
     match (kind, tone) {
         (NodeKind::Text, _) => ("none".into(), "none".into(), colors.text.clone()),
@@ -321,6 +372,21 @@ fn node_colors(
             colors.text.clone(),
         ),
     }
+}
+
+/// The HSL lightness of a `#rgb` or `#rrggbb` color, 0 to 1.
+fn lightness(hex: &str) -> f32 {
+    let digits = hex.trim_start_matches('#');
+    let channel = |i: usize| -> f32 {
+        let v = if digits.len() == 3 {
+            u8::from_str_radix(&digits[i..=i], 16).map_or(0, |v| v * 17)
+        } else {
+            u8::from_str_radix(&digits[i * 2..i * 2 + 2], 16).unwrap_or(0)
+        };
+        f32::from(v) / 255.0
+    };
+    let (r, g, b) = (channel(0), channel(1), channel(2));
+    (r.max(g).max(b) + r.min(g).min(b)) / 2.0
 }
 
 fn shape(out: &mut String, kind: NodeKind, r: Rect, fill: &str, stroke: &str, width: f32) {
@@ -372,12 +438,38 @@ fn shape(out: &mut String, kind: NodeKind, r: Rect, fill: &str, stroke: &str, wi
     out.push_str(&svg);
 }
 
-fn text(out: &mut String, words: &str, at: Point, color: &str, size: f32, bold: bool) {
+/// `words` on one line centred on `at`, cut with an ellipsis to fit `room`
+/// pixels.
+fn text(
+    out: &mut String,
+    measure: &mut dyn FnMut(&str, f32) -> f32,
+    words: &str,
+    at: Point,
+    room: f32,
+    ink: Ink<'_>,
+) {
     if words.is_empty() {
         return;
     }
-    let color = escape(color);
-    let weight = if bold {
+    let size = ink.size;
+    let mut words = words.to_owned();
+    if measure(&words, size) > room {
+        // Cut at characters, by halves, to the longest start that fits.
+        let chars: Vec<char> = words.chars().collect();
+        let (mut lo, mut hi) = (0, chars.len());
+        while lo < hi {
+            let mid = (lo + hi).div_ceil(2);
+            let cut: String = chars[..mid].iter().collect::<String>() + "…";
+            if measure(&cut, size) <= room {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        words = chars[..lo].iter().collect::<String>() + "…";
+    }
+    let color = escape(ink.color);
+    let weight = if ink.bold {
         r#" font-weight="500""#
     } else {
         ""
@@ -387,8 +479,66 @@ fn text(out: &mut String, words: &str, at: Point, color: &str, size: f32, bold: 
         r#"<text x="{:.1}" y="{:.1}" fill="{color}" font-size="{size}" text-anchor="middle" dominant-baseline="central"{weight}>{}</text>"#,
         at.x,
         at.y,
-        escape(words)
+        escape(&words)
     );
+}
+
+/// `words` wrapped at spaces to `room` pixels wide, as many lines as
+/// `height` holds (the last cut with an ellipsis), centred on `center`, or
+/// hanging from it with `top`.
+#[allow(clippy::too_many_arguments)]
+fn paragraph(
+    out: &mut String,
+    measure: &mut dyn FnMut(&str, f32) -> f32,
+    words: &str,
+    center: Point,
+    top: bool,
+    room: f32,
+    height: f32,
+    ink: Ink<'_>,
+) {
+    if words.is_empty() {
+        return;
+    }
+    let line = ink.size * 1.3;
+    let most = ((height / line).floor() as usize).max(1);
+    let mut lines: Vec<String> = Vec::new();
+    if most == 1 || measure(words, ink.size) <= room {
+        lines.push(words.to_owned());
+    } else {
+        let mut current = String::new();
+        for word in words.split_whitespace() {
+            let tried = if current.is_empty() {
+                word.to_owned()
+            } else {
+                format!("{current} {word}")
+            };
+            if current.is_empty() || measure(&tried, ink.size) <= room {
+                current = tried;
+            } else {
+                lines.push(std::mem::replace(&mut current, word.to_owned()));
+            }
+        }
+        if !current.is_empty() {
+            lines.push(current);
+        }
+        if lines.len() > most {
+            lines.truncate(most);
+            if let Some(last) = lines.last_mut() {
+                last.push('…');
+            }
+        }
+    }
+    let total = line * lines.len() as f32;
+    let start = if top {
+        center.y
+    } else {
+        center.y - total / 2.0
+    };
+    for (i, words) in lines.iter().enumerate() {
+        let middle = Point::new(center.x, start + line * (i as f32 + 0.5));
+        text(out, measure, words, middle, room, ink);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -536,7 +686,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            layout::{Approx, Options, layout},
+            layout::{Approx, Measure as _, Options, layout},
             parse,
         },
     };
@@ -545,7 +695,14 @@ mod tests {
     fn a_diagram_exports_as_svg_with_every_part() {
         let d = parse::mermaid::parse("flowchart LR\n a[\"A & B\"] -->|go| b{B?}\n b -.-> c[(C)]\n subgraph g [Group]\n c\n end").unwrap();
         let out = layout(&d, &Approx, &Options::default(), None);
-        let svg = svg(&d, &out, &Colors::dark(), "Inter", &["b".into()]);
+        let svg = svg(
+            &d,
+            &out,
+            &Colors::dark(),
+            "Inter",
+            &["b".into()],
+            &mut approx,
+        );
         assert!(svg.starts_with("<svg ") && svg.ends_with("</svg>"));
         assert!(svg.contains("A &amp; B"), "{svg}");
         assert!(svg.contains("<polygon"), "a diamond and an arrowhead");
@@ -561,8 +718,47 @@ mod tests {
         d.nodes[0].fill = Some("#\" onload=\"alert(1)".into());
         d.nodes[1].fill = Some("#abc".into());
         let out = layout(&d, &Approx, &Options::default(), None);
-        let svg = svg(&d, &out, &Colors::light(), "\"><script>", &[]);
+        let svg = svg(&d, &out, &Colors::light(), "\"><script>", &[], &mut approx);
         assert!(!svg.contains("onload") && !svg.contains("<script"), "{svg}");
         assert!(svg.contains("fill=\"#abc\""));
+    }
+
+    fn approx(text: &str, size: f32) -> f32 {
+        Approx.width(text, size)
+    }
+
+    #[test]
+    fn a_dark_fill_gets_light_text_and_a_light_fill_dark() {
+        let mut d = parse::mermaid::parse("flowchart LR\n a[Night] --> b[Day]").unwrap();
+        d.nodes[0].fill = Some("#18181b".into());
+        d.nodes[1].fill = Some("#fde68a".into());
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let svg = svg(&d, &out, &Colors::light(), "Inter", &[], &mut approx);
+        assert!(
+            svg.contains(r##"fill="#f5f5f5" font-size="14""##) && svg.contains(">Night<"),
+            "{svg}"
+        );
+        assert!(svg.contains(r##"fill="#1f1f1f" font-size="14""##), "{svg}");
+    }
+
+    #[test]
+    fn a_long_label_wraps_inside_its_box_and_a_longer_one_is_cut() {
+        let mut d = parse::mermaid::parse("flowchart LR\n a[x] --> b[y]").unwrap();
+        d.nodes[0].label = "one two three four five six".into();
+        d.nodes[0].at = Some(Rect::new(0.0, 0.0, 120.0, 80.0));
+        d.nodes[1].label = "word ".repeat(40);
+        d.nodes[1].at = Some(Rect::new(200.0, 0.0, 120.0, 60.0));
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let svg = svg(&d, &out, &Colors::light(), "Inter", &[], &mut approx);
+        let lines: Vec<&str> = svg
+            .split("<text ")
+            .skip(1)
+            .map(|t| t.split('>').nth(1).unwrap().trim_end_matches("</text"))
+            .collect();
+        assert!(lines.len() > 3, "wrapped onto lines: {lines:?}");
+        for line in &lines {
+            assert!(Approx.width(line, 14.0) <= 108.0 + 0.01, "{line:?} fits");
+        }
+        assert!(lines.iter().any(|l| l.ends_with('…')), "{lines:?}");
     }
 }

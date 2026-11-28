@@ -38,7 +38,7 @@ use {
 pub use {
     camera::Camera,
     picture::{measure, picture},
-    style::export_colors,
+    style::{export_colors, export_svg},
 };
 
 /// Diagrams with up to this many nodes are laid out at once, on the UI
@@ -139,6 +139,8 @@ pub struct DiagramView {
     pub(crate) scroll_needs_focus: bool,
     pub(crate) told_zoom: f32,
     layout_task: Option<Task<()>>,
+    /// A layout runs in the background: `layout` is not yet the diagram's.
+    laying_out: bool,
 }
 
 impl EventEmitter<DiagramEvent> for DiagramView {}
@@ -174,6 +176,7 @@ impl DiagramView {
             scroll_needs_focus: false,
             told_zoom: 1.0,
             layout_task: None,
+            laying_out: false,
         }
     }
 
@@ -183,6 +186,12 @@ impl DiagramView {
 
     pub fn layout(&self) -> &Layout {
         &self.layout
+    }
+
+    /// Whether the diagram given last is still being laid out, so
+    /// [`Self::layout`] is an older one's.
+    pub fn is_laying_out(&self) -> bool {
+        self.laying_out
     }
 
     pub fn camera(&self) -> Camera {
@@ -201,15 +210,20 @@ impl DiagramView {
         if diagram.nodes.len() <= LAY_OUT_AT_ONCE {
             let out = layout::layout(&diagram, &widths, &options, Some(&previous));
             self.layout_task = None;
+            self.laying_out = false;
             self.apply(out, cx);
             return;
         }
+        self.laying_out = true;
         let work = cx.background_spawn(async move {
             layout::layout(&diagram, &widths, &options, Some(&previous))
         });
         self.layout_task = Some(cx.spawn(async move |this, cx| {
             let out = work.await;
-            let _ = this.update(cx, |this, cx| this.apply(out, cx));
+            let _ = this.update(cx, |this, cx| {
+                this.laying_out = false;
+                this.apply(out, cx);
+            });
         }));
     }
 

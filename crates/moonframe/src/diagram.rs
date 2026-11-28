@@ -50,13 +50,15 @@ pub(crate) struct DiagramHost {
     camera_seq: Option<Data>,
     /// The last `export` request acted on, by its `seq`.
     export_seq: Option<Data>,
-    /// Exports and copies asked for, done once the frame has laid the
-    /// document out.
+    /// Exports asked for, done once the view has laid the document out.
     asked: Vec<read::Hand>,
     messenger: Messenger,
     /// The view's `id`, naming its exported files.
     name: String,
     _events: Subscription,
+    /// Draws again when a background layout lands, for the exports
+    /// waiting on it.
+    _laid_out: Subscription,
 }
 
 impl DiagramHost {
@@ -66,6 +68,11 @@ impl DiagramHost {
         let tells = messenger.clone();
         let events = cx.subscribe(&view, move |_, _, event: &DiagramEvent, _| {
             tells.send(tell::message(event))
+        });
+        let laid_out = cx.observe(&view, |host: &mut Self, _, cx| {
+            if !host.asked.is_empty() {
+                cx.notify();
+            }
         });
         let mut host = Self {
             view,
@@ -78,6 +85,7 @@ impl DiagramHost {
             messenger,
             name: format!("{}-{}", init.owner(), init.id()),
             _events: events,
+            _laid_out: laid_out,
         };
         host.set_props(init.props(), cx);
         host
@@ -135,18 +143,26 @@ impl Render for DiagramHost {
             self.view
                 .update(cx, |view, cx| view.set_diagram(diagram, window, cx));
         }
-        for hand in std::mem::take(&mut self.asked) {
-            let view = self.view.read(cx);
-            let (diagram, layout, lit) = (
-                view.diagram().clone(),
-                view.layout().clone(),
-                view.highlighted(),
-            );
-            match hand {
-                read::Hand::Export(format) => {
-                    let done = export::file(&diagram, &layout, &lit, &format, &self.name, cx);
-                    self.messenger.send(export::told(done, &format));
-                },
+        // An export waits for the layout of the document it was asked
+        // with; only the SVG text is made here, the file in the background.
+        if !self.view.read(cx).is_laying_out() {
+            for hand in std::mem::take(&mut self.asked) {
+                let read::Hand::Export(format) = hand;
+                let view = self.view.read(cx);
+                let svg = moonframe_diagram::view::export_svg(
+                    view.diagram(),
+                    view.layout(),
+                    &view.highlighted(),
+                    window,
+                    cx,
+                );
+                let (messenger, name, renderer) =
+                    (self.messenger.clone(), self.name.clone(), cx.svg_renderer());
+                cx.background_spawn(async move {
+                    let done = export::write(&svg, &format, &name, &renderer);
+                    messenger.send(export::told(done, &format));
+                })
+                .detach();
             }
         }
         let problem = self.problem.clone().map(|problem| {

@@ -1,13 +1,13 @@
-//! Exports drawn for real: a diagram laid out in a headless window, then
-//! written as SVG and as PNG through GPUI's SVG renderer.
+//! Exports drawn for real: a diagram as SVG, written as a file and as a
+//! PNG through GPUI's SVG renderer, with no window (CI has no GPU).
 
 use {
-    gpui_kit::{AppContext as _, HeadlessAppContext, px, size},
+    gpui_kit::HeadlessAppContext,
     moonframe_diagram::{
         Options,
-        layout::layout,
+        export::Colors,
+        layout::{Approx, Measure as _, layout},
         parse,
-        view::{DiagramView, measure},
     },
     std::sync::Arc,
 };
@@ -19,26 +19,26 @@ fn a_diagram_exports_as_svg_and_png() {
         Arc::new(crate::assets::Assets::new(None)),
         gpui_platform_capture::current_headless_renderer,
     );
-    cx.update(gpui_kit::init);
-    let handle = cx
-        .open_window(size(px(400.0), px(300.0)), |_, cx| cx.new(DiagramView::new))
-        .expect("a window");
+    let renderer = cx.update(|cx| cx.svg_renderer());
     let diagram =
         parse::mermaid::parse("flowchart LR\n a[Export] --> b{Works?} -->|yes| c((Done))")
             .expect("parsed");
+    let laid = layout(&diagram, &Approx, &Options::default(), None);
+    let mut approx = |text: &str, size: f32| Approx.width(text, size);
+    let text = moonframe_diagram::export::svg(
+        &diagram,
+        &laid,
+        &Colors::light(),
+        "Helvetica",
+        &[],
+        &mut approx,
+    );
     let name = format!("test-{}", std::process::id());
-    let (svg, png) = cx
-        .update_window(handle.into(), |_, window, cx| {
-            let widths = measure(&diagram, 14.0, window, cx);
-            let laid = layout(&diagram, &widths, &Options::default(), None);
-            let svg = super::export::file(&diagram, &laid, &[], "svg", &name, cx);
-            let png = super::export::file(&diagram, &laid, &[], "png", &name, cx);
-            (svg, png)
-        })
-        .expect("drawn");
-    let (svg, png) = (svg.expect("svg written"), png.expect("png written"));
-    let text = std::fs::read_to_string(&svg).expect("svg read");
-    assert!(text.contains(">Works?<"), "{text}");
+    let svg = super::export::write(&text, "svg", &name, &renderer).expect("svg written");
+    let png = super::export::write(&text, "png", &name, &renderer).expect("png written");
+    assert!(super::export::write(&text, "gif", &name, &renderer).is_err());
+    let written = std::fs::read_to_string(&svg).expect("svg read");
+    assert!(written.contains(">Works?<"), "{written}");
     let picture = image::open(&png).expect("png decodes");
     assert!(
         picture.width() > 200 && picture.height() > 60,
@@ -51,19 +51,18 @@ fn a_diagram_exports_as_svg_and_png() {
         let keep = std::path::PathBuf::from(keep);
         let _ = std::fs::copy(&svg, keep.join("export.svg"));
         let _ = std::fs::copy(&png, keep.join("export.png"));
-        for (colors, file) in [
-            (moonframe_diagram::export::Colors::light(), "light.svg"),
-            (moonframe_diagram::export::Colors::dark(), "dark.svg"),
-        ] {
-            let widths = moonframe_diagram::layout::Approx;
-            let laid = layout(&diagram, &widths, &Options::default(), None);
-            let _ =
-                std::fs::write(
-                    keep.join(file),
-                    moonframe_diagram::export::svg(&diagram, &laid, &colors, "Helvetica", &[
-                        "b".into()
-                    ]),
-                );
+        for (colors, file) in [(Colors::light(), "light.svg"), (Colors::dark(), "dark.svg")] {
+            let _ = std::fs::write(
+                keep.join(file),
+                moonframe_diagram::export::svg(
+                    &diagram,
+                    &laid,
+                    &colors,
+                    "Helvetica",
+                    &["b".into()],
+                    &mut approx,
+                ),
+            );
         }
     }
     let _ = std::fs::remove_file(svg);

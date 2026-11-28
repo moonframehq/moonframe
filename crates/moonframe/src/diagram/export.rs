@@ -3,26 +3,23 @@
 //! mod names).
 
 use {
-    gpui_kit::App,
+    gpui_kit::SvgRenderer,
     moonframe_core::Data,
-    moonframe_diagram::{Diagram, Layout, export, view},
-    std::path::PathBuf,
+    std::path::{Path, PathBuf},
 };
 
-/// A file of `diagram` in `format` (`svg` or `png`), drawn in the app's
-/// colors, written to the share folder as `diagram-<name>.<format>`.
-pub(super) fn file(
-    diagram: &Diagram,
-    layout: &Layout,
-    highlight: &[String],
+/// `svg` as a file in `format` (`svg` or `png`), written to the share
+/// folder as `diagram-<name>.<format>`. Off the UI thread: a PNG is drawn,
+/// encoded and written here.
+pub(super) fn write(
+    svg: &str,
     format: &str,
     name: &str,
-    cx: &App,
+    renderer: &SvgRenderer,
 ) -> Result<PathBuf, String> {
-    let font = gpui_kit::component::ActiveTheme::theme(cx)
-        .font_family
-        .to_string();
-    let svg = export::svg(diagram, layout, &view::export_colors(cx), &font, highlight);
+    if !matches!(format, "svg" | "png") {
+        return Err(format!("no export as `{format}`: svg or png"));
+    }
     let dir = crate::paths::shared();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let name: String = name
@@ -36,18 +33,17 @@ pub(super) fn file(
         })
         .collect();
     let path = dir.join(format!("diagram-{name}.{format}"));
-    match format {
-        "svg" => std::fs::write(&path, svg).map_err(|e| e.to_string())?,
-        "png" => png(&svg, &path, cx)?,
-        other => return Err(format!("no export as `{other}`: svg or png")),
+    if format == "svg" {
+        std::fs::write(&path, svg).map_err(|e| e.to_string())?;
+    } else {
+        png(svg, &path, renderer)?;
     }
     Ok(path)
 }
 
 /// `svg` rasterized at twice its size by GPUI's SVG renderer, as a PNG.
-fn png(svg: &str, path: &std::path::Path, cx: &App) -> Result<(), String> {
-    let picture = cx
-        .svg_renderer()
+fn png(svg: &str, path: &Path, renderer: &SvgRenderer) -> Result<(), String> {
+    let picture = renderer
         .render_single_frame(svg.as_bytes(), 2.0)
         .map_err(|e| e.to_string())?;
     let size = picture.size(0);

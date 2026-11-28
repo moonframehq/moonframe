@@ -153,6 +153,27 @@ pub fn export_colors(cx: &App) -> crate::export::Colors {
     }
 }
 
+/// `diagram` laid out as `layout`, as SVG in the theme's colors and font,
+/// its labels measured as the view measures them; `highlight` ids in the
+/// accent.
+pub fn export_svg(
+    diagram: &crate::model::Diagram,
+    layout: &crate::layout::Layout,
+    highlight: &[String],
+    window: &mut Window,
+    cx: &App,
+) -> String {
+    let font = cx.theme().font_family.to_string();
+    crate::export::svg(
+        diagram,
+        layout,
+        &export_colors(cx),
+        &font,
+        highlight,
+        &mut |text, size| super::paint::text_width(text, size, window, cx),
+    )
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
