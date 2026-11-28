@@ -377,6 +377,10 @@ impl Parser {
     }
 
     fn node_or_edge(&mut self, scope: &Scope) -> Result<Vec<String>, Unsupported> {
+        let subgraph = self
+            .peek_id()
+            .is_some_and(|w| w.eq_ignore_ascii_case("subgraph"))
+            || self.peek() == Some(&Token::Punct('{'));
         let mut ends = vec![self.end(scope)?];
         while self.peek() == Some(&Token::Link) {
             self.at += 1;
@@ -384,6 +388,11 @@ impl Parser {
         }
         let given = self.attributes()?;
         let mut named = Vec::new();
+        // A subgraph standing alone declared its nodes inside, with the
+        // defaults there: declaring them again here would undo those.
+        if ends.len() == 1 && subgraph {
+            return Ok(ends.concat());
+        }
         if ends.len() == 1 {
             for id in &ends[0] {
                 let mut attributes = scope.node.clone();

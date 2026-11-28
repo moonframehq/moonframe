@@ -6,7 +6,7 @@ use {
     super::*,
     crate::{
         layout::{Approx, Options, layout},
-        model::{DiagramKind, Head},
+        model::{DiagramKind, EdgeKind, Head, NodeKind, Tone},
         write,
     },
     std::{fmt::Write as _, path::PathBuf},
@@ -150,6 +150,7 @@ fn what_is_written_reads_back_the_same() {
         "flowchart-shapes.mmd",
         "sequence-login.mmd",
         "digraph-deps.dot",
+        "class-shapes.mmd",
     ] {
         let path = fixtures().join(name);
         let language = if name.ends_with(".dot") {
@@ -163,10 +164,26 @@ fn what_is_written_reads_back_the_same() {
         let written = write::mermaid(&first);
         let again = mermaid::parse(&written).unwrap_or_else(|e| panic!("{name}: {e}\n{written}"));
         // Places and sublabels aside, the same nodes, edges and messages.
+        // A flowchart has no UML heads: it draws them as arrows.
+        let flowchart = written.starts_with("flowchart");
+        let drawn = |h: Head| match h {
+            Head::Triangle | Head::Diamond | Head::HollowDiamond | Head::Open if flowchart => {
+                Head::Arrow
+            },
+            h => h,
+        };
         let shape = |d: &Diagram| {
-            let mut nodes: Vec<_> = d.nodes.iter().map(|n| (n.kind, n.fill.clone())).collect();
-            nodes.sort_by_key(|(k, f)| (k.name(), f.clone()));
-            let edges: Vec<_> = d.edges.iter().map(|e| (e.end, e.label.clone())).collect();
+            let mut nodes: Vec<_> = d
+                .nodes
+                .iter()
+                .map(|n| (n.kind, n.fill.clone(), n.tone.map(|t| format!("{t:?}"))))
+                .collect();
+            nodes.sort_by_key(|(k, f, t)| (k.name(), f.clone(), t.clone()));
+            let edges: Vec<_> = d
+                .edges
+                .iter()
+                .map(|e| (drawn(e.start), drawn(e.end), e.label.clone()))
+                .collect();
             (nodes, edges, d.messages.len(), d.groups.len())
         };
         assert_eq!(shape(&first), shape(&again), "{name}:\n{written}");
@@ -239,4 +256,129 @@ fn nodes_alone_count_toward_the_limit() {
     assert!(mermaid::parse(&format!("sequenceDiagram\n{messages}")).is_err());
     let dot_nodes: String = names.iter().map(|n| format!("{n};")).collect();
     assert!(dot::parse(&format!("digraph {{ {dot_nodes} }}")).is_err());
+}
+
+#[test]
+fn a_subgraph_keeps_what_its_nodes_were_given() {
+    let d = dot::parse(
+        "digraph { node [shape=box]; subgraph cluster_x { a [shape=diamond, label=\"A\"]; } }",
+    )
+    .unwrap();
+    assert_eq!(d.nodes[0].kind, NodeKind::Diamond);
+    assert_eq!(d.nodes[0].label, "A");
+    assert_eq!(d.nodes[0].group.as_deref(), Some("cluster_x"));
+    // Defaults still reach a node first named in the subgraph.
+    let d = dot::parse("digraph { node [shape=box]; subgraph { b } }").unwrap();
+    assert_eq!(d.nodes[0].kind, NodeKind::Box);
+}
+
+#[test]
+fn trapezoids_find_their_own_closers() {
+    let d = mermaid::parse(
+        "flowchart TD\n  A[/Trapezoid\\] --> B[\\Inverse/]\n  C[/Lean/] --> D[\\Back\\]",
+    )
+    .unwrap();
+    let labels: Vec<_> = d.nodes.iter().map(|n| n.label.as_str()).collect();
+    assert_eq!(labels, ["Trapezoid", "Inverse", "Lean", "Back"]);
+    // The nearest closer wins when two could match on one line.
+    let d = mermaid::parse("flowchart TD\n  A[/x\\] --> B[/y/]").unwrap();
+    assert_eq!(d.nodes[0].label, "x");
+    assert_eq!(d.nodes[1].label, "y");
+}
+
+#[test]
+fn class_relations_are_found_outside_cardinalities() {
+    let d = mermaid::parse("classDiagram\n  A \"0..1\" --> \"1\" B : owns").unwrap();
+    assert_eq!(d.edges.len(), 1);
+    let e = &d.edges[0];
+    assert_eq!((e.from.as_str(), e.to.as_str()), ("A", "B"));
+    assert_eq!(
+        (e.start, e.end, e.kind),
+        (Head::None, Head::Arrow, EdgeKind::Solid)
+    );
+    assert_eq!(e.label.as_deref(), Some("owns"));
+    // Marks at both ends, and a name ending in `o` is not a diamond.
+    let d = mermaid::parse("classDiagram\n  A <|--|> B\n  Foo--Bar\n  C o..> D").unwrap();
+    let heads: Vec<_> = d.edges.iter().map(|e| (e.start, e.end, e.kind)).collect();
+    assert_eq!(heads, [
+        (Head::Triangle, Head::Triangle, EdgeKind::Solid),
+        (Head::None, Head::None, EdgeKind::Solid),
+        (Head::HollowDiamond, Head::Open, EdgeKind::Dashed),
+    ]);
+    assert_eq!(d.edges[1].from, "Foo");
+}
+
+#[test]
+fn a_body_never_closed_is_an_error_on_its_line() {
+    let err = mermaid::parse("classDiagram\n  class A {\n    +x int\n  A --> B").unwrap_err();
+    assert_eq!(err.line, 2);
+    let err =
+        mermaid::parse("erDiagram\n  A ||--o{ B : has\n  B {\n    string id\n  A }o--|| C : x")
+            .unwrap_err();
+    assert_eq!(err.line, 3);
+}
+
+#[test]
+fn written_ids_never_merge_two_nodes() {
+    let d =
+        mermaid::parse("flowchart TD\n  api-gw --> api_gw\n  e[end] --> end_\n  1 --> n1").unwrap();
+    let written = write::mermaid(&d);
+    let again = mermaid::parse(&written).unwrap_or_else(|e| panic!("{e}\n{written}"));
+    assert_eq!(again.nodes.len(), d.nodes.len(), "{written}");
+    assert!(again.edges.iter().all(|e| e.from != e.to), "{written}");
+}
+
+#[test]
+fn repeated_group_names_are_written_once_each() {
+    let d = mermaid::parse("stateDiagram-v2\nstate A {\nstate A {\nB --> C\n}\n}").unwrap();
+    let written = write::mermaid(&d);
+    assert_eq!(
+        written.matches("subgraph").count(),
+        d.groups.len(),
+        "{written}"
+    );
+    // A group that is its own parent is still written, with its nodes.
+    let mut d = mermaid::parse("flowchart TD\n  subgraph g\n    a\n  end").unwrap();
+    d.groups[0].parent = Some("g".into());
+    let written = write::mermaid(&d);
+    assert!(
+        written.contains("subgraph g") && written.contains("a[\"a\"]"),
+        "{written}"
+    );
+}
+
+#[test]
+fn tones_are_written_as_classes() {
+    let d =
+        mermaid::parse("flowchart TD\n  a --> b\n  classDef danger stroke:#f00\n  class b danger")
+            .unwrap();
+    assert_eq!(d.nodes[1].tone, Some(Tone::Danger));
+    let again = mermaid::parse(&write::mermaid(&d)).unwrap();
+    assert_eq!(again.nodes[1].tone, Some(Tone::Danger));
+    assert_eq!(again.nodes[0].tone, None);
+}
+
+#[test]
+fn class_heads_and_names_survive_writing() {
+    let text = "classDiagram\n  class Canvas[\"The canvas\"]\n  Canvas o-- Theme\n  Shape <|-- Circle : is a";
+    let d = mermaid::parse(text).unwrap();
+    let written = write::mermaid(&d);
+    assert!(written.starts_with("classDiagram"), "{written}");
+    let again = mermaid::parse(&written).unwrap();
+    let heads = |d: &Diagram| -> Vec<_> {
+        d.edges
+            .iter()
+            .map(|e| {
+                (
+                    e.from.clone(),
+                    e.to.clone(),
+                    e.start,
+                    e.end,
+                    e.label.clone(),
+                )
+            })
+            .collect()
+    };
+    assert_eq!(heads(&again), heads(&d), "{written}");
+    assert_eq!(again.nodes[0].label, "The canvas");
 }
