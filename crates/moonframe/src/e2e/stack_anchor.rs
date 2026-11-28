@@ -92,3 +92,52 @@ fn rows_sliding_in_above_leave_the_row_being_read_where_it_is(cx: &mut TestAppCo
         );
     }
 }
+
+/// Rows arrive above while the column reveals one: the reveal places it,
+/// and what was kept before does not move it away after.
+const REVEALING: &str = r##"
+return mod {
+	init = function()
+		local items = {}
+		for i = 1, 30 do items[i] = `i{i}` end
+		return { log = "", items = items, added = 0, seq = 0 }
+	end,
+	update = function(state, msg)
+		if msg == "go" then
+			for _ = 1, 8 do
+				state.added += 1
+				table.insert(state.items, 1, `new{state.added}`)
+			end
+			state.seq += 1
+			state.to = { key = "i25", seq = state.seq }
+		end
+	end,
+	view = function(state)
+		local rows = {}
+		for _, item in state.items do
+			table.insert(rows, ui.row { key = item, class = if item == "i25" then "wanted" else nil,
+				height = 40, ui.text { item } })
+		end
+		return shell(state, ui.column {
+			ui.row { class = "go", msg = "go", ui.text "Go" },
+			ui.column { class = "feed", height = 200, gap = "none", scroll = true, scroll_to = state.to,
+				table.unpack(rows) },
+		})
+	end,
+}
+"##;
+
+#[gpui_kit::test]
+fn a_revealed_row_stays_in_view_after_rows_arrived_above(cx: &mut TestAppContext) {
+    let mut window = open(cx, REVEALING);
+    window.wheel("feed", 200.0);
+    window.click("go");
+    for _ in 0..4 {
+        window.settle();
+    }
+    let (feed, wanted) = (window.bounds("feed"), window.bounds("wanted"));
+    assert!(
+        wanted.top() >= feed.top() && wanted.bottom() <= feed.bottom() + px(1.),
+        "{wanted:?} {feed:?}"
+    );
+}

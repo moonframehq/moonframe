@@ -71,6 +71,12 @@ pub(super) fn begin(
         .children
         .iter()
         .any(|child| matches!(child, Node::Stack(child) if child.key.is_some()));
+    if revealing {
+        // What it kept before the reveal moved it is stale after: it starts
+        // afresh once the reveal is done.
+        let key = format!("{:?}/{}", painter.window, place.path);
+        KEPT.with_borrow_mut(|kept| kept.remove(&key));
+    }
     if !down || !keyed || revealing || painter.preview {
         return None;
     }
