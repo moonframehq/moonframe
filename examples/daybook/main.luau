@@ -6,6 +6,9 @@
 local MENUS: { { title: string, items: { any } } } = {
 	{ title = "File", items = {
 		{ label = "New Task", msg = "focus", to = "topbar", shortcut = "secondary-n" },
+		{ label = "New Note", msg = "new-note", to = "agenda", shortcut = "secondary-shift-n" },
+		{ label = "New Event", msg = { view = "events" }, to = "sidebar", shortcut = "secondary-shift-e" },
+		"-",
 		{ label = "Search…", msg = "focus", to = "topbar", shortcut = "secondary-k" },
 	} },
 	{ title = "Go", items = {
@@ -15,6 +18,7 @@ local MENUS: { { title: string, items: { any } } } = {
 		{ label = "Notes", msg = { view = "notes" }, to = "sidebar", shortcut = "secondary-4" },
 		{ label = "Tasks", msg = { view = "tasks" }, to = "sidebar", shortcut = "secondary-5" },
 		{ label = "Events", msg = { view = "events" }, to = "sidebar", shortcut = "secondary-6" },
+		{ label = "Habits", msg = { view = "habits" }, to = "sidebar", shortcut = "secondary-7" },
 		"-",
 		{ label = "Previous Day", msg = { shift = -1 }, to = "provider:planner", shortcut = "secondary-[" },
 		{ label = "Next Day", msg = { shift = 1 }, to = "provider:planner", shortcut = "secondary-]" },
@@ -22,7 +26,8 @@ local MENUS: { { title: string, items: { any } } } = {
 	} },
 	{ title = "View", items = {
 		{ label = "Show or Hide the Sidebar", msg = "toggle-left", shortcut = "secondary-s" },
-		{ label = "Show or Hide the Inbox", msg = "toggle-right", shortcut = "secondary-i" },
+		{ label = "Show or Hide the Right Pane", msg = "toggle-right", shortcut = "secondary-i" },
+		{ label = "AI Assistant", msg = "open-assistant", to = "topbar", shortcut = "secondary-shift-a" },
 		"-",
 		{ label = "Classic Look", msg = { look = "classic" }, to = "provider:planner" },
 		{ label = "Sepia Look", msg = { look = "sepia" }, to = "provider:planner" },
@@ -43,8 +48,8 @@ return mod<<State>> {
 	window = { titlebar = "hidden", traffic_lights = { x = 20, y = 24 } },
 
 	about = {
-		version = "0.1",
-		description = "Today's tasks and events, an inbox, a month at a glance, and notes.",
+		version = "0.2",
+		description = "Today's tasks, events, habits, upcoming boards, hourly calendar, rich notes, and an assistant.",
 		website = "https://github.com/moonframehq/moonframe",
 		copyright = "MIT licensed",
 	},
@@ -60,6 +65,10 @@ return mod<<State>> {
 			state.left = not state.left
 		elseif msg == "toggle-right" then
 			state.right = not state.right
+		elseif msg == "show-right" then
+			state.right = true
+		elseif msg == "hide-right" then
+			state.right = false
 		end
 	end,
 

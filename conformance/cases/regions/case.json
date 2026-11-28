@@ -1,0 +1,44 @@
+{
+  "about": "Mods placed in a region by order, and one mounted by name; app.dark is false.",
+  "steps": [
+    {
+      "regions": {
+        "left": [
+          "second",
+          "first"
+        ]
+      }
+    },
+    {
+      "expect": {
+        "detail": {
+          "text": "light",
+          "type": "text"
+        },
+        "first": {
+          "text": "first",
+          "type": "text"
+        },
+        "second": {
+          "text": "second",
+          "type": "text"
+        },
+        "shell": {
+          "children": [
+            {
+              "direction": "column",
+              "gap": "small",
+              "name": "left",
+              "type": "region"
+            },
+            {
+              "mod": "detail",
+              "type": "mount"
+            }
+          ],
+          "type": "row"
+        }
+      }
+    }
+  ]
+}

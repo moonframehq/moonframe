@@ -126,6 +126,9 @@ pub enum ToolItem {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ToolView {
+    /// Transcript entry used to retrieve the original text on demand.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_key: Option<String>,
     /// The agent's id for the call.
     pub id: String,
     /// `"read" "edit" "delete" "move" "search" "execute" "think" "fetch"
@@ -357,7 +360,7 @@ fn flush(
                 let steps = steps
                     .get(tool.call_id.as_str())
                     .map_or(&[][..], Vec::as_slice);
-                ToolItem::Tool(tool::view(tool, steps, limits))
+                ToolItem::Tool(tool::view(tool, steps, limits, key(entry)))
             },
             EntryKind::Thought { text } => ToolItem::Thought {
                 key: key(entry),

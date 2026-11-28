@@ -9,6 +9,7 @@
 // keep-sorted start
 mod agent_chat;
 mod both_backends;
+mod chat_toolbar;
 mod composer_field;
 mod divider_keys;
 mod focus_keys;
@@ -22,6 +23,7 @@ mod markdown_scroll;
 mod markdown_tooltips;
 mod outside;
 mod overlay_letter_keys;
+mod overlay_scroll_to;
 mod page_text;
 mod paste;
 mod regressions;
