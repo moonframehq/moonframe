@@ -687,6 +687,7 @@ export type IconName =
 	| "gitlab"
 	| "globe"
 	| "grip-vertical"
+	| "hand"
 	| "hard-drive"
 	| "hash"
 	| "heading"
@@ -732,6 +733,7 @@ export type IconName =
 	| "minus"
 	| "monitor"
 	| "moon"
+	| "mouse-pointer-2"
 	| "network"
 	| "octagon-alert"
 	| "palette"
@@ -791,6 +793,7 @@ export type IconName =
 	| "star"
 	| "star-fill"
 	| "star-off"
+	| "sticky-note"
 	| "strikethrough"
 	| "sun"
 	| "tag"
@@ -803,6 +806,7 @@ export type IconName =
 	| "trash"
 	| "trash-2"
 	| "triangle-alert"
+	| "type"
 	| "undo"
 	| "undo-2"
 	| "unlock"
@@ -3238,6 +3242,20 @@ type UseDayStripProps = {
 	read event: string?,
 	read to: string?,
 }
+type UseDiagramShape = any
+type UseDiagramLink = any
+type UseDiagramProps = {
+	read id: string,
+	read shapes: { UseDiagramShape },
+	read links: { UseDiagramLink }?,
+	read selected: { string }?,
+	read tool: string?,
+	read version: number?,
+}
+type UseDiagramView = any
+type UseDiagramDrag = any
+type UseDiagramState = any
+type UseDiagramBox = any
 type UseDialogButton = any
 type UseDialogProps = {
 	read open: boolean?,
@@ -5066,6 +5084,7 @@ type UseProps = {
 	["date-picker"]: UseDatePickerProps,
 	["date-tile"]: UseDateTileProps,
 	["day-strip"]: UseDayStripProps,
+	["diagram"]: UseDiagramProps,
 	["dialog"]: UseDialogProps,
 	["dictation"]: UseDictationProps,
 	["diff-counts"]: UseDiffCountsProps,

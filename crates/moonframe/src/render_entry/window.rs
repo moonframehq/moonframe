@@ -155,6 +155,7 @@ fn open(
                 app
             });
             app = Some(view.clone());
+            crate::render::forget_window(window.window_handle().window_id());
             let view = cx.new(|cx| crate::app::MainWindow::new(view, None, window, cx));
             cx.new(|cx| Root::new(view, window, cx))
         })
