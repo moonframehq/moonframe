@@ -77,7 +77,7 @@ for the API, limits, caller identity and build policies.
 | `ui.badge "..."` | a small pill: counts, tags, states | `text`, `tone`, extras |
 | `ui.terminal { id = "main" }` | a live shell that fills its space | `id`, `cwd`, `engine` (`alacritty`, `ghostty`), `exit` (sent once, with `exited = true` added, as the shell exits; without it Enter starts another) |
 | `ui.browser { id = "docs", url = "https://..." }` | a web page in a native view that fills its space (macOS, Windows; Linux offers the system browser); drive it with `command = "browser-back"` (`-forward`, `-reload`, `-stop`) and `browser = "<id>"` on a control | `id`, `url` (http, https, file), `zoom`, `navigate` (sent with `url`, `title`, `loading`, `back`, `forward` added) and `loading` (with `loading`, `url`); a `ui.input { browser = "<id>" }` is its address bar |
-| `ui.document { html = state.html }` | HTML shown sealed in a native view that fills its space (macOS, Windows): no script runs and nothing loads but the document (pictures and fonts inline as `data:`), in the app's light or dark look, for a briefing, a shared file's preview or a note; `editable = true` edits it in place | `id`, `html` or `src` (a file, named as `ui.image` names pictures), `link` (sent with `url`, `text`: links are never followed, `#part` scrolls), `scroll` (with `y`, `height`, `content_height`), `scroll_to` (a `y`, an element `id`, or `{ y \| id, seq }`), `select` (with `text`, `x`, `y`, `width`, `height`), `editable`, `change` and `done` (with `html`, the whole document) |
+| `ui.document { html = state.html }` | HTML shown sealed in a native view that fills its space (macOS, Windows): no script runs and nothing loads but the document (pictures and fonts inline as `data:`), in the app's light or dark look, for a briefing, a shared file's preview or a note; `editable = true` edits it in place | `id`, `html` or `src` (a file, named as `ui.image` names pictures), `link` (sent with `url`, `text`: links are never followed, `#part` scrolls), `scroll` (with `y`, `height`, `content_height`), `scroll_to` (a `y`, an element `id`, or `{ y \| id, seq }`), `select` (with `text`, `x`, `y`, `width`, `height`), `editable`, `change` and `done` (with `html`, the whole document; `done` also with `edited`, typed into since the last `done` or the load) |
 | `ui.markdown "# Notes"` | a markdown document drawn by the host (headings, emphasis, lists, task lists, tables, quotes, `> [!NOTE]` alerts, footnotes, frontmatter, ` ```mermaid `, ` ```dot ` and ` ```graphviz ` fences drawn as diagrams in the theme with the `diagram` feature (Copy as Mermaid and Copy source in their corner; while a fence streams in, the last version that parsed stays; what does not parse shows as code with why), highlighted code with a copy button; LaTeX in a build with `math`), up to 1 MiB; links send `link` instead of opening, a `#heading` link scrolls there, a `[label](cite:source)` link draws a source chip, and pictures show only with `images`, never from the web (a picture titled `emoji`, `![:party:](~/.cache/moonframe/images/emoji/party.png "emoji")`, draws inline at the line's height from the image cache alone, with or without `images`, its alt text standing in until it loads or when it is missing); styled by `markdown`, `markdown-code`, `markdown-quote`, `markdown-alert`, `markdown-find` and `markdown-find-current` rules | `text`, `link` (sent with `url` added), `tooltips` (`{ [url] = text }`: a link's tooltip, over its own title; a link with a title, `[text](url "title")`, shows it while every link to that address has the same title; links in a `> [!NOTE]` alert too), `to`, `grow`, `scroll`, `width`, `height`, `max_width`, `lines` (at most N lines, for a preview), `images`, `image` (a click on a picture on its own line, with `src` and `alt`), `outline` (sent with `headings`: `level`, `text`, `at`, `slug`), `section` (sent with `heading`, the index being read), `reveal = { at, seq }` (scrolls there when it changes), `find`, `find_index`, `found` (sent with `count`), `stream` (fade in what is added), `scrolled` (with `scroll`: sent as the reader scrolls, with `fraction`, 0 at the top to 1 at the end), `scroll_at = { fraction, seq }` (with `scroll`: scrolls there when it changes, without sending `scrolled`) |
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key, nor do `vector-liberty` `vector-positron` `vector-streets` `vector-dark` `vector-graphite`, vector tiles drawn on the GPU by gpui-maps in builds with the `map-vector` feature; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` when a `via` route is found or `routed`/`to` changes), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
@@ -138,7 +138,11 @@ macOS, ctrl elsewhere) then a key, joined by `-`.
   `scroll_to = "row-7"` reveals the first row or column with
   `key = "row-7"` inside it, however deep (a row in a card in the list),
   once it is drawn; `scroll_to = { key = "row-7", seq = n }` asks again
-  for the same key with each new `seq`. Both are the GPUI window's, so far.
+  for the same key with each new `seq`. `scroll_to = { y = state.y, seq =
+  n }` (and `x`) scrolls back to how far `measure` told it was, as far as
+  the content goes: a reader reopened where it was left. With a `seq`, only
+  a new `seq` asks again, so keep `measure`'s `y` in state as it comes. All are the GPUI
+  window's, so far.
 
 - **Measure a scrolling stack** (`row`, `column`): with `scroll` enabled,
   `measure = msg` sends `msg` (to `to`, else the drawing mod) with its
@@ -364,6 +368,9 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`avatar-stack`](#avatar-stack) | Data | Who is in a group, in a card or a row (38 investors, 3 reviewers), when their names matter less than how many. For one person use `avatar`; for a list of people use `list` or `table`. |
 | [`bar-chart`](#bar-chart) | Data | Counts over time or per category: tokens per day, runs per hour, alerts per device, stacked by kind. For a tiny live trend in a status bar use `sparkline`; for one fraction use `meter`; for one headline number use `stat-tile`. |
 | [`chat-message`](#chat-message) | Data | Each turn of a conversation with an agent or a person, stacked in a scrolling column over a `composer`. For a comment on a pull request use `comment-card`; for a notification use `toast`. |
+| [`chat-question`](#chat-question) | Data | A permission in `app.chat`'s view that carries a `question`; `agent-chat` draws it already. For a yes/no permission use the permission's options as buttons; for a form of your own use `form-grid`. |
+| [`chat-waiting`](#chat-waiting) | Data | Between an agent conversation from `app.chat`'s view and its composer; `agent-chat` draws it already. For one run's question use `agent-run`; for a plain confirmation use `confirm`. |
+| [`chat-working`](#chat-working) | Data | Under an agent conversation drawn from `app.chat`'s view; `agent-chat` draws it already. For one run's status use `agent-run`; for a plain spinner use `loading`. |
 | [`code-view`](#code-view) | Data | Show code or a log read-only: a file at a line, a snippet in a comment, a test's output. For changes use `diff-view`; for a live shell use `terminal`. |
 | [`comment-card`](#comment-card) | Data | Comments in a pull request conversation, review threads, notes left by agents or people. Stack them in a column. For a numbered review note with a remove button use `note-card`; for events in order use `timeline`. |
 | [`contribution-graph`](#contribution-graph) | Data | Daily activity over months or a year, GitHub style: commits, agent runs, posts, workouts, a streak. Pass one count per day and the first day's date. For weekly or arbitrary buckets without dates use `heat-grid`; for counts with an axis use `bar-chart`; for picking a day use `month-grid`. |
@@ -1334,7 +1341,7 @@ A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 
 #### `agent-chat`
 
-**Agent Chat.** A whole conversation with a coding agent through herdr-acp: transcript with folded tool runs, permission questions, queue, Stop and Resume, mode/model/effort pickers and a multiline composer with history, / commands and attachments.
+**Agent Chat.** A whole conversation with a coding agent through Sheprd's sheprd-acp: transcript with folded tool runs and handoffs, what the agent is doing with its stoppable sub-agents and shells, permission questions and questions with choices, a queue to steer or send now, Stop and Resume, pull requests, pickers for the agent (switched mid-conversation), mode, model, effort and other settings, auto-accept, and a multiline composer with history, / commands and attachments.
 
 **When:** Give an app a chat with Claude, Codex, OpenCode, pi or Gemini on the `chat` provider (crates/moonframe-chat) in a few lines; the mod must be in providers/chat's `starters`. For one run of an agent the app starts itself use `agent-run`; for a static message use `chat-message`; for a send box alone use `composer`.
 
@@ -1353,7 +1360,7 @@ A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 | `to` | where its commands go (default "provider:chat"; "parent" sends them to the mod, as a demo does) |
 | `view` | stands in for the `app.chat` chat { id, status, error?, session?, view }, for a preview or demo |
 
-**Styles:** `.agent-chat` `.agent-chat-bottom` `.agent-chat-composer` `.agent-chat-context` `.agent-chat-empty-icon` `.agent-chat-ended` `.agent-chat-error` `.agent-chat-field` `.agent-chat-file` `.agent-chat-notice` `.agent-chat-notice:error` `.agent-chat-notice:warning` `.agent-chat-permission` `.agent-chat-permission-icon` `.agent-chat-permission-tool` `.agent-chat-plan` `.agent-chat-plan-done` `.agent-chat-plan-running` `.agent-chat-queued` `.agent-chat-transcript` `.agent-chat-turn` `.agent-chat-turn:cancelled` `.agent-chat-turn:failed` `.agent-chat-user` `.agent-chat-working`
+**Styles:** `.agent-chat` `.agent-chat-auto-accept` `.agent-chat-bottom` `.agent-chat-composer` `.agent-chat-context` `.agent-chat-empty-icon` `.agent-chat-ended` `.agent-chat-error` `.agent-chat-field` `.agent-chat-file` `.agent-chat-guest` `.agent-chat-handoff` `.agent-chat-handoff-line` `.agent-chat-notice` `.agent-chat-notice:error` `.agent-chat-notice:warning` `.agent-chat-notice-details` `.agent-chat-transcript` `.agent-chat-turn` `.agent-chat-turn:cancelled` `.agent-chat-turn:failed` `.agent-chat-user` `.agent-chat-working`
 
 ```lua
 local agent_chat = use "agent-chat"
@@ -1517,6 +1524,70 @@ chat_message {
 	author = "Sales agent", text = "Start with Lumen Retail: the biggest deal at risk.",
 	thinking { seconds = 4, open = state.thought, msg = "toggle-thought" },
 }
+```
+
+#### `chat-question`
+
+**Chat Question.** A question a coding agent asks with choices: each choice with its description, one click to answer (or tick several, then Send), and a field for the user's own words.
+
+**When:** A permission in `app.chat`'s view that carries a `question`; `agent-chat` draws it already. For a yes/no permission use the permission's options as buttons; for a form of your own use `form-grid`.
+
+| Prop | Meaning |
+| --- | --- |
+| `id` | the instance's id, one per question (such as `q-<permission id>`) |
+| `permission` | the view's permission: { id, title, question = { header?, text, multiple, options = { { label, description? } } } } |
+
+**Styles:** `.chat-question` `.chat-question-choice` `.chat-question-choice:picked` `.chat-question-field` `.chat-question-header`
+
+```lua
+local chat_question = use "chat-question"
+
+chat_question { id = "example", permission = { id = 1, question = { header = "Tab detail", multiple = false, options = { { description = "Shortest; best for many tabs", label = "Title only" }, { description = "Shows which agent runs there", label = "Title and agent" } }, text = "How much should each tab show?" }, title = "How should tabs show?" } }
+```
+
+#### `chat-waiting`
+
+**Chat Waiting.** What waits on the user above an agent's composer: its plan, permission questions with the agent's options, questions with choices, guests' prompts to allow, and queued prompts to take back, steer into the turn or send now.
+
+**When:** Between an agent conversation from `app.chat`'s view and its composer; `agent-chat` draws it already. For one run's question use `agent-run`; for a plain confirmation use `confirm`.
+
+| Prop | Meaning |
+| --- | --- |
+| `chat` | the chat's id, which keeps each question's instance its own |
+| `plan_open` | the plan is listed item by item rather than folded |
+| `plan_toggle` | message sent when the plan's line is clicked |
+| `view` | the chat's view: its `plan`, `permissions`, `queue`, `status` and `can_steer` |
+
+**Styles:** `.chat-waiting` `.chat-waiting-guest` `.chat-waiting-permission` `.chat-waiting-permission-icon` `.chat-waiting-permission-tool` `.chat-waiting-plan` `.chat-waiting-plan-done` `.chat-waiting-plan-running` `.chat-waiting-queued` `.chat-waiting-queued:held`
+
+```lua
+local chat_waiting = use "chat-waiting"
+
+chat_waiting { chat = "example", plan_open = false, view = { can_steer = true, permissions = { { id = 7, options = { { allows = true, id = "yes", kind = "allow_once", name = "Allow" }, { allows = false, id = "no", kind = "reject_once", name = "Reject" } }, title = "Run a command?", tool = "rm -rf build" } }, plan = { current = "Write the tests", done = 1, items = {  }, total = 3 }, queue = { { held = false, id = "q1", steered = false, text = "Also update the README" }, { held = false, id = "q2", steered = true, text = "Use tabs, not spaces" } }, status = "working" } }
+```
+
+#### `chat-working`
+
+**Chat Working.** What a coding agent is doing now: a spinner with its current step and how long the turn has run, or "Waiting for you", and its running sub-agents and background shells with their times and Stop buttons.
+
+**When:** Under an agent conversation drawn from `app.chat`'s view; `agent-chat` draws it already. For one run's status use `agent-run`; for a plain spinner use `loading`.
+
+| Prop | Meaning |
+| --- | --- |
+| `activities` | `view.activities`: { call_id, kind, label, detail?, running_for?, stoppable } |
+| `open` | the activities are listed one per line rather than counted |
+| `step` | what the agent is doing, such as the running tool's title |
+| `toggle` | message sent when the activity count is clicked |
+| `waiting` | a question waits for the user, so the agent is paused |
+| `working` | a turn runs now |
+| `working_for` | how long the turn has run (`view.working_for`) |
+
+**Styles:** `.chat-working` `.chat-working-activity` `.chat-working-list` `.chat-working-time`
+
+```lua
+local chat_working = use "chat-working"
+
+chat_working { activities = { { call_id = "a", detail = "Reading lib.rs", kind = "subagent", label = "Explore the chat crates", running_for = "1m 05s", stoppable = true }, { call_id = "b", kind = "shell", label = "npm run dev", running_for = "3m 12s", stoppable = false } }, open = true, step = "Running cargo test", working = true, working_for = "42s" }
 ```
 
 #### `code-view`
@@ -2907,7 +2978,7 @@ system_load { cpu = 0.14, history = { 0.1, 0.2, 0.1, 0.3, 0.2, 0.6, 0.4, 0.2, 0.
 | `measure` | with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too; empty, `first` and `last` are 0); a body past 200 rows is a `ui.list`, which takes `range` instead |
 | `reorder` | rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way |
 | `rows` | list of maps: `id` plus a value per column key; a value may be a string, a number or an element |
-| `scroll_to` | with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes |
+| `scroll_to` | with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes, or `{ y = state.y, seq = n }` scrolls back to the `y` `measure` told (past 200 rows, the `y` its `ui.list`'s `range` told) |
 | `selected` | id of the selected row |
 | `sort` | key of the sorted column (shows an arrow) |
 | `sortable` | false makes no header clickable (a column can also set `sortable = false`) |

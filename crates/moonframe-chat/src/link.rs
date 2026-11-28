@@ -183,6 +183,19 @@ fn session(shared: &Shared, host: &Handle, id: &str, mut stream: UnixStream) -> 
             }
             state.unsaved = true;
         }
+        // Another agent took the conversation over: a resume starts it.
+        if let Some(agent) = state
+            .chat(id)
+            .and_then(|chat| chat.transcript.as_ref())
+            .and_then(|transcript| transcript.harnesses.as_ref())
+            .and_then(|harnesses| harnesses.current)
+            .map(|agent| agent.name())
+            && let Some(chat) = state.chat_mut(id)
+            && chat.agent != agent
+        {
+            agent.clone_into(&mut chat.agent);
+            state.unsaved = true;
+        }
         state.dirty = true;
     }
 }

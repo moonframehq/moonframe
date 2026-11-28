@@ -284,8 +284,10 @@ export type StackProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- Reveal this direct child (one-based) when the index changes; or the
 	-- first row or column with this `key`, however deep, when the key (or
-	-- `seq`, to ask again) changes.
-	scroll_to: (number | string | { key: string, seq: any? })?,
+	-- `seq`, to ask again) changes; or scroll to the `y` (and `x`) its
+	-- `measure` told, as far as the content goes: with a `seq`, only a new
+	-- `seq` asks again, so `measure`'s `y` can be kept as it comes.
+	scroll_to: (number | string | { key: string?, x: number?, y: number?, seq: any? })?,
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,
@@ -1105,7 +1107,9 @@ export type DocumentProps = {
 	-- after an edit; give it back as `html` and nothing reloads. Grown past
 	-- the 8 MB `html` takes, it comes with `error` instead.
 	change: Data,
-	-- While editable: sent with `html` as the document loses the keyboard.
+	-- While editable: sent with `html` as the document loses the keyboard,
+	-- and `edited`, whether it was typed into since the last `done` (or
+	-- since it loaded): skip saving a blur that changed nothing.
 	done: Data,
 	[number]: string,
 }
@@ -3094,6 +3098,26 @@ type UseChatMessageProps = {
 	read icon: string?,
 	read text: string?,
 	read [number]: any,
+}
+type UseChatQuestionProps = {
+	read id: string?,
+	read permission: any,
+}
+type UseChatQuestionState = any
+type UseChatWaitingProps = {
+	read view: any,
+	read chat: string?,
+	read plan_open: boolean?,
+	read plan_toggle: any,
+}
+type UseChatWorkingProps = {
+	read working: boolean?,
+	read waiting: boolean?,
+	read step: string?,
+	read working_for: string?,
+	read activities: { any }?,
+	read open: boolean?,
+	read toggle: any,
 }
 type UseCheckboxProps = {
 	read checked: boolean?,
@@ -5178,6 +5202,9 @@ type UseProps = {
 	["change-tree"]: UseChangeTreeProps,
 	["chat-markdown"]: UseChatMarkdownProps,
 	["chat-message"]: UseChatMessageProps,
+	["chat-question"]: UseChatQuestionProps,
+	["chat-waiting"]: UseChatWaitingProps,
+	["chat-working"]: UseChatWorkingProps,
 	["checkbox"]: UseCheckboxProps,
 	["checks"]: UseChecksProps,
 	["chips"]: UseChipsProps,

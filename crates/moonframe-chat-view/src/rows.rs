@@ -5,7 +5,8 @@
 use {
     crate::{Limits, text, tool, unframe},
     herdr_chat_protocol::{
-        ATTACHED, Author, Entry, EntryKind, NoticeLevel, Tool, Transcript, TurnEnd,
+        ATTACHED, Agent, Author, Entry, EntryKind, Guest, HandedOver, NoticeLevel, Tool,
+        Transcript, TurnEnd,
     },
     serde::Serialize,
     std::collections::{HashMap, HashSet},
@@ -25,6 +26,10 @@ pub enum Row {
         files: Vec<String>,
         /// It went with an app's context frame, which is not shown.
         context: bool,
+        /// Who wrote it, when the user allowed a guest's prompt rather
+        /// than typing it: `Bob via tma`.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        guest: Option<String>,
     },
     /// The agent's answer, Markdown.
     Answer {
@@ -59,6 +64,22 @@ pub enum Row {
         #[serde(skip_serializing_if = "Vec::is_empty")]
         answers: Vec<QuestionView>,
     },
+    /// Another agent took the conversation over.
+    Handoff {
+        key: String,
+        /// The agents' names, such as `codex`; `from` is none for a chat
+        /// that had none before.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        from: Option<&'static str>,
+        to: &'static str,
+        /// Entries handed over, and ones left out for length.
+        kept: usize,
+        omitted: usize,
+        /// It went back to its own earlier session.
+        resumed: bool,
+        /// `Continued in Codex: 12 entries handed over`.
+        text: String,
+    },
     /// How a turn ended.
     Turn {
         key: String,
@@ -80,6 +101,7 @@ impl Row {
             | Self::Thought { key, .. }
             | Self::Image { key, .. }
             | Self::Notice { key, .. }
+            | Self::Handoff { key, .. }
             | Self::Turn { key, .. } => key,
             Self::Tools(group) => &group.key,
         }
@@ -217,7 +239,10 @@ fn key(entry: &Entry) -> String {
 /// A row for an entry that is not a tool call or a thought.
 fn row(key: String, kind: &EntryKind, streaming: bool, limits: &Limits) -> Row {
     match kind {
-        EntryKind::User { text, files } => user(key, text, *files, limits),
+        EntryKind::User {
+            text, files, guest, ..
+        } => user(key, text, *files, guest.as_ref(), limits),
+        EntryKind::Handoff(handed) => handoff(key, handed),
         EntryKind::Agent { text } => Row::Answer {
             key,
             text: text::tail(text, limits.answer),
@@ -296,8 +321,44 @@ fn row(key: String, kind: &EntryKind, streaming: bool, limits: &Limits) -> Row {
     }
 }
 
+/// The divider where another agent took over.
+fn handoff(key: String, handed: &HandedOver) -> Row {
+    let to = handed.to.display_name();
+    let mut text = if handed.resumed {
+        format!("Back to {to}")
+    } else {
+        format!("Continued in {to}")
+    };
+    match (handed.kept, handed.omitted) {
+        (0, _) => {},
+        (1, 0) => text.push_str(": 1 entry handed over"),
+        (kept, 0) => text.push_str(&format!(": {kept} entries handed over")),
+        (kept, omitted) => {
+            text.push_str(&format!(": {kept} entries handed over, {omitted} left out"));
+        },
+    }
+    Row::Handoff {
+        key,
+        from: handed.from.map(Agent::name),
+        to: handed.to.name(),
+        kept: handed.kept,
+        omitted: handed.omitted,
+        resumed: handed.resumed,
+        text,
+    }
+}
+
+/// A guest as a row names them: `Bob via tma`.
+pub(crate) fn guest_name(guest: &Guest) -> String {
+    format!(
+        "{} via {}",
+        text::head(&guest.name, 100),
+        text::head(&guest.tool, 100)
+    )
+}
+
 /// A prompt as its bubble shows it: no context frame, no file lines.
-fn user(key: String, text: &str, files: usize, limits: &Limits) -> Row {
+fn user(key: String, text: &str, files: usize, guest: Option<&Guest>, limits: &Limits) -> Row {
     let (context, prompt) = unframe(text);
     let mut lines: Vec<&str> = prompt.split('\n').collect();
     let mut names = Vec::new();
@@ -316,6 +377,7 @@ fn user(key: String, text: &str, files: usize, limits: &Limits) -> Row {
         text: text::head(lines.join("\n").trim_end(), limits.text),
         files: names,
         context: context.is_some(),
+        guest: guest.map(guest_name),
     }
 }
 
