@@ -4,9 +4,11 @@
 //! shared chat lock so paging later pages is O(1) without rescanning earlier
 //! characters or stalling other chats.
 
+#[cfg(any(unix, test))]
+use herdr_chat_protocol::Change;
 use {
     crate::{Chat, State, lock},
-    herdr_chat_protocol::{Change, EntryId, EntryKind, ToolContent},
+    herdr_chat_protocol::{EntryId, EntryKind, ToolContent},
     serde_json::{Value, json},
     std::{collections::HashMap, sync::Mutex},
 };
@@ -21,6 +23,7 @@ pub(crate) struct Revisions {
     entries: HashMap<EntryId, u64>,
 }
 
+#[cfg(any(unix, test))]
 impl Revisions {
     pub(crate) fn on_snapshot(&mut self) {
         self.epoch = self.epoch.wrapping_add(1);
@@ -39,7 +42,9 @@ impl Revisions {
             _ => {},
         }
     }
+}
 
+impl Revisions {
     pub(super) fn for_entry(&self, id: EntryId) -> (u64, u64) {
         (self.epoch, self.entries.get(&id).copied().unwrap_or(0))
     }
