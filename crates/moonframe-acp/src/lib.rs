@@ -548,16 +548,13 @@ impl Acp {
             return Err("the context is too large".to_owned());
         }
         // A warm agent's run already has its id: its MCP servers were told
-        // it as its session opened.
-        let warm = self.take_warm(agent, &cwd);
+        // it as its session opened. Should the agent go before it is
+        // adopted, a new one starts under that id.
         let now = now();
-        let id = match &warm {
-            Some(run) => run.id.clone(),
-            None => {
-                self.serial += 1;
-                run_id(self.serial)
-            },
-        };
+        let id = self.warm_id(agent, &cwd).unwrap_or_else(|| {
+            self.serial += 1;
+            run_id(self.serial)
+        });
         // A run on the app itself: its agent is told about the app, and the
         // app is checked before and after it.
         let on_app = message.get("app").and_then(Value::as_bool) == Some(true);
@@ -601,13 +598,9 @@ impl Acp {
             installed: self.installed.clone(),
             now,
         };
-        let launched = match warm {
-            Some(mut run) => {
-                run.adopt(start);
-                lock(&self.state).runs.push(run);
-                Ok(())
-            },
-            None => self.launch(Run::new(start, Some(host.clone())), &program, &args, false),
+        let launched = match self.adopt_warm(start) {
+            None => Ok(()),
+            Some(start) => self.launch(Run::new(start, Some(host.clone())), &program, &args, false),
         };
         let mut state = lock(&self.state);
         if let Err(error) = launched {

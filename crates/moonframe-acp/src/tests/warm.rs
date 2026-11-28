@@ -75,3 +75,17 @@ fn a_run_elsewhere_leaves_the_warm_agent_waiting() {
     assert!(lock(&rig.acp.state).warm.is_some());
     assert_eq!(rig.run()["timing"]["warm"], false);
 }
+
+#[test]
+fn a_run_started_while_the_warm_agent_starts_gets_its_replies() {
+    let mut rig = rig_allowing(json!({ "feedback": "all" }));
+    rig.send("feedback", json!({ "warm": true }));
+    let id = lock(&rig.acp.state).warm.as_ref().unwrap().id.clone();
+    // At once, before the agent answered its handshake: the replies still
+    // reach the run that took it.
+    rig.send("feedback", json!({ "start": "Make it bold" }));
+    let run = rig.wait_for("done");
+    assert_eq!(run["message"], "I changed the title.");
+    assert_eq!(run["timing"]["warm"], true);
+    assert_eq!(run["id"], id.as_str());
+}
