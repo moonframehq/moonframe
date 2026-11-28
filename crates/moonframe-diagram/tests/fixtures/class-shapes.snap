@@ -1,0 +1,12 @@
+Flow Right
+node Shape "Shape" box sub="+area() float, +perimeter() float"
+node Circle "Circle" box sub="+float radius"
+node Square "Square" box sub="+float side"
+node Canvas "Canvas" box
+node Theme "Theme" box
+node Renderer "Renderer" box
+edge e0 Shape -> Circle Solid triangle..none
+edge e1 Shape -> Square Solid triangle..none
+edge e2 Canvas -> Shape Solid diamond..none "draws"
+edge e3 Canvas -> Theme Solid hollow-diamond..none
+edge e4 Canvas -> Renderer Dashed none..open "uses"

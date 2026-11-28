@@ -209,7 +209,50 @@ The plan as first written:
   types in `types/moonframe.d.luau`, `just components`. Rune draws a
   placeholder with the title; note it in `docs/rune-coverage.md`.
 
-### 3. Mermaid and Graphviz
+### 3. Mermaid and Graphviz (done)
+
+As built: `crates/moonframe-diagram/src/parse` (`mermaid/{flowchart,
+sequence,state,class,er}.rs`, `dot.rs`) and `src/write.rs`, hand-written
+(no dependency): front matter, `%%{init}%%` and comments passed over;
+labels lose `<br>`, tags, markdown strings and `#quot;` entities.
+
+- Flowchart: every bracket shape, `-->` `---` `-.->` `==>` `--o` `--x`
+  `<-->` `~~~`, `|labels|` and `-- inline -->` labels, `&`, chains,
+  nested subgraphs, `classDef`/`class`/`:::`/`style` as fills (a class
+  named `danger`, `success`... gives that tone), Mermaid 11's `@{ label }`.
+- Sequence: participants and actors with aliases, every arrow, `+`/`-`
+  activations, notes; `loop`/`alt`/`opt`/`par`/`rect`/`critical`/`box`
+  keep their messages but draw no frame yet.
+- State (composites as groups, `[*]` as dots, transitions into a
+  composite to its start), class (members under the name, every
+  relation's heads), ER (attributes; "many" as an open head).
+- DOT: `graph`/`digraph`, attribute lists, scoped `node`/`edge` defaults,
+  chains, subgraphs as edge ends, `cluster_*` as groups; `rankdir`,
+  `shape`, `style`, `fillcolor`, `dir`, `arrowhead`/`arrowtail`.
+- `ui.diagram { mermaid = "..." }` or `{ dot = "..." }` draws text; what
+  does not parse shows its reason in the view's corner.
+- Fixtures in `crates/moonframe-diagram/tests/fixtures` (my own, modelled
+  on what agents write) with readable snapshots, each also laid out (no
+  overlaps, every edge routed), and round trips through the writer.
+
+What agents write (the fenced diagrams in this Mac's Claude transcripts,
+2026-11): about 100 flowcharts and 50 sequence diagrams, nothing else; no
+DOT. Two thirds of flowcharts label edges with `|...|`, 43 % use `{}`
+decisions, a third quote labels; most sequence diagrams alias
+participants. `cargo run --release -p moonframe-diagram --example
+parse-corpus -- DIR` over the 129 intact ones: 127 parse (98 %); the
+other two are not valid Mermaid (`D>S:`, likely `<<->>` lost on the way).
+The transcripts stay out of the repository.
+
+Layout fixes found on these: labels sit on the leg into their target
+(their own column, so labels of edges bending in one gap no longer
+meet), and a long edge's stand-ins a few pixels off its line are put on
+it, so it runs straight.
+
+Not yet: frames for sequence blocks, an edge going back up the ranks
+still meets its target where the forward edges leave it.
+
+The plan as first written:
 
 - Our own Mermaid parser (no Node, no mermaid.js), into the model:
   `flowchart`/`graph` (all node shapes, edge kinds, labels, subgraphs,
@@ -277,8 +320,9 @@ One PR per phase where it can stand alone (1 and 2 may go together).
 
 ## Open questions
 
-- Which Mermaid types after flowchart and sequence? Decide from what agents
-  write in real transcripts.
+- Which Mermaid types after flowchart and sequence? Agents here wrote no
+  others (2026-11 survey, above), so state, class and ER stay basic and
+  gantt, pie, mindmap and the rest wait for a use.
 - Is the watched folder per project (`.moonframe/diagrams`) or global?
 - Should the user's edits to an agent's diagram be sent back automatically?
 - Should `ui.diagram` name a provider's diagram (`source =

@@ -1,0 +1,16 @@
+Flow Right
+group cluster_core "Core" in -
+node web "Web app" rounded
+node ios "iOS app" rounded
+node gw "Gateway" rounded group="cluster_core"
+node auth "auth" rounded group="cluster_core"
+node billing "billing" rounded group="cluster_core"
+node db "Postgres" cylinder
+node legend "v2" note fill="#fef3c7"
+edge e0 web -> gw Solid none..arrow
+edge e1 ios -> gw Solid none..arrow
+edge e2 gw -> auth Solid none..arrow
+edge e3 gw -> billing Solid none..arrow
+edge e4 auth -> db Solid none..arrow
+edge e5 billing -> db Dashed none..arrow "writes"
+edge e6 billing -> gw Solid triangle..none

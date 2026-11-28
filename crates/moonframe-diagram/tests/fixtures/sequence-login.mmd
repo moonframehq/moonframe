@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant App as Desktop app
+    participant API as "Auth API"
+    participant DB
+    U->>App: Click Sign in
+    App->>+API: POST /session
+    Note over App,API: TLS, retried with the same key
+    loop Until the code is accepted
+        API->>DB: check code
+        DB-->>API: valid
+    end
+    alt code ok
+        API-->>-App: 200 token
+    else expired
+        API--xApp: 401
+    end
+    App-)U: Signed in
+    Note right of U: done
