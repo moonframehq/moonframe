@@ -1,5 +1,5 @@
 use {
-    super::revealed,
+    super::{MAX_TRIES, Pending, revealed, waits},
     gpui_kit::{Bounds, Pixels, point, px, size},
 };
 
@@ -48,4 +48,19 @@ fn it_never_scrolls_past_either_end() {
         point(px(0.), px(0.)),
     );
     assert_eq!(wide, point(px(0.), px(0.)));
+}
+
+#[test]
+fn a_missing_target_draws_again_only_while_the_stack_has_no_size() {
+    let pending = Pending::key("row-7".into());
+    // Laid out without it: wait for the next draw, whenever that is.
+    assert!(!waits(&pending, false));
+    // Not laid out yet: draw again, a bounded number of times.
+    let again = (0..MAX_TRIES + 10)
+        .filter(|_| waits(&pending, true))
+        .count();
+    assert_eq!(again, MAX_TRIES as usize);
+    let child = Pending::child(3);
+    child.done.set(true);
+    assert!(!waits(&child, true));
 }

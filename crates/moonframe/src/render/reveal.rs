@@ -166,8 +166,7 @@ fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
                 Target::Key(_) => pending.found.take(),
             };
             let Some(target) = target.filter(|_| !view.size.is_zero()) else {
-                // Not laid out yet: the next frame may be.
-                if !pending.done() {
+                if waits(&pending, view.size.is_zero()) {
                     window.refresh();
                 }
                 return;
@@ -202,6 +201,18 @@ fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
     .absolute()
     .size_0()
     .into_any_element()
+}
+
+/// Whether a reveal whose target is not there this frame draws again for
+/// it: only while the stack has no size yet (an overlay's content as it
+/// opens), and at most [`MAX_TRIES`] times. Laid out without it (a row not
+/// arrived or filtered out), it waits for whatever draws the window next.
+fn waits(pending: &Pending, sizeless: bool) -> bool {
+    if pending.done() || !sizeless || pending.tries.get() >= MAX_TRIES {
+        return false;
+    }
+    pending.tries.set(pending.tries.get() + 1);
+    true
 }
 
 /// The offset (GPUI's, at or below zero) that shows `target`, laid out at
