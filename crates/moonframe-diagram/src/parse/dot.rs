@@ -353,7 +353,11 @@ impl Parser {
                 });
                 inner.group = Some(id);
             }
-            return self.statements(&inner);
+            // Each node once, however often the subgraph names it.
+            let mut members = self.statements(&inner)?;
+            let mut seen = std::collections::HashSet::new();
+            members.retain(|m| seen.insert(m.clone()));
+            return Ok(members);
         }
         let Some(id) = self.next_id() else {
             return Err(Unsupported::at(self.line(), "expected a node"));

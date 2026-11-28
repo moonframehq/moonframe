@@ -128,12 +128,29 @@ pub fn from_text(language: &str, text: &str) -> Result<Value, String> {
     }
 }
 
+/// How deep a document may nest (a node's field is three down): well
+/// within what one publish holds below the document (16 in all), so one
+/// diagram can never keep the others from being shared.
+const MOST_DEPTH: usize = 8;
+
+/// How many levels `value` nests: 0 for a plain value.
+fn depth(value: &Value) -> usize {
+    match value {
+        Value::Array(items) => 1 + items.iter().map(depth).max().unwrap_or(0),
+        Value::Object(map) => 1 + map.values().map(depth).max().unwrap_or(0),
+        _ => 0,
+    }
+}
+
 /// A document an agent gave as a graph, held to what a diagram may be:
 /// lists where lists go, every node with an `id`, within the limits.
 pub fn check(doc: &Value) -> Result<Value, String> {
     let Value::Object(map) = doc else {
         return Err("a graph is an object with `nodes` and `edges`".into());
     };
+    if depth(doc) > MOST_DEPTH {
+        return Err(format!("a graph nests no deeper than {MOST_DEPTH} levels"));
+    }
     let list = |key: &str| match map.get(key) {
         None | Some(Value::Null) => Ok(Vec::new()),
         Some(Value::Array(items)) => Ok(items.clone()),
@@ -422,5 +439,10 @@ mod tests {
         assert!(check(&json!({ "nodes": [{ "label": "no id" }] })).is_err());
         assert!(check(&json!({ "nodes": "a" })).is_err());
         assert!(check(&json!({ "edges": [{ "from": "a" }] })).is_err());
+        let mut deep = json!("x");
+        for _ in 0..20 {
+            deep = json!([deep]);
+        }
+        assert!(check(&json!({ "nodes": [{ "id": "a", "data": deep }] })).is_err());
     }
 }

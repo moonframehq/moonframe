@@ -409,10 +409,8 @@ fn flush(
         .and_then(|tool| text::first_line(&tool.title, 300));
     let files = totals(&items);
     let mut diagrams: Vec<DiagramRef> = Vec::new();
-    for shown in tools.iter().filter_map(|tool| tool::diagram(tool)) {
-        if !diagrams.contains(&shown) {
-            diagrams.push(shown);
-        }
+    for tool in &tools {
+        shown_diagrams(tool, steps, 0, &mut diagrams);
     }
     let more = items.len().saturating_sub(limits.group);
     items.drain(..more);
@@ -429,6 +427,28 @@ fn flush(
         items,
         diagrams,
     }));
+}
+
+/// Adds the diagrams `tool` showed to `out`, each once, and those its
+/// sub-agent's steps showed (their own steps too, a few levels down): a
+/// step is no row, so its group draws its diagram.
+fn shown_diagrams(
+    tool: &Tool,
+    steps: &HashMap<&str, Vec<&Tool>>,
+    depth: usize,
+    out: &mut Vec<DiagramRef>,
+) {
+    if let Some(shown) = tool::diagram(tool)
+        && !out.contains(&shown)
+    {
+        out.push(shown);
+    }
+    if depth >= 4 {
+        return;
+    }
+    for step in steps.get(tool.call_id.as_str()).into_iter().flatten() {
+        shown_diagrams(step, steps, depth + 1, out);
+    }
 }
 
 /// The files a group changed, each once, its counts summed.
