@@ -1,0 +1,112 @@
+{
+  "about": "Each shared element and token, and how a primary value given first, as a string or by name reads.",
+  "steps": [
+    {
+      "expect": {
+        "shell": {
+          "children": [
+            {
+              "actions": [
+                {
+                  "icon": "plus",
+                  "msg": "add",
+                  "tooltip": "Add",
+                  "type": "button"
+                }
+              ],
+              "children": [
+                {
+                  "align": "center",
+                  "children": [
+                    {
+                      "name": "git-branch",
+                      "type": "icon"
+                    },
+                    {
+                      "size": "small",
+                      "text": "main",
+                      "tone": "muted",
+                      "type": "text",
+                      "weight": "semibold"
+                    },
+                    {
+                      "text": "3",
+                      "tone": "accent",
+                      "type": "badge"
+                    }
+                  ],
+                  "gap": "small",
+                  "justify": "between",
+                  "type": "row"
+                },
+                {
+                  "badge": "new",
+                  "detail": "12",
+                  "label": "Inbox",
+                  "msg": {
+                    "open": "inbox"
+                  },
+                  "selected": true,
+                  "type": "item"
+                },
+                {
+                  "label": "Save",
+                  "msg": "save",
+                  "type": "button",
+                  "variant": "primary"
+                },
+                {
+                  "disabled": true,
+                  "label": "Later",
+                  "small": true,
+                  "type": "button",
+                  "variant": "ghost"
+                },
+                {
+                  "change": "q",
+                  "id": "q",
+                  "placeholder": "Search",
+                  "submit": "go",
+                  "type": "input",
+                  "value": ""
+                },
+                {
+                  "change": "notes",
+                  "id": "notes",
+                  "multiline": true,
+                  "type": "input",
+                  "value": "one\ntwo"
+                },
+                {
+                  "text": "# Title",
+                  "type": "markdown"
+                },
+                {
+                  "text": "plain",
+                  "type": "text"
+                },
+                {
+                  "name": "trash-2",
+                  "tone": "danger",
+                  "type": "icon"
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "spacer"
+                }
+              ],
+              "title": "Elements",
+              "type": "panel"
+            }
+          ],
+          "gap": "normal",
+          "grow": true,
+          "padding": "large",
+          "type": "column"
+        }
+      }
+    }
+  ]
+}

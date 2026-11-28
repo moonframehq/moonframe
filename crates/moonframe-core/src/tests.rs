@@ -10,11 +10,13 @@ use {
 };
 
 // keep-sorted start
+mod agent_chat;
 mod app_icons;
 mod check_data;
 mod checks;
 mod components;
 mod composer_field;
+mod conformance;
 mod dictation;
 mod document;
 mod drawn_text;
