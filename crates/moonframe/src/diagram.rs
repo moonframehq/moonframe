@@ -50,8 +50,11 @@ pub(crate) struct DiagramHost {
     camera_seq: Option<Data>,
     /// The last `export` request acted on, by its `seq`.
     export_seq: Option<Data>,
-    /// Exports asked for, done once the view has laid the document out.
+    /// Exports asked for, done once the view has laid the document out;
+    /// a new document turns them down, as theirs is gone.
     asked: Vec<read::Hand>,
+    /// Exports made, so each writes a file of its own.
+    exports: u64,
     messenger: Messenger,
     /// The view's `id`, naming its exported files.
     name: String,
@@ -82,6 +85,7 @@ impl DiagramHost {
             camera_seq: None,
             export_seq: None,
             asked: Vec::new(),
+            exports: 0,
             messenger,
             name: format!("{}-{}", init.owner(), init.id()),
             _events: events,
@@ -97,6 +101,12 @@ impl HostView for DiagramHost {
         let props = read::props(props);
         if props.document != self.document {
             self.document = props.document.clone();
+            for read::Hand::Export(format) in std::mem::take(&mut self.asked) {
+                self.messenger.send(export::told(
+                    Err("the diagram changed before it was laid out".to_owned()),
+                    &format,
+                ));
+            }
             match props.diagram {
                 Ok(diagram) => {
                     self.problem = None;
@@ -156,8 +166,9 @@ impl Render for DiagramHost {
                     window,
                     cx,
                 );
-                let (messenger, name, renderer) =
-                    (self.messenger.clone(), self.name.clone(), cx.svg_renderer());
+                self.exports += 1;
+                let name = format!("{}-{}", self.name, self.exports);
+                let (messenger, renderer) = (self.messenger.clone(), cx.svg_renderer());
                 cx.background_spawn(async move {
                     let done = export::write(&svg, &format, &name, &renderer);
                     messenger.send(export::told(done, &format));

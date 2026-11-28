@@ -410,7 +410,8 @@ As built:
   nowhere a mod names) and sends `{ exported = { path, format } }`, or
   `{ exported = { error, format } }`; PNG is the SVG rasterized at 2x by
   GPUI's SVG renderer. An export waits for a big document's background
-  layout, and the file is drawn and written off the UI thread. ⌘C in the view
+  layout (a new document first turns it down), and each file, its own,
+  is drawn and written off the UI thread. ⌘C in the view
   copies it as Mermaid: the user's action, as a mod may not write the
   clipboard by itself.
 - Only strict `#rgb`/`#rrggbb` fills are taken (`model::is_hex_color`),

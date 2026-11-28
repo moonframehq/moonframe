@@ -523,6 +523,10 @@ return mod {
 			state.export = { format = msg.export, seq = state.exports }
 			state.export_error = nil
 		elseif msg.exported then
+			-- Asked of a diagram no longer on show: let it go.
+			if not state.export then
+				return
+			end
 			-- Answered: no view asks again when it is drawn anew.
 			state.export = nil
 			if msg.exported.error then
