@@ -1,0 +1,25 @@
+Flow Right
+group backend "Backend services" in -
+group data "Data" in backend
+node client "Browser" pill
+node cdn "CDN edge" note
+node api-gw "API gateway" box
+node users "Users" rounded group="backend"
+node orders "Orders" rounded group="backend"
+node pg "Postgres" cylinder group="data"
+node cache "Redis" circle group="data"
+node queue "Queue" rounded fill="#e0e7ff"
+node worker "Worker" box fill="#fde68a"
+node dlq "Dead letters" box
+edge e0 client -> cdn Solid none..arrow
+edge e1 cdn -> api-gw Solid none..arrow
+edge e2 api-gw -> users Solid none..arrow
+edge e3 api-gw -> orders Solid none..arrow
+edge e4 users -> pg Solid none..arrow
+edge e5 orders -> pg Solid none..arrow "writes"
+edge e6 orders -> cache Dashed none..arrow "warms"
+edge e7 orders -> queue Thick none..arrow
+edge e8 queue -> worker Solid none..circle
+edge e9 worker -> dlq Solid none..cross
+edge e10 client -> worker Invisible none..none
+edge e11 worker -> client Solid none..arrow

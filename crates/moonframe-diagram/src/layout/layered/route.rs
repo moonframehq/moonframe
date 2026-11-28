@@ -15,6 +15,10 @@ use {
 
 /// The most room between two tracks in one gap.
 const TRACK_STEP: f32 = 6.0;
+/// How far off its line a stand-in may be and still be put on it.
+const STRAIGHTEN: f32 = 8.0;
+/// The least length of the leg into a node that holds the label.
+const LABEL_LEG: f32 = 24.0;
 /// How far a self loop stands out from its node.
 const LOOP_OUT: f32 = 20.0;
 
@@ -92,6 +96,13 @@ pub(super) fn edges(
             reach[c],
             bands.middle(items[last].rank) - items[last].along / 2.0,
         ));
+        // A stand-in a few pixels off the line before it is put on it, so
+        // a long edge runs straight instead of stepping at each gap.
+        for k in 1..stops.len().saturating_sub(1) {
+            if (stops[k].0 - stops[k - 1].0).abs() < STRAIGHTEN {
+                stops[k].0 = stops[k - 1].0;
+            }
+        }
         let mut path = vec![stops[0]];
         for (k, w) in stops.windows(2).enumerate() {
             let (p, q) = (w[0], w[1]);
@@ -152,7 +163,7 @@ pub(super) fn edges(
         } else {
             let points = simplify(points);
             Route {
-                label: Route::middle(&points),
+                label: label_place(&points, chain.reversed),
                 points,
             }
         };
@@ -172,6 +183,24 @@ pub(super) fn edges(
             label: Some(Point::new(x + LOOP_OUT + 4.0, cy)),
             points,
         });
+    }
+}
+
+/// Where an edge's label goes: on the leg into its target (the leg out of
+/// its source, for an edge drawn against the ranks), which is in that
+/// node's own column, so labels of edges bending in one gap don't meet;
+/// the middle of the route when that leg is too short.
+fn label_place(points: &[Point], reversed: bool) -> Option<Point> {
+    let leg = if reversed {
+        points.get(..2)
+    } else {
+        points.get(points.len().saturating_sub(2)..)
+    };
+    match leg {
+        Some([a, b]) if a.distance(*b) >= LABEL_LEG => {
+            Some(Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0))
+        },
+        _ => Route::middle(points),
     }
 }
 

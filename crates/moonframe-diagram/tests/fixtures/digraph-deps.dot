@@ -1,0 +1,19 @@
+// Service dependencies
+digraph deps {
+    rankdir=LR;
+    node [shape=box, style=rounded];
+    edge [color="#888"];
+    web [label="Web app"];
+    ios [label="iOS app"];
+    subgraph cluster_core {
+        label = "Core";
+        gw [label="Gateway", shape=Mrecord];
+        auth; billing;
+    }
+    db [shape=cylinder, label="Postgres"];
+    {web ios} -> gw -> {auth billing};
+    auth -> db; billing -> db [style=dashed, label="writes"];
+    billing -> gw [dir=back, arrowtail=empty];
+    /* a note */
+    legend [shape=note, label="v2", style=filled, fillcolor="#fef3c7"];
+}

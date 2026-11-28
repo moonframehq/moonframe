@@ -1,0 +1,8 @@
+Flow Down
+node a "a" pill
+node b "b" pill
+node c "c" pill
+node d "Decide" diamond
+edge e0 a -> b Solid none..none
+edge e1 b -> c Solid none..none
+edge e2 b -> d Dotted none..none

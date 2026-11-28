@@ -24,3 +24,7 @@ gpui-kit = { optional = true, workspace = true }
 name              = "layout-bench"
 path              = "examples/layout_bench.rs"
 required-features = []
+
+[[example]]
+name = "parse-corpus"
+path = "examples/parse_corpus.rs"
