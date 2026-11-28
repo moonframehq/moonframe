@@ -157,7 +157,7 @@ impl<'w> Draw<'w> for Stack {
             Some(pointer) => super::carry::attach(element, pointer, painter, place, cx),
             None => element.into_any_element(),
         };
-        super::anchor::wrap(element, self, anchoring, &handle, painter, place)
+        super::anchor::wrap(element, anchoring, &handle, painter, place)
     }
 }
 /// An element's tooltip, right-click and copy, on the element that draws it.

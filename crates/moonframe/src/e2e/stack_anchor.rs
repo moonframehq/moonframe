@@ -67,3 +67,28 @@ fn at_the_top_rows_arriving_join_the_top(cx: &mut TestAppContext) {
         "{before:?} {after:?}"
     );
 }
+
+#[gpui_kit::test]
+fn rows_sliding_in_above_leave_the_row_being_read_where_it_is(cx: &mut TestAppContext) {
+    let sliding = FEED.replace(
+        "	view = function(state)",
+        "	styles = { [\".grows\"] = { transition = \"slide 150ms linear\" } },\n	view = function(state)",
+    )
+    .replace(
+        "class = if item == \"i12\" then \"target\" else nil,",
+        "class = if item == \"i12\" then \"target\" else \"grows\",",
+    );
+    let mut window = open(cx, &sliding);
+    window.wheel("feed", 420.0);
+    let before = window.bounds("target");
+    window.click("add");
+    for _ in 0..10 {
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        window.settle();
+        let now = window.bounds("target");
+        assert!(
+            (f32::from(now.top()) - f32::from(before.top())).abs() < 1.,
+            "{before:?} {now:?}"
+        );
+    }
+}

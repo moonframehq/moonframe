@@ -45,11 +45,25 @@ fn the_first_child_showing_is_kept_only_while_scrolled_down() {
             .map(|(key, top)| (key.to_owned(), px(top), px(40.0)))
     };
     let now = Instant::now();
-    assert_eq!(first_showing(laid(), px(100.0), px(0.0), now), None);
+    assert_eq!(
+        first_showing(laid(), (px(100.0), px(300.0)), px(0.0), now),
+        None
+    );
     // Scrolled 50: "a" (100..140) is gone above, "b" (140..180, now 90..130)
     // shows from 10 above the top.
-    let showing = first_showing(laid(), px(100.0), px(-50.0), now).unwrap();
+    let showing = first_showing(laid(), (px(100.0), px(300.0)), px(-50.0), now).unwrap();
     assert_eq!(showing.key, "b");
     assert_eq!(showing.below, px(-10.0));
     assert_eq!(showing.offset, px(-50.0));
+}
+
+#[test]
+fn a_keyed_child_below_the_box_is_not_kept() {
+    // The box shows 100..200; scrolled 50, unkeyed rows fill it and the
+    // first keyed child lies at 260..300 (unscrolled 310): not showing.
+    let laid = [("far".to_owned(), px(310.0), px(40.0))];
+    assert_eq!(
+        first_showing(laid, (px(100.0), px(200.0)), px(-50.0), Instant::now()),
+        None
+    );
 }

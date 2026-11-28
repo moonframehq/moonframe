@@ -112,12 +112,13 @@ pub(super) fn begin(stack: &Stack, painter: &mut Painter<'_, '_>, place: &Place<
         painter.reveal.push(pending.clone());
         painter.resizing = false;
     }
+    let anchoring = super::anchor::begin(stack, pending.is_some(), painter, place);
     Revealing {
         handle,
         pending,
         marks,
         resizing,
-        anchoring: super::anchor::begin(stack, painter, place),
+        anchoring,
     }
 }
 

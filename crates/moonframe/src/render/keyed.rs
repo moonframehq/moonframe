@@ -74,7 +74,8 @@ impl<'w> Painter<'w, '_> {
             let child = place.keyed(key, direction);
             let Some(transition) = self.keyed_transition(stack, &child) else {
                 drawn.keys.push(key.to_owned());
-                elements.push(node.draw(self, &child, cx));
+                let element = node.draw(self, &child, cx);
+                elements.push(super::anchor::note(element, key, self, place));
                 continue;
             };
             let arriving = before.is_some_and(|before| !before.keys.iter().any(|seen| seen == key));
@@ -104,7 +105,9 @@ impl<'w> Painter<'w, '_> {
             let element = self.moving(shown.moving().is_some(), |painter| {
                 node.draw(painter, &child, cx)
             });
-            elements.push(self.sized(element, shown, transition.kind, stack, &child, false));
+            // Noted as the column lays it out: clipped while it grows in.
+            let element = self.sized(element, shown, transition.kind, stack, &child, false);
+            elements.push(super::anchor::note(element, key, self, place));
         }
         // What went since the last frame, drawn where it was until it is
         // gone; it is kept again, for the frames still to come.

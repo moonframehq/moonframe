@@ -3,8 +3,9 @@
 //! as children arrive, go or move above it, as a `ui.list`'s first row
 //! does. At the top nothing is kept: arrivals join the top.
 //!
-//! Each keyed child, as it draws inside such a column, is wrapped so that
-//! its layout is noted as the window lays out. The column itself is wrapped
+//! Each keyed child, as the column draws it, is wrapped so that its layout
+//! (the box the column lays out, clipped while it grows in) is noted as the
+//! window lays out; one leaving is not. The column itself is wrapped
 //! so that, once laid out and before it places its children, it scrolls by
 //! as much as the kept child moved: the frame shows it in place, with no
 //! frame in between. After the children are placed, it notes the first
@@ -53,9 +54,12 @@ pub(crate) struct Anchoring {
 }
 
 /// Before `stack` draws its children: the anchoring its keyed children note
-/// their layout in, if it scrolls down and has any.
+/// their layout in, if it scrolls down and has any. None while it is
+/// `revealing` something: the reveal moves it, and keeping a child in place
+/// as well would look to it like a scroll by hand, which ends it.
 pub(super) fn begin(
     stack: &Stack,
+    revealing: bool,
     painter: &mut Painter<'_, '_>,
     place: &Place<'_>,
 ) -> Option<Rc<Anchoring>> {
@@ -67,7 +71,7 @@ pub(super) fn begin(
         .children
         .iter()
         .any(|child| matches!(child, Node::Stack(child) if child.key.is_some()));
-    if !down || !keyed || painter.preview {
+    if !down || !keyed || revealing || painter.preview {
         return None;
     }
     let anchoring = Rc::new(Anchoring {
@@ -85,18 +89,16 @@ pub(super) fn end(painter: &mut Painter<'_, '_>, anchoring: Option<&Rc<Anchoring
     }
 }
 
-/// `element`, the stack `stack` drew at `place`, kept in place as a column
-/// that `anchoring`s (scrolled by `handle`), and noting its layout as a
-/// keyed child of the column it is directly in.
+/// `element`, the stack drawn at `place`, kept in place as a column that
+/// `anchoring`s (scrolled by `handle`).
 pub(super) fn wrap(
     element: AnyElement,
-    stack: &Stack,
     anchoring: Option<Rc<Anchoring>>,
     handle: &ScrollHandle,
     painter: &Painter<'_, '_>,
     place: &Place<'_>,
 ) -> AnyElement {
-    let element = match anchoring {
+    match anchoring {
         Some(anchoring) => Keeper {
             inner: element,
             anchoring,
@@ -105,14 +107,23 @@ pub(super) fn wrap(
         }
         .into_any_element(),
         None => element,
-    };
-    let around = painter.anchoring.last().zip(stack.key.as_deref());
-    match around {
-        // Directly in that column: keyed children are drawn at `/#key`.
-        Some((column, key)) if place.path == format!("{}/#{key}", column.path) => Noter {
+    }
+}
+
+/// `element`, the keyed child `key` of the container at `column` as the
+/// container lays it out, noting its layout if that container keeps its
+/// first keyed child in place.
+pub(super) fn note(
+    element: AnyElement,
+    key: &str,
+    painter: &Painter<'_, '_>,
+    column: &Place<'_>,
+) -> AnyElement {
+    match painter.anchoring.last() {
+        Some(anchoring) if anchoring.path == column.path => Noter {
             inner: element,
             key: key.to_owned(),
-            anchoring: column.clone(),
+            anchoring: anchoring.clone(),
         }
         .into_any_element(),
         _ => element,
@@ -130,11 +141,12 @@ fn kept_in_place(kept: &Kept, top: Pixels, column_top: Pixels, offset: Pixels) -
 }
 
 /// The first of `laid` (each child's key and top and height, not scrolled)
-/// that shows in a column at `column_top` scrolled by `offset`; none at the
-/// top, where arrivals join it.
+/// any part of which shows in a column from `column_top` to `column_bottom`
+/// scrolled by `offset`; none at the top, where arrivals join it, nor when
+/// no keyed child shows (one further down moves with what is read).
 fn first_showing(
     laid: impl IntoIterator<Item = (String, Pixels, Pixels)>,
-    column_top: Pixels,
+    (column_top, column_bottom): (Pixels, Pixels),
     offset: Pixels,
     now: Instant,
 ) -> Option<Kept> {
@@ -143,7 +155,7 @@ fn first_showing(
     }
     laid.into_iter().find_map(|(key, top, height)| {
         let top = top + offset;
-        (top + height > column_top + SLACK).then(|| Kept {
+        (top + height > column_top + SLACK && top < column_bottom - SLACK).then(|| Kept {
             key,
             below: top - column_top,
             offset,
@@ -228,7 +240,7 @@ impl Element for Keeper {
                 let laid = window.layout_bounds(id);
                 (key, laid.top(), laid.size.height)
             }),
-            bounds.top(),
+            (bounds.top(), bounds.bottom()),
             offset,
             now,
         );
