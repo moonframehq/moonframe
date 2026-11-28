@@ -329,6 +329,58 @@ fn rows_answers_and_groups_stay_within_their_limits() {
 }
 
 #[test]
+fn a_group_keeps_the_diagrams_its_calls_showed_past_its_trim() {
+    let answer = |call: &str, title: &str, status: ToolStatus, text: &str| {
+        let mut shown = tool(call, ToolKind::Other, title, status);
+        shown.content = vec![ToolContent::Text {
+            text: text.to_owned(),
+        }];
+        EntryKind::Tool(shown)
+    };
+    let mut calls = vec![
+        answer(
+            "d1",
+            "mcp__moonframe-diagrams__diagram_show",
+            ToolStatus::Completed,
+            "Showing `plan` (3 nodes) to the user.",
+        ),
+        answer(
+            "d2",
+            "diagram_patch",
+            ToolStatus::Completed,
+            "`plan`: added 1 node.",
+        ),
+        answer(
+            "d3",
+            "diagram_show",
+            ToolStatus::Failed,
+            "Showing `broken` (0 nodes)",
+        ),
+        answer(
+            "d4",
+            "diagram_show",
+            ToolStatus::Completed,
+            "Showing `flow` (2 nodes) to the user.",
+        ),
+        answer(
+            "r1",
+            "Read notes.md",
+            ToolStatus::Completed,
+            "`notes` say hi",
+        ),
+    ];
+    calls.extend((0..8).map(|index| call(&format!("c{index}"), ToolKind::Read, "Read")));
+    let limits = Limits {
+        group: 3,
+        ..Limits::FULL
+    };
+    let view = prepare(&transcript(calls), &limits);
+    let tools = group(&view.rows[0]);
+    assert_eq!(tools.items.len(), 3);
+    assert_eq!(tools.diagrams, ["plan", "flow"]);
+}
+
+#[test]
 fn edits_count_their_lines_per_file() {
     let mut edit = tool("e", ToolKind::Edit, "Edit lib.rs", ToolStatus::Completed);
     edit.content = vec![

@@ -199,17 +199,19 @@ return component {
 		end
 
 		local tools: { any } = {}
-		local list: { Tool } = {}
-		-- Its `diagram_*` calls show as the diagrams they drew, below.
-		for _, tool in run.tools or {} do
-			if not string.find(tool.title or "", "diagram_", 1, true) then
-				table.insert(list, tool)
-			end
-		end
 		local cards: { any } = {}
 		for _, d in props.diagrams or {} do
 			if d.run == run.id then
 				table.insert(cards, diagram_card { diagram = d, height = 260 })
+			end
+		end
+		-- Its `diagram_*` calls show as the diagrams they drew, below; a
+		-- failed one, or any while no card draws, stays a line.
+		local list: { Tool } = {}
+		for _, tool in run.tools or {} do
+			local drawn = #cards > 0 and tool.status ~= "failed" and string.find(tool.title or "", "diagram_", 1, true)
+			if not drawn then
+				table.insert(list, tool)
 			end
 		end
 		local first = math.max(1, #list - (props.tools or 4) + 1)

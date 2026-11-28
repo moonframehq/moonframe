@@ -34,6 +34,8 @@ type State = {
 	exports: number,
 	-- Why the last export failed, shown in the top bar until dismissed.
 	export_error: string?,
+	-- Zooming the diagram on show, as `camera` asks it.
+	live_camera: { [string]: any }?,
 	undo: { Doc },
 	redo: { Doc },
 }
@@ -410,7 +412,7 @@ local function live_view(state: State, d: any, app: any): any
 			id = "live",
 			document = d.document,
 			highlight = d.highlight,
-			camera = { fit = true, seq = d.key },
+			camera = state.live_camera or { fit = true, seq = d.key },
 			export = state.export,
 		}
 	return ui.column {
@@ -462,12 +464,30 @@ return mod {
 		state.export = nil
 		state.exports = 0
 		state.export_error = nil
+		state.live_camera = nil
 		-- History lives for the session only.
 		state.undo, state.redo = {}, {}
 		return state
 	end,
 
 	update = function(state: State, msg: any)
+		-- While an agent's diagram is on show, zooming moves it, and what it
+		-- tells of itself and an export of it stay its own; anything else is
+		-- for the user's diagram, which comes back first so no edit lands
+		-- unseen.
+		local live_msg = type(msg) == "table"
+			and (msg.live ~= nil or msg.close_live or msg.export or msg.exported or msg.export_error ~= nil)
+		if state.live and not live_msg then
+			if type(msg) == "table" and (msg.zoom_by or msg.zoom_to or msg.fit) then
+				local seq = if state.live_camera then state.live_camera.seq + 1 else 1
+				state.live_camera = { zoom_by = msg.zoom_by, zoom = msg.zoom_to, fit = msg.fit, seq = seq }
+				return
+			elseif type(msg) == "table" and (msg.zoom or msg.selected) then
+				state.zoom = msg.zoom or state.zoom
+				return
+			end
+			state.live = nil
+		end
 		if msg == "undo" or msg == "redo" then
 			local from, to = if msg == "undo" then state.undo else state.redo, if msg == "undo" then state.redo else state.undo
 			local doc = table.remove(from)
@@ -541,6 +561,7 @@ return mod {
 		elseif msg.live ~= nil then
 			state.live = msg.live or nil
 			state.export = nil
+			state.live_camera = nil
 		elseif msg.close_live then
 			state.live = nil
 			state.export = nil
@@ -586,8 +607,8 @@ return mod {
 					grow = true,
 					gap = "none",
 					-- An agent's diagram, read-only, while one is picked.
-					if live(state, app)
-						then live_view(state, live(state, app), app)
+					if shown
+						then live_view(state, shown, app)
 					-- The Rust view where the build has it, else the Luau canvas:
 					-- the same props, the same messages back.
 					elseif app.capabilities.diagram
@@ -609,7 +630,8 @@ return mod {
 							version = state.version,
 						},
 				},
-				inspector { doc = state.doc, selected = state.selected, fills = FILLS },
+				-- The inspector edits the user's diagram: not beside another.
+				not shown and inspector { doc = state.doc, selected = state.selected, fills = FILLS },
 			},
 		}
 	end,

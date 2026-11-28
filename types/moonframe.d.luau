@@ -2574,7 +2574,7 @@ type ProviderAgentsPublished = {
 	count: number,
 }
 type ProviderDiagramsShown = {
-	-- Unique in the list: `agent/<id>` or `project/<id>`.
+	-- Unique in the list: `agent/<file name>` or `project/<file name>`.
 	key: string,
 	id: string,
 	title: string,
@@ -5041,6 +5041,7 @@ type UseToolGroupProps = {
 	read msg: any,
 	read to: string?,
 	read diagrams: { any }?,
+	read cards: { [string]: string }?,
 }
 type UseToolbarButton = any
 type UseToolbarProps = {

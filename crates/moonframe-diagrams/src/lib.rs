@@ -8,7 +8,7 @@
 //! - [`provider`]: the `diagrams` native provider, which shares those and
 //!   a project's `.moonframe/diagrams` files as `app.diagrams`.
 //!
-//! The two meet in a folder ([`store::default_dir`]), one JSON file per
+//! The two meet in a folder ([`store::agents_dir`]), one JSON file per
 //! diagram, so neither waits for the other.
 
 pub mod document;

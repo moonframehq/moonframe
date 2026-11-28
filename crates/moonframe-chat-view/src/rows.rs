@@ -110,6 +110,10 @@ pub struct ToolGroup {
     /// Items before the first one kept.
     pub more: usize,
     pub items: Vec<ToolItem>,
+    /// The diagrams its `moonframe mcp diagrams` calls showed, by id, each
+    /// once in the order they came: kept whole, as `items` may drop them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub diagrams: Vec<String>,
 }
 
 /// A call in a group, or a thought between calls.
@@ -392,6 +396,12 @@ fn flush(
         .find(|tool| tool::running(tool.status))
         .and_then(|tool| text::first_line(&tool.title, 300));
     let files = totals(&items);
+    let mut diagrams: Vec<String> = Vec::new();
+    for id in tools.iter().filter_map(|tool| tool::diagram(tool)) {
+        if !diagrams.contains(&id) {
+            diagrams.push(id);
+        }
+    }
     let more = items.len().saturating_sub(limits.group);
     items.drain(..more);
     rows.push(Row::Tools(ToolGroup {
@@ -405,6 +415,7 @@ fn flush(
         files,
         more,
         items,
+        diagrams,
     }));
 }
 

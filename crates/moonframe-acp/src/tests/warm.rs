@@ -25,7 +25,14 @@ fn a_warm_agent_starts_ahead_and_the_next_run_takes_it() {
     }
     // Asking again keeps the one there.
     rig.send("feedback", json!({ "warm": true }));
-    let conn = lock(&rig.acp.state).warm.as_ref().unwrap().conn;
+    let (conn, id) = {
+        let state = lock(&rig.acp.state);
+        let warm = state.warm.as_ref().unwrap();
+        (warm.conn, warm.id.clone())
+    };
+    // Named before its session opened, so the MCP servers it was offered
+    // already know the run they work for.
+    assert!(!id.is_empty());
 
     rig.send("feedback", json!({ "start": "Make it bold" }));
     assert!(lock(&rig.acp.state).warm.is_none());
@@ -46,6 +53,7 @@ fn a_warm_agent_starts_ahead_and_the_next_run_takes_it() {
         json!("session/prompt")
     ]);
     assert_eq!(lock(&rig.acp.state).runs[0].conn, conn);
+    assert_eq!(run["id"], id.as_str());
 }
 
 #[test]

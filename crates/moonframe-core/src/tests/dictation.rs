@@ -29,6 +29,7 @@ fn fixture(window: &str) -> (tempfile::TempDir, Workspace) {
     for name in [
         "agent-run",
         "avatar",
+        "diagram-card",
         "dictation",
         "dropdown",
         "feedback",
