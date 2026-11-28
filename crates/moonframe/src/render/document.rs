@@ -1,6 +1,8 @@
 //! A `ui.document`: a box styled by the `document` rule, which the sealed
 //! page's view fills (see `crate::browser::sealed`). Its HTML is its own,
-//! or a file's, named and allowed as `ui.image` names and allows pictures.
+//! or a file's, named and allowed as `ui.image` names and allows pictures:
+//! in the app's folders or the image cache, where a provider writes a page
+//! too large to publish.
 //! Previews and platforms without a web view say what it would show.
 
 use {
@@ -47,7 +49,7 @@ impl<'w> Draw<'w> for Document {
                 let folder = painter.folder(place.owner).unwrap_or(Path::new("."));
                 let workspace = painter.workspace;
                 super::images::resolve_src(src, place.owner, folder, || {
-                    workspace.roots().layers().map(Path::to_owned).collect()
+                    roots(workspace.roots().layers(), crate::paths::images())
                 })
                 .ok_or_else(|| format!("`{src}` is no file this document may show"))
                 .and_then(|path| read(&path))
@@ -70,6 +72,14 @@ impl<'w> Draw<'w> for Document {
             Err(error) => problem(format!("document `{}`: {error}", self.id), cx),
         }
     }
+}
+
+/// The folders a document's `src` may name a file in, as `ui.image` takes
+/// a picture from: the app's `layers` and the image `cache` providers write
+/// files for views to (a briefing, a preview converted from a shared file).
+/// A file the user gave the mod is allowed besides.
+fn roots<'a>(layers: impl Iterator<Item = &'a Path>, cache: PathBuf) -> Vec<PathBuf> {
+    layers.map(Path::to_owned).chain([cache]).collect()
 }
 
 /// What shows where the document would be.
@@ -180,6 +190,31 @@ mod tests {
             let total: usize = files.values().map(|kept| kept.html.len()).sum();
             assert!(total <= super::KEPT_BYTES);
         });
+    }
+
+    #[test]
+    fn a_document_names_a_file_in_the_apps_folders_or_the_image_cache() {
+        let (app, cache, elsewhere) = (
+            tempfile::tempdir().unwrap(),
+            tempfile::tempdir().unwrap(),
+            tempfile::tempdir().unwrap(),
+        );
+        for dir in [&app, &cache, &elsewhere] {
+            std::fs::write(dir.path().join("acme.html"), "<p>acme</p>").unwrap();
+        }
+        let allowed = super::roots([app.path()].into_iter(), cache.path().to_owned());
+        let resolve = |src: &std::path::Path| {
+            moonframe_core::resolve_file(
+                &src.to_string_lossy(),
+                app.path(),
+                None,
+                &allowed,
+                moonframe_core::MAX_HTML as u64,
+            )
+        };
+        assert!(resolve(std::path::Path::new("acme.html")).is_some());
+        assert!(resolve(&cache.path().join("acme.html")).is_some());
+        assert!(resolve(&elsewhere.path().join("acme.html")).is_none());
     }
 
     #[test]

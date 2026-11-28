@@ -610,9 +610,11 @@ ui.document {
   all. On macOS WebKit's content rules refuse every load but `about:` and
   `data:` as well. The host's own script, which reports links, scrolling,
   the selection and edits, is the only one that runs.
-- **Source:** `html`, up to 8 MB, or `src`, a file named and allowed as
-  `ui.image` names pictures (the mod's folder, the app's folders, a file
-  the user gave it). A changed file is read again. It is HTML: an SVG
+- **Source:** `html`, up to 8 MB, or `src`, a file of up to 8 MB named
+  and allowed as `ui.image` names pictures: the mod's folder, the app's
+  folders, the image cache (`~/.cache/moonframe/images`, where a provider
+  writes a page too large to publish, or a preview it converted), or a
+  file the user gave it. A changed file is read again. It is HTML: an SVG
   document shows inline; put other text in a `<pre>`.
 - **Links** are never followed: `link` tells the mod, which may open one
   with `app:open`. A fragment link (`#part-2`) scrolls to its element.
