@@ -12,7 +12,10 @@ mod sequence;
 mod state;
 // keep-sorted end
 
-use {super::Unsupported, crate::model::Diagram};
+use {
+    super::Unsupported,
+    crate::model::{Diagram, Direction},
+};
 
 /// One meaningful line: its number from 1, and its text trimmed.
 pub(super) type Line<'a> = (usize, &'a str);
@@ -70,4 +73,15 @@ pub(super) fn split_outside_quotes<'a>(text: &'a str, sep: &str) -> Option<(&'a 
         }
     }
     None
+}
+
+/// A `direction` statement's direction (`TB`, `TD`, `BT`, `LR`, `RL`), or
+/// `None` when the line is not one.
+pub(super) fn direction(line: &str) -> Option<Direction> {
+    Some(match line.strip_prefix("direction ")?.trim() {
+        "BT" => Direction::Up,
+        "LR" => Direction::Right,
+        "RL" => Direction::Left,
+        _ => Direction::Down,
+    })
 }
