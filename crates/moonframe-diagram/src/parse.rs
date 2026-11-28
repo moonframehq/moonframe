@@ -13,6 +13,15 @@ mod tests;
 
 use crate::model::Diagram;
 
+/// The most nodes a parsed diagram may have: text from anywhere (an
+/// agent, a file) can't make one that takes the layout minutes.
+pub const MOST_NODES: usize = 5_000;
+/// The most edges, which `a & b --> c & d` or DOT's `{a b} -> {c d}`
+/// multiply.
+pub const MOST_EDGES: usize = 20_000;
+/// The deepest nesting of subgraphs or groups a parser follows.
+pub(crate) const MOST_DEPTH: usize = 64;
+
 /// Why a text is not a diagram this crate draws.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unsupported {
@@ -22,6 +31,13 @@ pub struct Unsupported {
 }
 
 impl Unsupported {
+    pub(crate) fn too_big(line: usize) -> Self {
+        Self::at(
+            line,
+            format!("more than {MOST_NODES} nodes or {MOST_EDGES} edges"),
+        )
+    }
+
     pub(crate) fn at(line: usize, reason: impl Into<String>) -> Self {
         Self {
             line,

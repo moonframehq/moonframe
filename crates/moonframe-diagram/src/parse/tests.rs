@@ -189,3 +189,35 @@ fn an_edge_needs_an_arrow_it_knows() {
     let err = mermaid::parse("flowchart TD\n  A ->> B").unwrap_err();
     assert_eq!(err.line, 2);
 }
+
+#[test]
+fn hostile_text_is_refused_not_obeyed() {
+    // An HTML label never closed, at the very end.
+    assert!(dot::parse("digraph { a [label=<").is_err());
+    // Subgraphs nested past the limit.
+    let deep = format!(
+        "digraph {{ {} a {} }}",
+        "subgraph { ".repeat(200),
+        "} ".repeat(200)
+    );
+    assert!(dot::parse(&deep).is_err());
+    let deep = format!(
+        "flowchart TD\n{}A-->B\n{}",
+        "subgraph s\n".repeat(200),
+        "end\n".repeat(200)
+    );
+    assert!(mermaid::parse(&deep).is_err());
+    // Edges multiplied past the limit.
+    let many: Vec<String> = (0..120).map(|i| format!("n{i}")).collect();
+    let group = format!("{{{}}}", many.join(" "));
+    assert!(dot::parse(&format!("digraph {{ {group} -> {group} }}")).is_ok());
+    let wide = format!("digraph {{ {group} -> {group} -> {group} }}");
+    assert_eq!(
+        dot::parse(&wide)
+            .map(|d| d.edges.len())
+            .map_err(|e| e.reason.contains("edges")),
+        Err(true)
+    );
+    let side = many.join(" & ");
+    assert!(mermaid::parse(&format!("flowchart TD\n{side} --> {side} --> {side}")).is_err());
+}

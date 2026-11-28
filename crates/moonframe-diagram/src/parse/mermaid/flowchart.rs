@@ -102,7 +102,7 @@ impl Builder {
     fn statement(&mut self, number: usize, s: &str) -> Result<(), Unsupported> {
         let word = s.split_whitespace().next().unwrap_or_default();
         match word {
-            "subgraph" => self.subgraph(s["subgraph".len()..].trim()),
+            "subgraph" => self.subgraph(number, s["subgraph".len()..].trim())?,
             "end" if s == "end" => {
                 self.open.pop();
             },
@@ -139,7 +139,10 @@ impl Builder {
         Ok(())
     }
 
-    fn subgraph(&mut self, rest: &str) {
+    fn subgraph(&mut self, number: usize, rest: &str) -> Result<(), Unsupported> {
+        if self.open.len() >= crate::parse::MOST_DEPTH {
+            return Err(Unsupported::at(number, "subgraphs nest too deep"));
+        }
         self.groups_made += 1;
         let (id, title) = if rest.starts_with('"') || rest.is_empty() {
             (format!("subgraph{}", self.groups_made), label(rest))
@@ -163,6 +166,7 @@ impl Builder {
             tone: None,
         });
         self.open.push(id);
+        Ok(())
     }
 
     /// The node `id`, made the first time it is named.
@@ -196,6 +200,11 @@ impl Builder {
             };
             c.skip_spaces();
             let next = self.nodes(&mut c, number)?;
+            if self.diagram.edges.len() + previous.len() * next.len() > crate::parse::MOST_EDGES
+                || self.diagram.nodes.len() > crate::parse::MOST_NODES
+            {
+                return Err(Unsupported::too_big(number));
+            }
             for &a in &previous {
                 for &b in &next {
                     let id = format!("e{}", self.diagram.edges.len());

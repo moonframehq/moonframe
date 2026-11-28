@@ -102,7 +102,10 @@ fn lex(text: &str) -> Result<Vec<Lexed>, Unsupported> {
                     }
                     i += 1;
                 }
-                let html: String = chars[start + 1..i.saturating_sub(1)].iter().collect();
+                if depth != 0 {
+                    return Err(Unsupported::at(line, "an HTML label `<` is never closed"));
+                }
+                let html: String = chars[start + 1..(i - 1).max(start + 1)].iter().collect();
                 out.push((Token::Id(label(&html)), line));
             },
             c if c.is_alphanumeric() || c == '_' || c == '.' || c == '-' => {
@@ -133,6 +136,8 @@ struct Parser {
     /// Each node's attributes as given so far, merged over the defaults.
     nodes: HashMap<String, usize>,
     clusters: usize,
+    /// How many `{ }` blocks the statement being read is inside.
+    depth: usize,
 }
 
 pub fn parse(text: &str) -> Result<Diagram, Unsupported> {
@@ -143,6 +148,7 @@ pub fn parse(text: &str) -> Result<Diagram, Unsupported> {
         diagram: Diagram::default(),
         nodes: HashMap::new(),
         clusters: 0,
+        depth: 0,
     };
     if p.peek_id()
         .is_some_and(|w| w.eq_ignore_ascii_case("strict"))
@@ -221,6 +227,16 @@ impl Parser {
     /// Statements up to the `}` closing this block. Returns the nodes
     /// named in it, for a subgraph used as an edge's end.
     fn statements(&mut self, outer: &Scope) -> Result<Vec<String>, Unsupported> {
+        self.depth += 1;
+        if self.depth > super::MOST_DEPTH {
+            return Err(Unsupported::at(self.line(), "subgraphs nest too deep"));
+        }
+        let named = self.block(outer);
+        self.depth -= 1;
+        named
+    }
+
+    fn block(&mut self, outer: &Scope) -> Result<Vec<String>, Unsupported> {
         let mut scope = outer.clone();
         let mut named = Vec::new();
         loop {
@@ -379,6 +395,13 @@ impl Parser {
         }
         let mut attributes = scope.edge.clone();
         attributes.extend(given);
+        let more: usize = ends
+            .windows(2)
+            .map(|pair| pair[0].len() * pair[1].len())
+            .sum();
+        if self.diagram.edges.len() + more > super::MOST_EDGES {
+            return Err(Unsupported::too_big(self.line()));
+        }
         for pair in ends.windows(2) {
             for a in &pair[0] {
                 for b in &pair[1] {
@@ -397,6 +420,7 @@ impl Parser {
         let index = match self.nodes.get(id) {
             Some(_) if !declared => return,
             Some(&i) => i,
+            None if self.diagram.nodes.len() >= super::MOST_NODES => return,
             None => {
                 let mut node = Node::new(id, id);
                 node.kind = NodeKind::Pill;
