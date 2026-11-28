@@ -63,7 +63,7 @@ return component {
 	when = "Tabular data with several aligned fields per row: devices, processes, files, runs; an admin list (audit log, orders) as `bordered` and `checkable`, with `filter-dropdown`s over it and `pagination` under it. For one field per row use `list`; for pull requests use `pr-row`; for label/value pairs use `key-values`.",
 	props = {
 		["columns"] = "list of { key, title, width (px; else it grows), align (left|center|right), mono, muted, sortable }",
-		["rows"] = "list of maps: `id` plus a value per column key; a value may be a string, a number or an element",
+		["rows"] = "list of maps: `id` plus a value per column key; a value may be a string, a number or an element. An `id` that can be a key (a plain string or a whole number) keeps its row in place, scrolled down, as rows arrive above it",
 		["selected"] = "id of the selected row",
 		["sort"] = "key of the sorted column (shows an arrow)",
 		["descending"] = "the sort arrow points down",
@@ -297,6 +297,22 @@ table_view {
 			return ui.row { class = "table-marker", float = if after then "bottom" else "top", height = 2 }
 		end
 
+		-- A row's `key`, its id when it can be one (a plain string or a whole
+		-- number) and no row before had it: the body keeps the first row
+		-- showing in place by it as rows arrive or move above.
+		local keyed: { [string]: boolean } = {}
+		local function row_key(id: any): string?
+			local text = if type(id) == "string"
+				then id
+				elseif type(id) == "number" and id == math.floor(id) then tostring(id)
+				else nil
+			if text == nil or #text == 0 or #text > 64 or keyed[text] or not string.match(text, "^[%w_%-]+$") then
+				return nil
+			end
+			keyed[text] = true
+			return text
+		end
+
 		local function draw(index: number, given: any?, group: any?)
 			local row: any = given or plain[index]
 			local id = row.id or index
@@ -327,6 +343,7 @@ table_view {
 			end
 			return ui.row {
 				class = classes,
+				key = row_key(row.id),
 				shrink = false,
 				align = "center",
 				height = if listed then row_height else nil,

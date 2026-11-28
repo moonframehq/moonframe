@@ -88,6 +88,9 @@ pub(super) struct Revealing {
     /// Whether what was drawn before this stack resizes, put back once its
     /// children have said whether they do.
     resizing: bool,
+    /// Where its keyed children note their layout, as a column that keeps
+    /// the first one showing in place (see `anchor`).
+    anchoring: Option<Rc<super::anchor::Anchoring>>,
 }
 
 /// Before `stack` draws its children: its scroll handle, with any
@@ -114,13 +117,23 @@ pub(super) fn begin(stack: &Stack, painter: &mut Painter<'_, '_>, place: &Place<
         pending,
         marks,
         resizing,
+        anchoring: super::anchor::begin(stack, painter, place),
     }
 }
 
 impl Revealing {
-    /// Once the children are drawn: the handle, and what to draw last
-    /// among them (no child's index moves).
-    pub(super) fn end(self, painter: &mut Painter<'_, '_>) -> (ScrollHandle, Vec<AnyElement>) {
+    /// Once the children are drawn: the handle, what to draw last among
+    /// them (no child's index moves), and the stack's anchoring, for
+    /// `anchor::wrap`.
+    pub(super) fn end(
+        self,
+        painter: &mut Painter<'_, '_>,
+    ) -> (
+        ScrollHandle,
+        Vec<AnyElement>,
+        Option<Rc<super::anchor::Anchoring>>,
+    ) {
+        super::anchor::end(painter, self.anchoring.as_ref());
         if let Some(pending) = &self.pending {
             painter.reveal.pop();
             pending.moving.set(painter.resizing);
@@ -128,7 +141,7 @@ impl Revealing {
         }
         let reader = self.pending.map(|pending| reader(pending, &self.handle));
         let extra = self.marks.into_iter().chain(reader).collect();
-        (self.handle, extra)
+        (self.handle, extra, self.anchoring)
     }
 }
 

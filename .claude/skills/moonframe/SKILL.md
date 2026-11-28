@@ -1528,6 +1528,12 @@ Text-like elements take their main value positionally:
 - `scroll = true` scrolls along the container's axis; `"x"`, `"y"` or
   `"both"` pick the axes (long code lines that scroll sideways). Give the container
   `grow = true` or a fixed size so it has something to overflow.
+- A column that scrolls keeps what is being read in place: scrolled down,
+  its first child with a `key` showing stays where it is on screen as
+  children arrive, go or move above it (a feed a provider republishes); at
+  the top, arrivals join the top. Give the rows a `key` (`ui.row { key =
+  item.id, ... }`); a `table`'s rows take their `id` as one. `ui.list` does
+  the same with its keyed rows. The GPUI window's, so far.
 - `follow = true`, with `scroll`, keeps it at its end while it is there:
   as the content grows (a chat streaming in, a log), it scrolls along;
   scrolled back, it stays where the user put it.

@@ -51,7 +51,7 @@ impl<'w> Draw<'w> for Stack {
             painter.outside.pop();
         }
         painter.in_drag = in_drag;
-        let (handle, revealed) = revealing.end(painter);
+        let (handle, revealed, anchoring) = revealing.end(painter);
         let focus = painter.focus_keys(&self.keys, views, place, cx);
         let theme = cx.theme();
         let element = div()
@@ -153,10 +153,11 @@ impl<'w> Draw<'w> for Stack {
         };
         let element = painter.at_root(element, place);
         let element = with_extras(element, &self.extras, painter, place, cx);
-        match &self.pointer {
+        let element = match &self.pointer {
             Some(pointer) => super::carry::attach(element, pointer, painter, place, cx),
             None => element.into_any_element(),
-        }
+        };
+        super::anchor::wrap(element, self, anchoring, &handle, painter, place)
     }
 }
 /// An element's tooltip, right-click and copy, on the element that draws it.

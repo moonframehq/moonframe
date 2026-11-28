@@ -35,6 +35,7 @@ mod scrolled_children;
 mod secret_input;
 mod spinner;
 mod split_resize;
+mod stack_anchor;
 mod stack_measure;
 mod view_access;
 mod window_size;
