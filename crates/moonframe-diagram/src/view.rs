@@ -424,7 +424,11 @@ impl DiagramView {
                 InputEvent::PressEnter { .. } | InputEvent::Blur => {
                     let label = state.read(cx).value().to_string();
                     this.editing = None;
-                    this.focus.focus(window, cx);
+                    // Enter gives the keys back to the canvas; a blur leaves
+                    // them with whatever the user clicked.
+                    if matches!(event, InputEvent::PressEnter { .. }) {
+                        this.focus.focus(window, cx);
+                    }
                     cx.emit(DiagramEvent::EditLabel {
                         id: editing.clone(),
                         label,
