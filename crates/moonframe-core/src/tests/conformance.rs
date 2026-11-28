@@ -109,6 +109,7 @@ fn play(
             return Err("`expect` is an object of trees by mod".to_owned());
         };
         for (name, want) in expect {
+            kept_is_current(workspace, name)?;
             let got = view_tree(workspace, name)?;
             if want.is_null() {
                 if !bless {
@@ -177,6 +178,27 @@ fn differ(what: &str, want: &Json, got: &Json) -> String {
         pretty(want),
         pretty(got)
     )
+}
+
+/// Whether the view the workspace keeps for `name`, the one a window shows,
+/// is what its view draws now: a send or a publish that changed what it
+/// draws without drawing it again leaves the window stale, though the tree
+/// `view_tree` builds afresh would still match.
+fn kept_is_current(workspace: &Workspace, name: &str) -> Result<(), String> {
+    let fresh = workspace
+        .fresh_view(name)
+        .ok_or_else(|| format!("no mod `{name}` loaded"))?
+        .map_err(|error| format!("{name}: {error}"))?;
+    let kept = workspace
+        .slot(name)
+        .and_then(|slot| slot.view())
+        .ok_or_else(|| format!("`{name}` has drawn nothing"))?;
+    if *kept != fresh {
+        return Err(format!(
+            "`{name}` shows a stale view: what it draws now changed, but it was not drawn again"
+        ));
+    }
+    Ok(())
 }
 
 /// The view of the mod `name` as a tree.
