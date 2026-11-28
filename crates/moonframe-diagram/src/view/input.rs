@@ -12,11 +12,11 @@ use {
     },
     crate::{
         geometry::{Point, Rect, bounds},
-        layout::node_size,
-        model::{Node, NodeKind},
+        layout::{Route, node_size},
+        model::{Diagram, EdgeKind, Node, NodeKind},
     },
     gpui_kit::*,
-    std::collections::HashSet,
+    std::collections::{BTreeMap, HashMap, HashSet},
 };
 
 /// Screen pixels a press must travel to be a drag, not a click.
@@ -93,6 +93,22 @@ fn order(view: &DiagramView) -> Vec<String> {
     view.diagram.nodes.iter().map(|n| n.id.clone()).collect()
 }
 
+/// The routes a press can land on: every edge drawn, so not an invisible
+/// one, which only keeps two nodes near.
+fn pressable(diagram: &Diagram, routes: &BTreeMap<String, Route>) -> HashMap<String, Route> {
+    let hidden: HashSet<&str> = diagram
+        .edges
+        .iter()
+        .filter(|e| e.kind == EdgeKind::Invisible)
+        .map(|e| e.id.as_str())
+        .collect();
+    routes
+        .iter()
+        .filter(|(id, _)| !hidden.contains(id.as_str()))
+        .map(|(id, route)| (id.clone(), route.clone()))
+        .collect()
+}
+
 pub(crate) fn down(
     view: &mut DiagramView,
     event: &MouseDownEvent,
@@ -104,12 +120,7 @@ pub(crate) fn down(
     let screen = local(view, event.position);
     let world = view.camera.to_world(screen);
     let (rects, _) = view.eased();
-    let routes: std::collections::HashMap<_, _> = view
-        .layout
-        .edges
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
+    let routes = pressable(&view.diagram, &view.layout.edges);
     let edit = view.mode == Mode::Edit;
     let handles = if edit && view.tool == Tool::Select {
         alone(view).map(str::to_owned)
@@ -425,7 +436,7 @@ pub(crate) fn hover(
     }
     let world = view.camera.to_world(local(view, event.position));
     let (rects, _) = view.eased();
-    let routes = std::collections::HashMap::new();
+    let routes = HashMap::new();
     let handles = if view.mode == Mode::Edit && view.tool == Tool::Select {
         alone(view).map(str::to_owned)
     } else {
@@ -570,4 +581,34 @@ pub(crate) fn key(
     }
     cx.stop_propagation();
     cx.notify();
+}
+
+#[cfg(test)]
+mod tests {
+    // Not `super::*`: gpui's `test` would shadow the standard one.
+    use {
+        super::pressable,
+        crate::{
+            layout::Route,
+            model::{Diagram, Edge, EdgeKind},
+        },
+        std::collections::BTreeMap,
+    };
+
+    #[test]
+    fn an_invisible_edge_cannot_be_pressed() {
+        let mut hidden = Edge::new("hidden", "a", "b");
+        hidden.kind = EdgeKind::Invisible;
+        let diagram = Diagram {
+            edges: vec![Edge::new("shown", "a", "b"), hidden],
+            ..Diagram::default()
+        };
+        let routes: BTreeMap<String, Route> = ["shown", "hidden"]
+            .into_iter()
+            .map(|id| (id.to_owned(), Route::default()))
+            .collect();
+        let pressable = pressable(&diagram, &routes);
+        assert!(pressable.contains_key("shown"));
+        assert!(!pressable.contains_key("hidden"));
+    }
 }
