@@ -85,6 +85,27 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
     }
 }
 
+/// The diagram a successful `moonframe mcp diagrams` call showed or
+/// changed: its answer names it first, in backticks ("Showing `plan` ...",
+/// "`plan`: ...").
+pub(crate) fn diagram(tool: &Tool) -> Option<String> {
+    if tool.status == ToolStatus::Failed || !tool.title.contains("diagram_") {
+        return None;
+    }
+    let answer = tool.content.iter().find_map(|item| match item {
+        ToolContent::Text { text } => Some(text.as_str()),
+        _ => None,
+    })?;
+    let (_, rest) = answer.split_once('`')?;
+    let (id, _) = rest.split_once('`')?;
+    let valid = !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    valid.then(|| id.to_owned())
+}
+
 /// A call's title, on one line; its kind's name when it has none.
 fn title(tool: &Tool, limits: &Limits) -> String {
     text::first_line(&tool.title, limits.text.min(500)).unwrap_or_else(|| {
