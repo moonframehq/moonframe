@@ -28,10 +28,13 @@ type State = {
 	-- The agent's (or project's) diagram on show instead of the document,
 	-- by its key in `app.diagrams`.
 	live: string?,
-	-- An export asked of the diagram on show, each new `seq` once, until
-	-- its answer comes back or another diagram is shown.
+	-- The last export asked of the diagram on show, each new `seq` once,
+	-- until its answer comes back or another diagram is shown.
 	export: { [string]: any }?,
 	exports: number,
+	-- The `seq` of every export not answered yet: each answer is taken
+	-- once, and only while its diagram is on show.
+	pending: { number },
 	-- Why the last export failed, shown in the top bar until dismissed.
 	export_error: string?,
 	-- Zooming the diagram on show, as `camera` asks it.
@@ -463,6 +466,7 @@ return mod {
 		state.live = nil
 		state.export = nil
 		state.exports = 0
+		state.pending = {}
 		state.export_error = nil
 		state.live_camera = nil
 		-- History lives for the session only.
@@ -541,14 +545,19 @@ return mod {
 			-- Asked of the diagram on show: the editor's or a live one.
 			state.exports += 1
 			state.export = { format = msg.export, seq = state.exports }
+			table.insert(state.pending, state.exports)
 			state.export_error = nil
 		elseif msg.exported then
 			-- Asked of a diagram no longer on show: let it go.
-			if not state.export then
+			local at = table.find(state.pending, msg.exported.seq)
+			if not at then
 				return
 			end
-			-- Answered: no view asks again when it is drawn anew.
-			state.export = nil
+			table.remove(state.pending, at)
+			-- The last one answered: no view asks again when it is drawn anew.
+			if state.export and state.export.seq == msg.exported.seq then
+				state.export = nil
+			end
 			if msg.exported.error then
 				state.export_error = msg.exported.error
 			elseif msg.exported.path then
@@ -558,13 +567,16 @@ return mod {
 		elseif msg.export_error == false then
 			state.export_error = nil
 			state.export = nil
+			state.pending = {}
 		elseif msg.live ~= nil then
 			state.live = msg.live or nil
 			state.export = nil
+			state.pending = {}
 			state.live_camera = nil
 		elseif msg.close_live then
 			state.live = nil
 			state.export = nil
+			state.pending = {}
 			return state, { { to = "provider:diagrams", msg = { close = msg.close_live } } }
 		elseif msg.pick then
 			state.selected = { msg.pick }

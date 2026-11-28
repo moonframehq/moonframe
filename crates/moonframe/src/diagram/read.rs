@@ -19,8 +19,8 @@ pub(super) enum Camera {
 
 /// What the mod asks the view to hand out.
 pub(super) enum Hand {
-    /// The diagram as a file, `svg` or `png`.
-    Export(String),
+    /// The diagram as a file, `svg` or `png`, asked with `seq`.
+    Export { format: String, seq: Data },
 }
 
 pub(super) struct Props {

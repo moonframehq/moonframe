@@ -101,10 +101,11 @@ impl HostView for DiagramHost {
         let props = read::props(props);
         if props.document != self.document {
             self.document = props.document.clone();
-            for read::Hand::Export(format) in std::mem::take(&mut self.asked) {
+            for read::Hand::Export { format, seq } in std::mem::take(&mut self.asked) {
                 self.messenger.send(export::told(
                     Err("the diagram changed before it was laid out".to_owned()),
                     &format,
+                    seq,
                 ));
             }
             match props.diagram {
@@ -125,8 +126,8 @@ impl HostView for DiagramHost {
             .export
             .filter(|(seq, _)| Some(seq) != self.export_seq.as_ref())
         {
-            self.export_seq = Some(seq);
-            self.asked.push(read::Hand::Export(format));
+            self.export_seq = Some(seq.clone());
+            self.asked.push(read::Hand::Export { format, seq });
         }
         self.view.update(cx, |view, cx| {
             view.set_mode(props.mode, cx);
@@ -155,9 +156,16 @@ impl Render for DiagramHost {
         }
         // An export waits for the layout of the document it was asked
         // with; only the SVG text is made here, the file in the background.
+        // Text that is no diagram has none to export: the view still shows
+        // the last one that was.
         if !self.view.read(cx).is_laying_out() {
             for hand in std::mem::take(&mut self.asked) {
-                let read::Hand::Export(format) = hand;
+                let read::Hand::Export { format, seq } = hand;
+                if let Some(problem) = &self.problem {
+                    self.messenger
+                        .send(export::told(Err(problem.clone()), &format, seq));
+                    continue;
+                }
                 let view = self.view.read(cx);
                 let svg = moonframe_diagram::view::export_svg(
                     view.diagram(),
@@ -171,7 +179,7 @@ impl Render for DiagramHost {
                 let (messenger, renderer) = (self.messenger.clone(), cx.svg_renderer());
                 cx.background_spawn(async move {
                     let done = export::write(&svg, &format, &name, &renderer);
-                    messenger.send(export::told(done, &format));
+                    messenger.send(export::told(done, &format, seq));
                 })
                 .detach();
             }

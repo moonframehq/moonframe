@@ -60,17 +60,16 @@ fn png(svg: &str, path: &Path, renderer: &SvgRenderer) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// What the mod hears of an export.
-pub(super) fn told(result: Result<PathBuf, String>, format: &str) -> Data {
-    let body = match result {
-        Ok(path) => Data::map([
-            ("path", Data::String(path.to_string_lossy().into_owned())),
-            ("format", Data::String(format.to_owned())),
-        ]),
-        Err(error) => Data::map([
-            ("error", Data::String(error)),
-            ("format", Data::String(format.to_owned())),
-        ]),
+/// What the mod hears of an export, with the `seq` it was asked with.
+pub(super) fn told(result: Result<PathBuf, String>, format: &str, seq: Data) -> Data {
+    let outcome = match result {
+        Ok(path) => ("path", Data::String(path.to_string_lossy().into_owned())),
+        Err(error) => ("error", Data::String(error)),
     };
+    let body = Data::map([
+        outcome,
+        ("format", Data::String(format.to_owned())),
+        ("seq", seq),
+    ]);
     Data::map([("exported", body)])
 }

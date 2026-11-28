@@ -130,7 +130,7 @@ pub fn svg(
     highlight: &[String],
     measure: &mut dyn FnMut(&str, f32) -> f32,
 ) -> String {
-    let b = layout.bounds;
+    let b = drawn_bounds(diagram, layout, measure);
     let (w, h) = (b.w + MARGIN * 2.0, b.h + MARGIN * 2.0);
     let (dx, dy) = (MARGIN - b.x, MARGIN - b.y);
     let at = |p: Point| Point::new(p.x + dx, p.y + dy);
@@ -337,6 +337,36 @@ pub fn svg(
     out.push_str(&labels);
     out.push_str("</svg>");
     out
+}
+
+/// The layout's bounds and every label drawn beside a line (a message's,
+/// an edge's), which the layout does not count, so none is cut off.
+fn drawn_bounds(
+    diagram: &Diagram,
+    layout: &Layout,
+    measure: &mut dyn FnMut(&str, f32) -> f32,
+) -> Rect {
+    let mut b = layout.bounds;
+    let mut add = |at: Point, words: &str, pad: f32| {
+        if !words.is_empty() {
+            let wide = measure(words, 12.0) + pad;
+            b = b.union(&Rect::new(at.x - wide / 2.0, at.y - 9.0, wide, 18.0));
+        }
+    };
+    for (message, route) in diagram.messages.iter().zip(&layout.messages) {
+        if let Some(at) = route.label {
+            add(at, &message.label, 0.0);
+        }
+    }
+    for edge in &diagram.edges {
+        if let (Some(at), Some(label)) = (
+            layout.edges.get(&edge.id).and_then(|r| r.label),
+            edge.label.as_deref(),
+        ) {
+            add(at, label, 10.0);
+        }
+    }
+    b
 }
 
 fn node_colors(
@@ -721,6 +751,31 @@ mod tests {
         let svg = svg(&d, &out, &Colors::light(), "\"><script>", &[], &mut approx);
         assert!(!svg.contains("onload") && !svg.contains("<script"), "{svg}");
         assert!(svg.contains("fill=\"#abc\""));
+    }
+
+    #[test]
+    fn a_long_message_to_itself_fits_in_the_export() {
+        let d = parse::mermaid::parse(
+            "sequenceDiagram\n A->>A: a very long message that the actor sends to itself to check",
+        )
+        .unwrap();
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let label = out.messages[0].label.unwrap();
+        let svg = svg(&d, &out, &Colors::light(), "Inter", &[], &mut approx);
+        let width: f32 = svg
+            .split("width=\"")
+            .nth(1)
+            .and_then(|w| w.split('"').next())
+            .unwrap()
+            .parse()
+            .unwrap();
+        let shift = MARGIN - drawn_bounds(&d, &out, &mut approx).x;
+        let right = label.x + shift + Approx.width(&d.messages[0].label, 12.0) / 2.0;
+        assert!(right <= width, "label ends at {right}, canvas {width}");
+        assert!(
+            out.bounds.right() + MARGIN * 2.0 < right,
+            "the layout alone would cut it"
+        );
     }
 
     fn approx(text: &str, size: f32) -> f32 {
