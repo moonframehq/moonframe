@@ -32,6 +32,20 @@ pub(crate) struct Shown {
 }
 
 impl Shown {
+    /// A diagram with nothing chosen, as a picture shows it.
+    pub(crate) fn still(diagram: Arc<Diagram>, layout: Arc<Layout>) -> Self {
+        Self {
+            diagram,
+            layout,
+            selected: HashSet::new(),
+            highlight: HashSet::new(),
+            hover: None,
+            handles: None,
+            editing: None,
+            font: 14.0,
+        }
+    }
+
     pub(crate) fn of(view: &DiagramView) -> Self {
         let handles =
             (view.mode == Mode::Edit && view.tool == Tool::Select && view.gesture.is_none())
