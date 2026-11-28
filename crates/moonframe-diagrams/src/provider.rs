@@ -451,6 +451,32 @@ mod tests {
     }
 
     #[test]
+    fn a_too_deep_diagram_is_an_error_and_the_others_still_go() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut deep = json!("x");
+        for _ in 0..20 {
+            deep = json!([deep]);
+        }
+        let file = json!({ "id": "deep", "document": { "nodes": [{ "id": "a", "data": deep }] } });
+        std::fs::write(dir.path().join("deep.json"), file.to_string()).unwrap();
+        std::fs::write(dir.path().join("fine.mmd"), "graph TD; a-->b").unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let host = handle(&seen, dir.path());
+        let mut provider = Diagrams::default();
+        provider.start(&host).unwrap();
+        let last = seen.lock().unwrap().last().cloned().expect("it published");
+        assert!(moonframe_providers::from_json(&last).is_ok());
+        let diagrams = last["diagrams"].as_array().unwrap();
+        let deep = diagrams.iter().find(|d| d["id"] == "deep").unwrap();
+        assert!(deep["error"].as_str().unwrap().contains("deeper"), "{deep}");
+        assert!(
+            diagrams
+                .iter()
+                .any(|d| d["id"] == "fine" && d.get("document").is_some())
+        );
+    }
+
+    #[test]
     fn many_diagrams_stay_within_what_one_publish_holds() {
         let dir = tempfile::tempdir().unwrap();
         let nodes: String = (0..400)
