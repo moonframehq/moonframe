@@ -98,11 +98,15 @@ pub(crate) fn label(raw: &str) -> String {
         if lower.starts_with("<br") {
             out.push(' ');
             rest = tail.find('>').map_or("", |end| &tail[end + 1..]);
-        } else if let Some(end) = tail
-            .find('>')
-            .filter(|_| tail[1..].starts_with(|c: char| c == '/' || c.is_ascii_alphabetic()))
-        {
-            // Other tags (`<b>`, `</i>`) leave their words.
+        } else if tail[1..].starts_with(|c: char| c == '/' || c.is_ascii_alphabetic()) {
+            // Other tags (`<b>`, `</i>`) leave their words. With no `>`
+            // left, no later `<` opens a tag either: the rest is text,
+            // and a label full of `<` is still read in one pass.
+            let Some(end) = tail.find('>') else {
+                out.push_str(tail);
+                rest = "";
+                break;
+            };
             rest = &tail[end + 1..];
         } else {
             out.push('<');
@@ -123,7 +127,10 @@ fn decode(text: &str) -> String {
     while let Some(at) = rest.find('#') {
         out.push_str(&rest[..at]);
         let tail = &rest[at + 1..];
-        let entity = tail.find(';').filter(|&end| end <= 7).and_then(|end| {
+        // An entity's name is at most 7 bytes: look no further for its `;`,
+        // so a long label full of `#` is read in one pass.
+        let near = &tail.as_bytes()[..tail.len().min(8)];
+        let entity = near.iter().position(|&b| b == b';').and_then(|end| {
             let decoded = match &tail[..end] {
                 "quot" => '"',
                 "amp" => '&',

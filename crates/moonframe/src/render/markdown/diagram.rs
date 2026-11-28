@@ -117,6 +117,11 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
             reason: format!("no parser for `{}`", fence.language),
         })
     });
+    // The layout this text grew from, whose ranks the new one keeps.
+    let previous = before
+        .as_ref()
+        .and_then(|b| b.as_ref().ok())
+        .map(|(_, l)| l.as_ref());
     let result: Laid = match parsed {
         // Laid out as the document draws: bigger diagrams show as source.
         Ok(diagram) if too_big(&diagram) => Err(format!(
@@ -124,17 +129,13 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
             diagram.nodes.len() + diagram.groups.len(),
             diagram.edges.len() + diagram.messages.len() + diagram.notes.len(),
         )),
-        Ok(diagram) if layout::cost(&diagram) > MOST_INLINE_COST => Err(format!(
+        Ok(diagram) if layout::cost(&diagram, previous) > MOST_INLINE_COST => Err(format!(
             "its edges cross too many ranks: {} items to place, more than a document draws ({MOST_INLINE_COST})",
-            layout::cost(&diagram),
+            layout::cost(&diagram, previous),
         )),
         Ok(diagram) => {
             let options = Options::default();
             let widths = view::measure(&diagram, options.font_size, window, cx);
-            let previous = before
-                .as_ref()
-                .and_then(|b| b.as_ref().ok())
-                .map(|(_, l)| l.as_ref());
             let out = layout(&diagram, &widths, &options, previous);
             Ok((Arc::new(diagram), Arc::new(out)))
         },

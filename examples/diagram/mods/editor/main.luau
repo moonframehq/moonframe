@@ -484,6 +484,9 @@ return mod {
 		[".editor-live-bar"] = { padding = { 6, 12 }, gap = 8, background = "accent/8", border = "bottom", border_color = "border" },
 	},
 
+	-- To hear the diagram on show go.
+	subscribe = { "provider/diagrams" },
+
 	init = function(previous: State?): State
 		local state: State = if type(previous) == "table" then previous else {} :: any
 		if type(state.doc) ~= "table" or type(state.doc.shapes) ~= "table" then
@@ -509,6 +512,21 @@ return mod {
 	end,
 
 	update = function(state: State, msg: any)
+		-- The diagram on show went (its agent closed it, its file went):
+		-- back to the user's, so the controls reach what is on screen.
+		if type(msg) == "table" and msg.topic == "provider/diagrams" then
+			if state.live then
+				local found = false
+				for _, d in (if msg.value then msg.value.diagrams else nil) or {} do
+					found = found or d.key == state.live
+				end
+				if not found then
+					state.live, state.live_camera = nil, nil
+					state.export, state.pending = nil, {}
+				end
+			end
+			return
+		end
 		-- While an agent's diagram is on show, zooming moves it, and what it
 		-- tells of itself and an export of it stay its own; anything else is
 		-- for the user's diagram, which comes back first so no edit lands
