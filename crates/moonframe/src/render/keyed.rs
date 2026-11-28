@@ -48,7 +48,19 @@ impl<'w> Painter<'w, '_> {
     ) -> Vec<AnyElement> {
         let last = match self.last_keyed {
             Some(last) if nodes.iter().any(|node| keyed(node).is_some()) => last,
-            _ => return self.children(nodes, place, direction, cx),
+            // Drawn as they are, as in a mod's own window: a column that
+            // keeps its first keyed child in place still notes them.
+            _ => {
+                let elements = self.children(nodes, place, direction, cx);
+                return nodes
+                    .iter()
+                    .zip(elements)
+                    .map(|(node, element)| match keyed(node) {
+                        Some((_, key)) => super::anchor::note(element, key, self, place),
+                        None => element,
+                    })
+                    .collect();
+            },
         };
         // `None` when the container was not drawn last frame: what it holds
         // as it appears is where it starts, not something arriving.
