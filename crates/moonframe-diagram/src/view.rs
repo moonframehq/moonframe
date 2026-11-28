@@ -8,6 +8,7 @@
 //! Layouts of big diagrams run on a background thread; the view keeps the
 //! last one meanwhile, then eases nodes to their new places.
 
+// keep-sorted start
 pub mod camera;
 mod hit;
 mod input;
@@ -16,6 +17,7 @@ mod picture;
 mod scene;
 mod snap;
 pub mod style;
+// keep-sorted end
 
 use {
     crate::{
