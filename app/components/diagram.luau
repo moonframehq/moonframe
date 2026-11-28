@@ -403,13 +403,28 @@ local function draw(props: Props, state: State): { any }
 		return b.x + b.w >= 0 and b.y + b.h >= 0 and b.x <= W and b.y <= H
 	end
 
+	-- Whether a routed line's bounds meet the view: a link between two
+	-- shapes off either side can still cross it.
+	local function crosses(points: { number }): boolean
+		local x0, y0, x1, y1 = math.huge, math.huge, -math.huge, -math.huge
+		for i = 1, #points - 1, 2 do
+			local x, y = points[i] :: number, points[i + 1] :: number
+			x0, x1 = math.min(x0, x), math.max(x1, x)
+			y0, y1 = math.min(y0, y), math.max(y1, y)
+		end
+		return x1 >= 0 and y1 >= 0 and x0 <= W and y0 <= H
+	end
+
 	-- Links, under the shapes.
 	local paths: { any } = {}
 	local marks: { any } = {}
 	for _, l in props.links or {} do
 		local a, b = boxes[l.from], boxes[l.to]
-		if a and b and (shows(a) or shows(b)) then
-			local points, mx, my = route(a, b)
+		local points: { number }?, mx, my = nil, 0, 0
+		if a and b then
+			points, mx, my = route(a, b)
+		end
+		if points and crosses(points) then
 			local on = chosen[l.id]
 			table.insert(paths, {
 				points = points,
@@ -484,13 +499,17 @@ local function draw(props: Props, state: State): { any }
 			alone, count = id, count + 1
 		end
 	end
-	if alone and count == 1 and (not drag or drag.kind == "resize") and tool == "select" then
+	-- A link drawn from a port keeps the handles and ports up until the
+	-- release: the host follows a press only while the pressed element is
+	-- still drawn, at the same place in the tree.
+	local linking = drag and drag.kind == "link" and drag.id == alone
+	if alone and count == 1 and (not drag or drag.kind == "resize" or linking) and tool == "select" then
 		local b = boxes[alone]
 		for _, c in CORNERS do
 			local hx, hy = b.x - 3 + c.fx * (b.w + 6) - 4, b.y - 3 + c.fy * (b.h + 6) - 4
 			table.insert(out, ui.row { area = area { x = hx, y = hy, w = 8, h = 8 }, class = "diagram-handle", cursor = c.cursor :: any, pointer = { handle = alone, corner = c.name } })
 		end
-		if not drag then
+		if not drag or linking then
 			for _, p in { { 0.5, 0 }, { 1, 0.5 }, { 0.5, 1 }, { 0, 0.5 } } do
 				local px, py = b.x + p[1] * b.w, b.y + p[2] * b.h
 				-- Beyond the edge, so a press on the shape near it still moves it.
