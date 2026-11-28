@@ -454,48 +454,71 @@ local function draw(props: Props, state: State): { any }
 			end
 		end
 	end
-	if #paths > 0 then
-		table.insert(out, ui.column { float = "fill", ui.paths { paths = paths } })
-	end
+	-- Each part in a layer of its own, always there: the host follows a
+	-- press by the pressed element's place in the tree, so what one layer
+	-- culls must not move the elements of another.
+	table.insert(out, ui.column { float = "fill", gap = "none", #paths > 0 and ui.paths { paths = paths } })
 
-	-- Shapes.
+	-- Shapes. During a drag those the press found in view keep their places
+	-- first, even once out of it, and those that came into view follow, so
+	-- the pressed shape stays where the host looks for it until the release.
 	local labels = z >= 0.45
-	for _, s in props.shapes do
+	local shapes: { any } = {}
+	local function add(s: Shape)
 		local b = boxes[s.id]
-		if shows(b) then
-			local kind = if SIZES[s.kind] then s.kind else "box"
-			local sticky = kind == "sticky"
-			table.insert(
-				out,
-				ui.column {
-					area = area(b),
-					class = { "diagram-shape", `diagram-{kind}` },
-					style = if s.fill and kind ~= "text" then { background = s.fill } else nil,
-					pointer = { shape = s.id },
-					cursor = if tool == "select" then "move" elseif tool == "hand" then "grab" else "crosshair",
-					align = if sticky then "start" else "center",
-					justify = if sticky then "start" else "center",
-					labels and s.label and s.label ~= "" and state.editing ~= s.id and ui.text {
-						s.label,
-						class = if kind == "text" then "diagram-text-label" else "diagram-label",
-						wrap = true,
-					},
-				}
-			)
+		local kind = if SIZES[s.kind] then s.kind else "box"
+		local sticky = kind == "sticky"
+		table.insert(
+			shapes,
+			ui.column {
+				area = area(b),
+				class = { "diagram-shape", `diagram-{kind}` },
+				style = if s.fill and kind ~= "text" then { background = s.fill } else nil,
+				pointer = { shape = s.id },
+				cursor = if tool == "select" then "move" elseif tool == "hand" then "grab" else "crosshair",
+				align = if sticky then "start" else "center",
+				justify = if sticky then "start" else "center",
+				labels and s.label and s.label ~= "" and state.editing ~= s.id and ui.text {
+					s.label,
+					class = if kind == "text" then "diagram-text-label" else "diagram-label",
+					wrap = true,
+				},
+			}
+		)
+	end
+	if drag then
+		local sx, sy = if drag.kind == "pan" then drag.vx or v.x else v.x, if drag.kind == "pan" then drag.vy or v.y else v.y
+		local placed: { [string]: boolean } = {}
+		for _, s in props.shapes do
+			if shows { x = (s.x - sx) * z, y = (s.y - sy) * z, w = s.w * z, h = s.h * z } then
+				placed[s.id] = true
+				add(s)
+			end
+		end
+		for _, s in props.shapes do
+			if not placed[s.id] and shows(boxes[s.id]) then
+				add(s)
+			end
+		end
+	else
+		for _, s in props.shapes do
+			if shows(boxes[s.id]) then
+				add(s)
+			end
 		end
 	end
-	for _, mark in marks do
-		table.insert(out, mark)
-	end
+	table.insert(out, ui.column { float = "fill", gap = "none", table.unpack(shapes) })
+	table.insert(out, ui.column { float = "fill", gap = "none", table.unpack(marks) })
 
 	-- The selection: an outline round each chosen shape; handles and
-	-- connector ports when one alone is chosen and nothing is dragged.
+	-- connector ports when one alone is chosen and nothing else is dragged.
+	local selection: { any } = {}
 	local alone: string? = nil
 	local count = 0
 	for id in chosen do
 		local b = boxes[id]
 		if b then
-			table.insert(out, ui.row { area = area { x = b.x - 3, y = b.y - 3, w = b.w + 6, h = b.h + 6 }, class = "diagram-selection" })
+			table.insert(selection, ui.row { area = area { x = b.x - 3, y = b.y - 3, w = b.w + 6, h = b.h + 6 }, class = "diagram-selection" })
 			alone, count = id, count + 1
 		end
 	end
@@ -507,7 +530,7 @@ local function draw(props: Props, state: State): { any }
 		local b = boxes[alone]
 		for _, c in CORNERS do
 			local hx, hy = b.x - 3 + c.fx * (b.w + 6) - 4, b.y - 3 + c.fy * (b.h + 6) - 4
-			table.insert(out, ui.row { area = area { x = hx, y = hy, w = 8, h = 8 }, class = "diagram-handle", cursor = c.cursor :: any, pointer = { handle = alone, corner = c.name } })
+			table.insert(selection, ui.row { area = area { x = hx, y = hy, w = 8, h = 8 }, class = "diagram-handle", cursor = c.cursor :: any, pointer = { handle = alone, corner = c.name } })
 		end
 		if not drag or linking then
 			for _, p in { { 0.5, 0 }, { 1, 0.5 }, { 0.5, 1 }, { 0, 0.5 } } do
@@ -515,10 +538,11 @@ local function draw(props: Props, state: State): { any }
 				-- Beyond the edge, so a press on the shape near it still moves it.
 				px += (p[1] - 0.5) * 24
 				py += (p[2] - 0.5) * 24
-				table.insert(out, ui.row { area = area { x = px - 5, y = py - 5, w = 10, h = 10 }, class = "diagram-port", cursor = "crosshair", pointer = { port = alone, px = px, py = py } })
+				table.insert(selection, ui.row { area = area { x = px - 5, y = py - 5, w = 10, h = 10 }, class = "diagram-port", cursor = "crosshair", pointer = { port = alone, px = px, py = py } })
 			end
 		end
 	end
+	table.insert(out, ui.column { float = "fill", gap = "none", table.unpack(selection) })
 
 	-- The gesture under way.
 	if drag and drag.kind == "marquee" then
