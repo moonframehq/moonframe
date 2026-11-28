@@ -8,6 +8,17 @@ type Props = {
 	shown: string?,
 }
 
+-- A row key for `key` (`agent/<file>`): each character a key may not
+-- hold as its hex code, `-` too, so two names never meet. One longer than
+-- a key may be (64) goes by its place instead: `long-<n>`, which no
+-- encoded key (they start `agent` or `project`) can be.
+local function row_key(key: string, place: number): string
+	local encoded = string.gsub(key, "[^%w_]", function(c)
+		return string.format("-%02x", string.byte(c))
+	end)
+	return if #encoded <= 64 then encoded else `long-{place}`
+end
+
 return component {
 	title = "Live Diagrams",
 	category = "Data",
@@ -28,17 +39,13 @@ return component {
 
 	build = function(props: Props)
 		local rows: { any } = {}
-		for _, d in props.diagrams do
+		for i, d in props.diagrams do
 			local detail = if d.error then "doesn't parse" elseif d.agent then d.agent else d.from
 			table.insert(
 				rows,
 				ui.row {
 					class = "live-diagram",
-					-- Each character a key may not hold as its hex code, `-` too,
-					-- so two names never meet.
-					key = (string.gsub(d.key, "[^%w_]", function(c)
-						return string.format("-%02x", string.byte(c))
-					end)),
+					key = row_key(d.key, i),
 					selected = d.key == props.shown,
 					align = "center",
 					msg = { live = d.key },
