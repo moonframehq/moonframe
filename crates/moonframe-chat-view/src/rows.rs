@@ -110,10 +110,19 @@ pub struct ToolGroup {
     /// Items before the first one kept.
     pub more: usize,
     pub items: Vec<ToolItem>,
-    /// The diagrams its `moonframe mcp diagrams` calls showed, by id, each
-    /// once in the order they came: kept whole, as `items` may drop them.
+    /// The diagrams its `moonframe mcp diagrams` calls showed, each once
+    /// in the order they came: kept whole, as `items` may drop them.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub diagrams: Vec<String>,
+    pub diagrams: Vec<DiagramRef>,
+}
+
+/// A diagram a call showed: its id, and the run its answer named, which
+/// tells it from another session's diagram of the same id.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct DiagramRef {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
 }
 
 /// A call in a group, or a thought between calls.
@@ -130,6 +139,9 @@ pub enum ToolItem {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ToolView {
+    /// Transcript entry used to retrieve the original text on demand.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_key: Option<String>,
     /// The agent's id for the call.
     pub id: String,
     /// `"read" "edit" "delete" "move" "search" "execute" "think" "fetch"
@@ -361,7 +373,7 @@ fn flush(
                 let steps = steps
                     .get(tool.call_id.as_str())
                     .map_or(&[][..], Vec::as_slice);
-                ToolItem::Tool(tool::view(tool, steps, limits))
+                ToolItem::Tool(tool::view(tool, steps, limits, key(entry)))
             },
             EntryKind::Thought { text } => ToolItem::Thought {
                 key: key(entry),
@@ -396,10 +408,10 @@ fn flush(
         .find(|tool| tool::running(tool.status))
         .and_then(|tool| text::first_line(&tool.title, 300));
     let files = totals(&items);
-    let mut diagrams: Vec<String> = Vec::new();
-    for id in tools.iter().filter_map(|tool| tool::diagram(tool)) {
-        if !diagrams.contains(&id) {
-            diagrams.push(id);
+    let mut diagrams: Vec<DiagramRef> = Vec::new();
+    for shown in tools.iter().filter_map(|tool| tool::diagram(tool)) {
+        if !diagrams.contains(&shown) {
+            diagrams.push(shown);
         }
     }
     let more = items.len().saturating_sub(limits.group);

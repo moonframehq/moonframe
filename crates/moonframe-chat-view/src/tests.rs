@@ -342,13 +342,13 @@ fn a_group_keeps_the_diagrams_its_calls_showed_past_its_trim() {
             "d1",
             "mcp__moonframe-diagrams__diagram_show",
             ToolStatus::Completed,
-            "Showing `plan` (3 nodes) to the user.",
+            "Showing `plan` (3 nodes) to the user.\n[run session-1]",
         ),
         answer(
             "d2",
             "diagram_patch",
             ToolStatus::Completed,
-            "`plan`: added 1 node.",
+            "`plan`: added 1 node.\n[run session-1]",
         ),
         answer(
             "d3",
@@ -377,7 +377,14 @@ fn a_group_keeps_the_diagrams_its_calls_showed_past_its_trim() {
     let view = prepare(&transcript(calls), &limits);
     let tools = group(&view.rows[0]);
     assert_eq!(tools.items.len(), 3);
-    assert_eq!(tools.diagrams, ["plan", "flow"]);
+    let shown = |id: &str, run: Option<&str>| DiagramRef {
+        id: id.to_owned(),
+        run: run.map(str::to_owned),
+    };
+    assert_eq!(tools.diagrams, [
+        shown("plan", Some("session-1")),
+        shown("flow", None)
+    ]);
 }
 
 #[test]
@@ -517,4 +524,33 @@ fn failed_and_read_only_chats_take_no_prompts() {
     chat.status = Status::Idle;
     chat.read_only = true;
     assert!(!prepare(&chat, &Limits::FULL).accepts);
+}
+
+#[test]
+fn output_key_is_exposed_only_after_a_tool_finishes() {
+    let make = |id: &str, status| {
+        let mut call = tool(id, ToolKind::Execute, "cargo test", status);
+        call.content.push(ToolContent::Text {
+            text: "line 1\nline 2".to_owned(),
+        });
+        EntryKind::Tool(call)
+    };
+    let view = prepare(
+        &transcript(vec![
+            make("p", ToolStatus::Pending),
+            make("r", ToolStatus::InProgress),
+            make("d", ToolStatus::Completed),
+            make("f", ToolStatus::Failed),
+        ]),
+        &Limits::FULL,
+    );
+    let keys: Vec<Option<&str>> = group(&view.rows[0])
+        .items
+        .iter()
+        .map(|item| match item {
+            ToolItem::Tool(tool) => tool.output_key.as_deref(),
+            ToolItem::Thought { .. } => None,
+        })
+        .collect();
+    assert_eq!(keys, [None, None, Some("e3"), Some("e4")]);
 }

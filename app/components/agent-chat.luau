@@ -36,6 +36,7 @@ type State = {
 	-- A prompt waiting for the chat `start` makes.
 	waiting: { prompt: string, files: { string } }?,
 	folds: { [string]: boolean },
+	output: any,
 	open: string,
 	shown: number,
 	pick: number,
@@ -301,8 +302,8 @@ local function card_owners(rows: { any }, first: number): { [string]: string }
 	for index = first, #rows do
 		local row = rows[index]
 		if row.type == "tools" then
-			for _, id in row.diagrams or {} do
-				owners[id] = owners[id] or row.key
+			for _, shown in row.diagrams or {} do
+				owners[shown.id] = owners[shown.id] or row.key
 			end
 		end
 	end
@@ -339,6 +340,8 @@ local function row_element(row: any, state: State, props: Props, diagrams: { any
 			tool_group {
 				group = row,
 				open = open,
+				inspect = true,
+				output = if state.output and state.output.chat == chat_id(props, state) then state.output else nil,
 				msg = { fold = row.key, open = not open },
 				diagrams = diagrams,
 				cards = owners,
@@ -552,6 +555,7 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 		ui.row {
 			gap = "small",
 			align = "center",
+			wrap = true,
 			#agents > 0 and dropdown {
 				icon = agent_icon(agent),
 				value = agent,
@@ -567,21 +571,28 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 			view and picker("model", view.model, state),
 			view and picker("effort", view.effort, state),
 			view and view.auto_accept and ui.button { "Auto-accept", icon = "zap", small = true, variant = "ghost", msg = { auto_accept = false }, tooltip = "Asks before acting again" },
-			ui.row { grow = true },
-			view and view.usage and ui.text {
-				view.usage.text .. (if view.usage.cost then " · " .. view.usage.cost else ""),
-				size = "small",
-				tone = "muted",
-				tooltip = `{view.usage.percent}% of the context window`,
-			},
-			working and ui.button { "Stop", icon = "square", small = true, variant = "outline", msg = "stop", tooltip = "Stop the turn (Esc)" },
-			ui.button {
-				icon = "arrow-up",
-				small = true,
-				variant = "primary",
-				msg = "send-draft",
-				disabled = not accepts,
-				tooltip = if working then "Queue it behind this turn (Enter)" else "Send (Enter)",
+			ui.spacer(),
+			ui.row {
+				class = "agent-chat-actions",
+				gap = "small",
+				align = "center",
+				justify = "end",
+				wrap = true,
+				view and view.usage and ui.text {
+					view.usage.text .. (if view.usage.cost then " · " .. view.usage.cost else ""),
+					size = "small",
+					tone = "muted",
+					tooltip = `{view.usage.percent}% of the context window`,
+				},
+				working and ui.button { "Stop", icon = "square", small = true, variant = "outline", msg = "stop", tooltip = "Stop the turn (Esc)" },
+				ui.button {
+					icon = "arrow-up",
+					small = true,
+					variant = "primary",
+					msg = "send-draft",
+					disabled = not accepts,
+					tooltip = if working then "Queue it behind this turn (Enter)" else "Send (Enter)",
+				},
 			},
 		},
 	}
@@ -713,6 +724,27 @@ end
 			table.remove(state.files, msg.unfile)
 		elseif type(msg) == "table" and msg.suggest then
 			sends = send_prompt(props, state, msg.suggest)
+		elseif type(msg) == "table" and msg.close_output then
+			state.output = nil
+		elseif type(msg) == "table" and msg.inspect then
+			local page = msg.page or 0
+			local fetch = msg.fetch == true
+			state.output = { chat = id, key = msg.inspect, page = page, fetch = fetch }
+			if fetch then
+				chat_msg({ tool_output = msg.inspect, page = page, id = { output = msg.inspect, page = page, chat = id } })
+			end
+		elseif type(msg) == "table" and type(msg.reply) == "table" and msg.reply.output then
+			local output = state.output
+			if output and output.chat == msg.reply.chat and output.key == msg.reply.output and output.page == msg.reply.page then
+				if msg.ok then
+					output.text = msg.text
+					output.more = msg.more
+					state.error = nil
+				else
+					state.error = msg.error
+					state.output = nil
+				end
+			end
 		elseif type(msg) == "table" and msg.fold then
 			if msg.open ~= nil then
 				state.folds[msg.fold] = msg.open

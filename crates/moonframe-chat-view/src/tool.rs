@@ -3,7 +3,7 @@
 use {
     crate::{
         Limits,
-        rows::{FileChange, ToolView},
+        rows::{DiagramRef, FileChange, ToolView},
         text,
     },
     herdr_chat_protocol::{EDIT_OMITTED, Tool, ToolContent, ToolKind, ToolStatus},
@@ -40,7 +40,7 @@ pub(crate) fn running(status: ToolStatus) -> bool {
 
 /// `tool` as its line shows it; `steps` are the calls a sub-agent made
 /// under it, oldest first.
-pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
+pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits, key: String) -> ToolView {
     let mut files = Vec::new();
     let mut output = None;
     for item in &tool.content {
@@ -48,7 +48,8 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
             ToolContent::Diff { new, old, path } => {
                 files.push(change(path, old.as_deref(), new, limits));
             },
-            ToolContent::Text { text } => output = Some(text.as_str()),
+            ToolContent::Text { text } if !text.trim().is_empty() => output = Some(text.as_str()),
+            ToolContent::Text { .. } => {},
             ToolContent::Image { .. } | ToolContent::Terminal { .. } => {},
         }
     }
@@ -72,6 +73,9 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
         .find(|step| running(step.status))
         .map(|step| text::head(&step.title, 300));
     ToolView {
+        output_key: output
+            .filter(|_| !running(tool.status) && running_step.is_none())
+            .map(|_| key),
         id: text::head(&tool.call_id, 256),
         kind: kind_name(tool.kind),
         title: title(tool, limits),
@@ -87,8 +91,8 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits) -> ToolView {
 
 /// The diagram a successful `moonframe mcp diagrams` call showed or
 /// changed: its answer names it first, in backticks ("Showing `plan` ...",
-/// "`plan`: ...").
-pub(crate) fn diagram(tool: &Tool) -> Option<String> {
+/// "`plan`: ..."), and the run it is for on its last line (`[run ID]`).
+pub(crate) fn diagram(tool: &Tool) -> Option<DiagramRef> {
     if tool.status == ToolStatus::Failed || !tool.title.contains("diagram_") {
         return None;
     }
@@ -98,12 +102,26 @@ pub(crate) fn diagram(tool: &Tool) -> Option<String> {
     })?;
     let (_, rest) = answer.split_once('`')?;
     let (id, _) = rest.split_once('`')?;
-    let valid = !id.is_empty()
+    let run = answer
+        .trim_end()
+        .lines()
+        .last()
+        .and_then(|line| line.strip_prefix("[run ")?.strip_suffix(']'))
+        .filter(|run| safe(run))
+        .map(str::to_owned);
+    safe(id).then(|| DiagramRef {
+        id: id.to_owned(),
+        run,
+    })
+}
+
+/// An id a diagram or run may have: letters, digits, `-` and `_`.
+fn safe(id: &str) -> bool {
+    !id.is_empty()
         && id.len() <= 128
         && id
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
-    valid.then(|| id.to_owned())
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 /// A call's title, on one line; its kind's name when it has none.

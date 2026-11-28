@@ -279,7 +279,8 @@ fn head(
         for &p in &corners[1..] {
             path.line_to(at(origin, p));
         }
-        if filled || corners.len() > 2 {
+        // An open arrow stays two strokes, unlike a hollow triangle.
+        if filled || (corners.len() > 2 && kind != Head::Open) {
             path.close();
         }
         if let Ok(path) = path.build() {

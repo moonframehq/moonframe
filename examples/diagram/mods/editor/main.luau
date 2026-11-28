@@ -45,6 +45,10 @@ type State = {
 
 -- How many earlier documents undo keeps.
 local HISTORY = 50
+-- Mod state is saved only while it holds at most 10,000 values, so undo and
+-- redo, with the document, keep under this many: a large document keeps
+-- fewer steps rather than stop being saved.
+local BUDGET = 7000
 local FILLS = { "#e2e8f0", "#bfdbfe", "#bbf7d0", "#fde68a", "#fecaca", "#ddd6fe" }
 local DEFAULT_FILL: { [string]: string } = { sticky = "#fde68a", diamond = "#ddd6fe", pill = "#ddd6fe", ellipse = "#bbf7d0" }
 local LABELS: { [string]: string } =
@@ -117,13 +121,43 @@ local function new_id(state: State, prefix: string): string
 	return `{prefix}{state.next}`
 end
 
--- Keep the document as it is now for undo, before changing it.
-local function remember(state: State)
-	table.insert(state.undo, copy(state.doc))
-	if #state.undo > HISTORY then
+-- At most how many values `doc` adds to the saved state: a shape holds up
+-- to eight fields and a link five, each one more in its list.
+local function weight(doc: Doc): number
+	return 2 + #doc.shapes * 9 + #doc.links * 6
+end
+
+-- Drop the oldest undo steps, then the farthest redo steps, until history
+-- fits both HISTORY and BUDGET.
+local function trim(state: State)
+	while #state.undo > HISTORY do
 		table.remove(state.undo, 1)
 	end
+	local total = weight(state.doc)
+	for _, doc in state.undo do
+		total += weight(doc)
+	end
+	for _, doc in state.redo do
+		total += weight(doc)
+	end
+	while total > BUDGET and #state.undo > 0 do
+		total -= weight(table.remove(state.undo, 1) :: Doc)
+	end
+	while total > BUDGET and #state.redo > 0 do
+		total -= weight(table.remove(state.redo, 1) :: Doc)
+	end
+end
+
+-- Keep `doc`, the document before a change, for undo.
+local function keep(state: State, doc: Doc)
+	table.insert(state.undo, doc)
 	state.redo = {}
+	trim(state)
+end
+
+-- Keep the document as it is now for undo, before changing it.
+local function remember(state: State)
+	keep(state, copy(state.doc))
 	state.version += 1
 end
 
@@ -500,6 +534,7 @@ return mod {
 				state.doc = doc
 				state.selected = {}
 				state.version += 1
+				trim(state)
 			end
 		elseif msg == "delete" then
 			if #state.selected > 0 then
@@ -583,6 +618,7 @@ return mod {
 		elseif msg.stress then
 			remember(state)
 			stress(state, msg.stress)
+			trim(state)
 			if state.luau then
 				return state, { { to = "diagram#main", msg = { fit = true } } }
 			end
@@ -590,11 +626,8 @@ return mod {
 		else
 			local before = copy(state.doc)
 			if apply(state, msg) then
-				table.insert(state.undo, before)
-				if #state.undo > HISTORY then
-					table.remove(state.undo, 1)
-				end
-				state.redo = {}
+				keep(state, before)
+				trim(state) -- the change may have grown the document
 				state.version += 1
 			end
 		end

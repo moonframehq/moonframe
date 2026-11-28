@@ -1639,7 +1639,8 @@ export type GitCommit = {
 -- app/providers/system/types.luau.
 export type System = ProviderSystemPublished
 
-export type Platform = "macos" | "linux" | "windows"
+-- `ios` is what MoonSwift reports on an iPhone or iPad.
+export type Platform = "macos" | "linux" | "windows" | "ios"
 export type Titlebar = "system" | "hidden"
 
 -- The window, for a title bar the layout draws itself.
@@ -2282,8 +2283,8 @@ export type MountProps = {
 	[number]: string,
 }
 
--- What draws this build.
-export type Renderer = "gpui" | "rune"
+-- What draws this build; `swiftui` is what MoonSwift reports.
+export type Renderer = "gpui" | "rune" | "swiftui"
 
 -- What every `view` gets as `app`.
 export type App = {
@@ -2591,7 +2592,8 @@ type ProviderDiagramsShown = {
 	highlight: { string },
 	note: string?,
 	agent: string?,
-	-- The `app.acp` run that showed it, when the app started the agent.
+	-- The run that last wrote it: the `app.acp` run when the app started
+	-- the agent, else the agent session's own.
 	run: string?,
 	-- The text it came from, `mermaid` or `dot`.
 	language: string?,
@@ -5037,6 +5039,8 @@ type UseToastsProps = {
 }
 type UseToolGroupProps = {
 	read group: any,
+	read inspect: boolean?,
+	read output: any,
 	read open: boolean?,
 	read msg: any,
 	read to: string?,

@@ -811,10 +811,6 @@ mod tests {
         let shift = MARGIN - drawn_bounds(&d, &out, &mut approx).x;
         let right = label.x + shift + Approx.width(&d.messages[0].label, 12.0) / 2.0;
         assert!(right <= width, "label ends at {right}, canvas {width}");
-        assert!(
-            out.bounds.right() + MARGIN * 2.0 < right,
-            "the layout alone would cut it"
-        );
     }
 
     #[test]

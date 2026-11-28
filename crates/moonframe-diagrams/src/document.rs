@@ -257,6 +257,26 @@ pub fn patch(doc: &mut Value, ops: &Value) -> Result<String, String> {
         if let Some(edges) = doc["edges"].as_array_mut() {
             edges.retain(|e| keep(e, "from") && keep(e, "to"));
         }
+        // A sequence draws every participant its messages name: the
+        // participant's messages go with it, and it leaves its notes.
+        if let Some(messages) = doc["messages"].as_array_mut() {
+            messages.retain(|m| keep(m, "from") && keep(m, "to"));
+        }
+        if let Some(notes) = doc["notes"].as_array_mut() {
+            for note in notes.iter_mut() {
+                if let Some(over) = note.get_mut("over").and_then(Value::as_array_mut) {
+                    over.retain(|who| {
+                        !who.as_str()
+                            .is_some_and(|id| removed.iter().any(|r| r == id))
+                    });
+                }
+            }
+            notes.retain(|n| {
+                n.get("over")
+                    .and_then(Value::as_array)
+                    .is_none_or(|o| !o.is_empty())
+            });
+        }
         changed.push(format!("{} nodes removed", removed.len()));
     }
     let gone_edges = list("remove_edges");
@@ -347,6 +367,24 @@ mod tests {
         );
         assert!(patch(&mut doc, &json!({ "set": { "zz": { "label": "x" } } })).is_err());
         assert!(patch(&mut doc, &json!({})).is_err());
+    }
+
+    #[test]
+    fn a_removed_participant_takes_its_messages_and_notes() {
+        let mut doc = from_text(
+            "mermaid",
+            "sequenceDiagram\n A->>B: hello\n A->>C: hi\n Note over A,B: both\n Note over B: alone",
+        )
+        .unwrap();
+        patch(&mut doc, &json!({ "remove_nodes": ["B"] })).unwrap();
+        let messages = doc["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 1, "{messages:?}");
+        assert_eq!(messages[0]["to"], "C");
+        let notes = doc["notes"].as_array().unwrap();
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert_eq!(notes[0]["over"], json!(["A"]));
+        let text = doc.to_string();
+        assert!(!text.contains("\"B\""), "{text}");
     }
 
     #[test]

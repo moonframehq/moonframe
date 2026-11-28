@@ -12,11 +12,11 @@ use {
     },
     crate::{
         geometry::{Point, Rect, bounds},
-        layout::node_size,
-        model::{Node, NodeKind},
+        layout::{Route, node_size},
+        model::{Diagram, EdgeKind, Node, NodeKind},
     },
     gpui_kit::*,
-    std::collections::HashSet,
+    std::collections::{BTreeMap, HashMap, HashSet},
 };
 
 /// Screen pixels a press must travel to be a drag, not a click.
@@ -29,30 +29,7 @@ const LEAST: f32 = 16.0;
 pub(crate) const PORT_OUT: f32 = 12.0;
 
 pub(crate) enum Gesture {
-    Pan {
-        start: Point,
-        camera: Camera,
-    },
-    Move {
-        ids: Vec<String>,
-        start: Point,
-        delta: Point,
-        guides: Vec<(Point, Point)>,
-        travelled: bool,
-        pressed: String,
-    },
-    Resize {
-        id: String,
-        corner: Corner,
-        start: Point,
-        original: Rect,
-        now: Rect,
-    },
-    Marquee {
-        start: Point,
-        end: Point,
-        add: bool,
-    },
+    // keep-sorted start
     Connect {
         from: String,
         end: Point,
@@ -63,6 +40,34 @@ pub(crate) enum Gesture {
         start: Point,
         end: Point,
     },
+    Marquee {
+        start: Point,
+        end: Point,
+        add: bool,
+    },
+    Move {
+        ids: Vec<String>,
+        start: Point,
+        delta: Point,
+        guides: Vec<(Point, Point)>,
+        travelled: bool,
+        pressed: String,
+        /// A shift-press, which added or removed `pressed` and leaves the
+        /// rest chosen.
+        shift: bool,
+    },
+    Pan {
+        start: Point,
+        camera: Camera,
+    },
+    Resize {
+        id: String,
+        corner: Corner,
+        start: Point,
+        original: Rect,
+        now: Rect,
+    },
+    // keep-sorted end
 }
 
 /// A window position in the view, from its corner.
@@ -88,6 +93,22 @@ fn order(view: &DiagramView) -> Vec<String> {
     view.diagram.nodes.iter().map(|n| n.id.clone()).collect()
 }
 
+/// The routes a press can land on: every edge drawn, so not an invisible
+/// one, which only keeps two nodes near.
+fn pressable(diagram: &Diagram, routes: &BTreeMap<String, Route>) -> HashMap<String, Route> {
+    let hidden: HashSet<&str> = diagram
+        .edges
+        .iter()
+        .filter(|e| e.kind == EdgeKind::Invisible)
+        .map(|e| e.id.as_str())
+        .collect();
+    routes
+        .iter()
+        .filter(|(id, _)| !hidden.contains(id.as_str()))
+        .map(|(id, route)| (id.clone(), route.clone()))
+        .collect()
+}
+
 pub(crate) fn down(
     view: &mut DiagramView,
     event: &MouseDownEvent,
@@ -99,12 +120,7 @@ pub(crate) fn down(
     let screen = local(view, event.position);
     let world = view.camera.to_world(screen);
     let (rects, _) = view.eased();
-    let routes: std::collections::HashMap<_, _> = view
-        .layout
-        .edges
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
+    let routes = pressable(&view.diagram, &view.layout.edges);
     let edit = view.mode == Mode::Edit;
     let handles = if edit && view.tool == Tool::Select {
         alone(view).map(str::to_owned)
@@ -181,6 +197,7 @@ pub(crate) fn down(
                     guides: Vec::new(),
                     travelled: false,
                     pressed: id,
+                    shift,
                 });
             },
             (_, Hit::Edge(id)) => choose(view, id, shift, cx),
@@ -314,9 +331,10 @@ fn released(view: &mut DiagramView, cx: &mut Context<DiagramView>) {
             view.pending.extend(moved.iter().cloned());
             cx.emit(DiagramEvent::Move(moved));
         },
-        Gesture::Move { pressed, .. } => {
-            // A click on one of several chosen nodes chooses it alone.
-            if view.selected.len() > 1 {
+        Gesture::Move { pressed, shift, .. } => {
+            // A click on one of several chosen nodes chooses it alone; a
+            // shift-click has already added or removed it.
+            if !shift && view.selected.len() > 1 {
                 view.select(vec![pressed], cx);
             }
         },
@@ -418,7 +436,7 @@ pub(crate) fn hover(
     }
     let world = view.camera.to_world(local(view, event.position));
     let (rects, _) = view.eased();
-    let routes = std::collections::HashMap::new();
+    let routes = HashMap::new();
     let handles = if view.mode == Mode::Edit && view.tool == Tool::Select {
         alone(view).map(str::to_owned)
     } else {
@@ -568,4 +586,34 @@ pub(crate) fn key(
     }
     cx.stop_propagation();
     cx.notify();
+}
+
+#[cfg(test)]
+mod tests {
+    // Not `super::*`: gpui's `test` would shadow the standard one.
+    use {
+        super::pressable,
+        crate::{
+            layout::Route,
+            model::{Diagram, Edge, EdgeKind},
+        },
+        std::collections::BTreeMap,
+    };
+
+    #[test]
+    fn an_invisible_edge_cannot_be_pressed() {
+        let mut hidden = Edge::new("hidden", "a", "b");
+        hidden.kind = EdgeKind::Invisible;
+        let diagram = Diagram {
+            edges: vec![Edge::new("shown", "a", "b"), hidden],
+            ..Diagram::default()
+        };
+        let routes: BTreeMap<String, Route> = ["shown", "hidden"]
+            .into_iter()
+            .map(|id| (id.to_owned(), Route::default()))
+            .collect();
+        let pressable = pressable(&diagram, &routes);
+        assert!(pressable.contains_key("shown"));
+        assert!(!pressable.contains_key("hidden"));
+    }
 }

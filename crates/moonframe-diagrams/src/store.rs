@@ -23,7 +23,8 @@ pub struct Shown {
     pub title: String,
     /// Who shows it, when the server was told (`--agent`).
     pub agent: Option<String>,
-    /// The app's agent run that showed it, when the app started the agent.
+    /// The run that last wrote it: the app's agent run when the app
+    /// started the agent, else the session of the server that wrote it.
     pub run: Option<String>,
     /// Counts each change, so a view can tell a new version.
     pub revision: u64,
@@ -121,15 +122,20 @@ pub fn path(dir: &Path, id: &str) -> PathBuf {
     dir.join(format!("{id}.json"))
 }
 
-/// Writes `shown` whole, so a reader never sees half a file.
+/// Writes `shown` whole, so a reader never sees half a file. One larger
+/// than readers take ([`MOST_BYTES`]) is refused, the file before it kept.
 pub fn write(dir: &Path, shown: &Shown) -> io::Result<()> {
+    let bytes = serde_json::to_vec(&shown.to_json()).map_err(io::Error::other)?;
+    if bytes.len() as u64 > MOST_BYTES {
+        return Err(io::Error::other(format!(
+            "it is larger than the {} KiB a diagram may take",
+            MOST_BYTES / 1024
+        )));
+    }
     std::fs::create_dir_all(dir)?;
     let target = path(dir, &shown.id);
     let partial = dir.join(format!(".{}.{}.partial", shown.id, std::process::id()));
-    std::fs::write(
-        &partial,
-        serde_json::to_vec_pretty(&shown.to_json()).map_err(io::Error::other)?,
-    )?;
+    std::fs::write(&partial, bytes)?;
     std::fs::rename(&partial, &target)
 }
 

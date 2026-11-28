@@ -14,6 +14,7 @@
 //! `edited`, `opened`, `zoom`, `tool`, the names the Luau `diagram`
 //! component sends, so a mod can use either.
 
+// keep-sorted start
 #[cfg(all(test, feature = "capture"))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod bench;
@@ -23,6 +24,7 @@ mod export;
 mod export_tests;
 mod read;
 mod tell;
+// keep-sorted end
 
 use {
     crate::hosted::{HostView, Messenger, Registry, ViewInit},
@@ -58,6 +60,9 @@ pub(crate) struct DiagramHost {
     messenger: Messenger,
     /// The view's `id`, naming its exported files.
     name: String,
+    /// A fit asked for with a new document, done once that document is
+    /// the view's.
+    fit_waiting: bool,
     _events: Subscription,
     /// Draws again when a background layout lands, for the exports
     /// waiting on it.
@@ -88,6 +93,7 @@ impl DiagramHost {
             exports: 0,
             messenger,
             name: format!("{}-{}", init.owner(), init.id()),
+            fit_waiting: false,
             _events: events,
             _laid_out: laid_out,
         };
@@ -138,6 +144,9 @@ impl HostView for DiagramHost {
             view.set_highlight(props.highlight, cx);
             view.set_scroll_needs_focus(props.scroll_needs_focus);
             match camera.map(|(_, ask)| ask) {
+                // The waiting document is the one to fit, after render
+                // hands it over.
+                Some(read::Camera::Fit) if self.waiting.is_some() => self.fit_waiting = true,
                 Some(read::Camera::Fit) => view.fit(cx),
                 Some(read::Camera::ZoomBy(by)) => view.zoom_by(by, cx),
                 Some(read::Camera::ZoomTo(to)) => view.zoom_to(to, cx),
@@ -151,8 +160,13 @@ impl HostView for DiagramHost {
 impl Render for DiagramHost {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if let Some(diagram) = self.waiting.take() {
-            self.view
-                .update(cx, |view, cx| view.set_diagram(diagram, window, cx));
+            let fit = std::mem::take(&mut self.fit_waiting);
+            self.view.update(cx, |view, cx| {
+                view.set_diagram(diagram, window, cx);
+                if fit {
+                    view.fit(cx);
+                }
+            });
         }
         // An export waits for the layout of the document it was asked
         // with; only the SVG text is made here, the file in the background.

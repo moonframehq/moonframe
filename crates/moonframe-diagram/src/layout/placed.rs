@@ -19,6 +19,10 @@ const FACING: f32 = 120.0;
 const MOST_DETOURS: usize = 6;
 /// The side of a cell of the obstacles' grid.
 const CELL: f32 = 160.0;
+/// The most cells a box is filed under or a leg looks in. A bigger box is
+/// checked by every leg, and a longer leg checks every box, so a huge box
+/// (a mod's `w = 1e9`) costs a list, not a grid of that size.
+const MOST_CELLS: i64 = 1024;
 /// What passing through one box costs: more than any length.
 const BLOCKED: f32 = 10_000.0;
 /// The least length of the last leg, so an arrowhead fits.
@@ -52,12 +56,14 @@ pub(super) fn layout(diagram: &Diagram, measure: &dyn Measure, options: &Options
             Point::new(all.x, all.bottom() + options.rank_gap)
         });
         let mut rect = Rect::new(start.x, start.y, size.w, size.h);
-        while out
+        // Under each box in the way: at most once per box, however tall.
+        while let Some(below) = out
             .nodes
             .values()
-            .any(|r| r.inflate(options.node_gap / 2.0).overlaps(&rect))
+            .map(|r| r.inflate(options.node_gap / 2.0))
+            .find(|r| r.overlaps(&rect))
         {
-            rect.y += size.h + options.node_gap;
+            rect.y = below.bottom();
         }
         out.nodes.insert(node.id.clone(), rect);
     }
@@ -271,29 +277,43 @@ fn facing(points: &[Point], a: &Rect, b: &Rect) -> f32 {
 pub struct Obstacles {
     rects: Vec<Rect>,
     cells: HashMap<(i32, i32), Vec<u32>>,
+    /// Boxes over more than [`MOST_CELLS`] cells, checked by every leg.
+    large: Vec<u32>,
 }
 
 impl Obstacles {
     pub fn new(rects: &[Rect]) -> Self {
         let mut cells: HashMap<(i32, i32), Vec<u32>> = HashMap::new();
+        let mut large = Vec::new();
         for (i, r) in rects.iter().enumerate() {
-            for cell in cells_of(r.x, r.y, r.right(), r.bottom()) {
-                cells.entry(cell).or_default().push(i as u32);
+            match cells_of(r.x, r.y, r.right(), r.bottom()) {
+                Some(under) => {
+                    for cell in under {
+                        cells.entry(cell).or_default().push(i as u32);
+                    }
+                },
+                None => large.push(i as u32),
             }
         }
         Self {
             rects: rects.to_vec(),
             cells,
+            large,
         }
     }
 
     /// The boxes the level or upright leg from `a` to `b` passes through.
     pub fn crossing(&self, a: Point, b: Point) -> Vec<Rect> {
-        let mut seen: Vec<u32> = cells_of(a.x.min(b.x), a.y.min(b.y), a.x.max(b.x), a.y.max(b.y))
-            .filter_map(|cell| self.cells.get(&cell))
-            .flatten()
-            .copied()
-            .collect();
+        let mut seen: Vec<u32> =
+            match cells_of(a.x.min(b.x), a.y.min(b.y), a.x.max(b.x), a.y.max(b.y)) {
+                Some(cells) => cells
+                    .filter_map(|cell| self.cells.get(&cell))
+                    .flatten()
+                    .chain(&self.large)
+                    .copied()
+                    .collect(),
+                None => (0..self.rects.len() as u32).collect(),
+            };
         seen.sort_unstable();
         seen.dedup();
         seen.into_iter()
@@ -303,10 +323,15 @@ impl Obstacles {
     }
 }
 
-fn cells_of(x0: f32, y0: f32, x1: f32, y1: f32) -> impl Iterator<Item = (i32, i32)> {
+/// The cells over a box, or none when it covers more than [`MOST_CELLS`]
+/// (or is no box at all: a negative size, not a number).
+fn cells_of(x0: f32, y0: f32, x1: f32, y1: f32) -> Option<impl Iterator<Item = (i32, i32)>> {
     let cell = |v: f32| (v / CELL).floor() as i32;
     let (cx0, cy0, cx1, cy1) = (cell(x0), cell(y0), cell(x1), cell(y1));
-    (cx0..=cx1).flat_map(move |cx| (cy0..=cy1).map(move |cy| (cx, cy)))
+    let count = (i64::from(cx1) - i64::from(cx0) + 1) * (i64::from(cy1) - i64::from(cy0) + 1);
+    (1..=MOST_CELLS)
+        .contains(&count)
+        .then(|| (cx0..=cx1).flat_map(move |cx| (cy0..=cy1).map(move |cy| (cx, cy))))
 }
 
 #[cfg(test)]
@@ -323,6 +348,45 @@ mod tests {
             Point::new(100.0, 20.0),
             Point::new(200.0, 20.0)
         ]);
+    }
+
+    #[test]
+    fn a_huge_box_is_routed_around_without_a_grid_of_its_size() {
+        let a = Rect::new(-500.0, 0.0, 100.0, 40.0);
+        let b = Rect::new(2e9, 0.0, 100.0, 40.0);
+        let huge = Rect::new(0.0, -1e9, 1e9, 2e9);
+        let obstacles = Obstacles::new(&[a, b, huge]);
+        assert!(obstacles.cells.values().flatten().all(|&i| i != 2));
+        assert_eq!(obstacles.large, vec![2]);
+        // A short leg still meets it, and so does one across the world.
+        assert_eq!(
+            obstacles.crossing(Point::new(-10.0, 0.0), Point::new(10.0, 0.0)),
+            vec![huge]
+        );
+        assert!(
+            obstacles
+                .crossing(Point::new(-400.0, 20.0), Point::new(2e9, 20.0))
+                .contains(&huge)
+        );
+    }
+
+    #[test]
+    fn a_node_beside_a_huge_one_is_placed_at_once() {
+        use crate::model::{Diagram, Edge, Node};
+        // `new` goes beside `a`, where a box 1e9 tall stands.
+        let gap = Options::default().node_gap;
+        let mut a = Node::new("a", "A");
+        a.at = Some(Rect::new(0.0, 0.0, 100.0, 40.0));
+        let mut tall = Node::new("tall", "Tall");
+        tall.at = Some(Rect::new(100.0 + gap * 2.0, 0.0, 100.0, 1e9));
+        let d = Diagram {
+            nodes: vec![a, tall, Node::new("new", "New")],
+            edges: vec![Edge::new("e", "a", "new")],
+            ..Diagram::default()
+        };
+        let out = super::super::layout(&d, &super::super::Approx, &Options::default(), None);
+        assert!(!out.nodes["new"].overlaps(&out.nodes["tall"]));
+        assert!(out.nodes["new"].y >= 1e9);
     }
 
     #[test]
