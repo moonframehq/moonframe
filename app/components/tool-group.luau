@@ -6,6 +6,8 @@
 
 type Props = {
 	group: any,
+	inspect: boolean?,
+	output: any,
 	open: boolean?,
 	msg: any,
 	to: string?,
@@ -58,7 +60,40 @@ local function totals(files: { any }): (number, number)
 	return added, removed
 end
 
-local function call_line(tool: any): any
+local function output_view(tool: any, props: Props): any
+	if not tool.detail then return nil end
+	local running = tool.status == "running" or tool.status == "pending"
+	local fetchable = not running and tool.output_key ~= nil
+	local key = if fetchable then tool.output_key else tool.id
+	local output = props.output
+	local expanded = output and output.key == key and (output.fetch == nil or output.fetch == fetchable)
+	local page = if output then (output.page or 0) else 0
+	local function request(target: number): any
+		return { inspect = key, page = target, fetch = fetchable }
+	end
+	return ui.column {
+		gap = "none",
+		ui.row {
+			class = "tool-group-detail",
+			align = "start",
+			msg = props.inspect and (if expanded then { close_output = true } else request(0)),
+			to = props.to,
+			tooltip = props.inspect and (if expanded then "Collapse output" else "Expand output") or nil,
+			ui.column { grow = true, ui.text {
+				if expanded and fetchable then output.text or tool.detail else tool.detail,
+				size = "small", wrap = true, lines = if expanded then nil else 3,
+			} },
+			props.inspect and ui.icon { name = if expanded then "chevron-up" else "chevron-down", size = "small" },
+		},
+		expanded and fetchable and (page > 0 or output.more) and ui.row {
+			gap = "small",
+			page > 0 and ui.button { "Previous", small = true, msg = request(page - 1), to = props.to },
+			output.more and ui.button { "Next", small = true, msg = request(page + 1), to = props.to },
+		},
+	}
+end
+
+local function call_line(tool: any, props: Props): any
 	local files: { any } = {}
 	for _, file in tool.files or {} do
 		table.insert(files, ui.row {
@@ -85,7 +120,7 @@ local function call_line(tool: any): any
 			},
 			status_icon(tool.status),
 		},
-		tool.detail and ui.text { tool.detail, class = "tool-group-detail", size = "small", wrap = true },
+		output_view(tool, props),
 		#files > 0 and ui.column { gap = "small", table.unpack(files) },
 	}
 end
@@ -97,8 +132,10 @@ return component {
 	description = "A run of an agent's tool calls folded to one line with its status and changed lines; open, each call with its output's end and its files.",
 	when = "Inside a chat with a coding agent, for each `tools` row of `app.chat`'s view (`agent-chat` draws them). For one agent run's whole progress use `agent-run`; for a plain fold use `collapsible`.",
 	props = {
-		["group"] = "a `ToolGroup` from `app.chat`: { key, title, status (\"running\" \"done\" \"failed\"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = \"tool\", id, kind, title, status, detail?, files, steps } or { type = \"thought\", gist, text } } }",
+		["group"] = "a `ToolGroup` from `app.chat`: { key, title, status (\"running\" \"done\" \"failed\"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = \"tool\", id, kind, title, status, detail?, output_key?, files, steps } or { type = \"thought\", gist, text } } }",
 		["open"] = "show its calls",
+		["inspect"] = "enable clicking a detail to send { inspect, page, fetch } or { close_output = true }",
+		["output"] = "the expanded detail { key, page, text?, more? }",
 		["msg"] = "message a click on the header sends (the mod flips `open`)",
 		["to"] = "mod to send it to, if not the drawing one",
 	},
@@ -148,7 +185,7 @@ return component {
 			end
 			for _, item in group.items or {} do
 				if item.type == "tool" then
-					table.insert(items, call_line(item))
+					table.insert(items, call_line(item, props))
 				elseif item.gist and item.gist ~= "" then
 					table.insert(items, ui.row {
 						class = "tool-group-thought",

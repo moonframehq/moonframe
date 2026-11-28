@@ -4890,6 +4890,8 @@ type UseToastsProps = {
 }
 type UseToolGroupProps = {
 	read group: any,
+	read inspect: boolean?,
+	read output: any,
 	read open: boolean?,
 	read msg: any,
 	read to: string?,

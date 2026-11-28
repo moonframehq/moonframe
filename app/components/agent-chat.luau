@@ -36,6 +36,7 @@ type State = {
 	-- A prompt waiting for the chat `start` makes.
 	waiting: { prompt: string, files: { string } }?,
 	folds: { [string]: boolean },
+	output: any,
 	open: string,
 	shown: number,
 	pick: number,
@@ -320,7 +321,13 @@ local function row_element(row: any, state: State, props: Props): any
 		end
 		return ui.column {
 			key = row.key,
-			tool_group { group = row, open = open, msg = { fold = row.key, open = not open } },
+			tool_group {
+				group = row,
+				open = open,
+				inspect = true,
+				output = if state.output and state.output.chat == chat_id(props, state) then state.output else nil,
+				msg = { fold = row.key, open = not open },
+			},
 		}
 	elseif kind == "turn" then
 		return ui.row {
@@ -699,6 +706,27 @@ end
 			table.remove(state.files, msg.unfile)
 		elseif type(msg) == "table" and msg.suggest then
 			sends = send_prompt(props, state, msg.suggest)
+		elseif type(msg) == "table" and msg.close_output then
+			state.output = nil
+		elseif type(msg) == "table" and msg.inspect then
+			local page = msg.page or 0
+			local fetch = msg.fetch == true
+			state.output = { chat = id, key = msg.inspect, page = page, fetch = fetch }
+			if fetch then
+				chat_msg({ tool_output = msg.inspect, page = page, id = { output = msg.inspect, page = page, chat = id } })
+			end
+		elseif type(msg) == "table" and type(msg.reply) == "table" and msg.reply.output then
+			local output = state.output
+			if output and output.chat == msg.reply.chat and output.key == msg.reply.output and output.page == msg.reply.page then
+				if msg.ok then
+					output.text = msg.text
+					output.more = msg.more
+					state.error = nil
+				else
+					state.error = msg.error
+					state.output = nil
+				end
+			end
 		elseif type(msg) == "table" and msg.fold then
 			if msg.open ~= nil then
 				state.folds[msg.fold] = msg.open

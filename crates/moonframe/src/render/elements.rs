@@ -608,7 +608,10 @@ impl<'w> Draw<'w> for Text {
             element = element.whitespace_nowrap().flex_shrink_0();
         }
         if let Some(lines) = self.lines {
-            element = element.min_w_0().line_clamp(usize::from(lines));
+            element = element
+                .min_w_0()
+                .line_clamp(usize::from(lines))
+                .text_ellipsis();
         }
         let text = match look.base.case {
             Some(Case::Upper) => self.text.to_uppercase(),
