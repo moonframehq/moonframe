@@ -1175,6 +1175,10 @@ export type DiagramProps = {
 	links: { any }?,
 	-- Or a document to lay out.
 	document: DiagramDocument?,
+	-- Or Mermaid (flowchart, sequence, state, class, er) or Graphviz DOT
+	-- text, laid out the same way; what does not parse shows why.
+	mermaid: string?,
+	dot: string?,
 	-- "edit" changes it (the default with `shapes`), "view" only looks.
 	mode: ("view" | "edit")?,
 	-- select hand connector, or a node kind to draw.

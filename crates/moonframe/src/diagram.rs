@@ -3,9 +3,9 @@
 //! hears each edit as a message to its `update`, so it keeps the document
 //! and its undo; the view never changes the document by itself.
 //!
-//! Props ([`read`]): `shapes` and `links` (an editor's document, every
-//! shape placed) or `document` (nodes, edges, groups, a sequence's
-//! messages and notes, laid out when unplaced), `mode`, `tool`,
+//! Props ([`read`]): `mermaid` or `dot` text, `shapes` and `links` (an
+//! editor's document, every shape placed) or `document` (nodes, edges,
+//! groups, a sequence's messages and notes, laid out when unplaced), `mode`, `tool`,
 //! `selected`, `highlight`, `camera`, `scroll`. Messages ([`tell`]):
 //! `selected`, `moved`, `resized`, `created`, `connected`, `deleted`,
 //! `edited`, `opened`, `zoom`, `tool`, the names the Luau `diagram`
@@ -19,7 +19,7 @@ mod tell;
 
 use {
     crate::hosted::{HostView, Messenger, Registry, ViewInit},
-    gpui_kit::*,
+    gpui_kit::{component::ActiveTheme as _, *},
     moonframe_core::Data,
     moonframe_diagram::view::{DiagramEvent, DiagramView},
 };
@@ -37,6 +37,8 @@ pub(crate) struct DiagramHost {
     /// A document to show, waiting for a frame with a window to measure
     /// its labels in.
     waiting: Option<moonframe_diagram::Diagram>,
+    /// Why the `mermaid` or `dot` text given is not a diagram.
+    problem: Option<String>,
     /// The last `camera` request acted on, by its `seq`.
     camera_seq: Option<Data>,
     _events: Subscription,
@@ -53,6 +55,7 @@ impl DiagramHost {
             view,
             document: Data::Nil,
             waiting: None,
+            problem: None,
             camera_seq: None,
             _events: events,
         };
@@ -66,7 +69,13 @@ impl HostView for DiagramHost {
         let props = read::props(props);
         if props.document != self.document {
             self.document = props.document.clone();
-            self.waiting = Some(props.diagram);
+            match props.diagram {
+                Ok(diagram) => {
+                    self.problem = None;
+                    self.waiting = Some(diagram);
+                },
+                Err(problem) => self.problem = Some(problem),
+            }
         }
         let camera = props
             .camera
@@ -99,6 +108,24 @@ impl Render for DiagramHost {
             self.view
                 .update(cx, |view, cx| view.set_diagram(diagram, window, cx));
         }
-        div().size_full().child(self.view.clone())
+        let problem = self.problem.clone().map(|problem| {
+            let theme = cx.theme();
+            div()
+                .absolute()
+                .top_2()
+                .left_2()
+                .px_2()
+                .py_1()
+                .rounded_md()
+                .bg(theme.background)
+                .text_color(theme.danger)
+                .text_sm()
+                .child(problem)
+        });
+        div()
+            .relative()
+            .size_full()
+            .child(self.view.clone())
+            .children(problem)
     }
 }

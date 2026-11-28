@@ -18,7 +18,8 @@ pub(super) enum Camera {
 }
 
 pub(super) struct Props {
-    pub diagram: Diagram,
+    /// The diagram, or why its `mermaid` or `dot` text is not one.
+    pub diagram: Result<Diagram, String>,
     /// The props the diagram was read from, to tell when it changed.
     pub document: Data,
     pub mode: Mode,
@@ -124,8 +125,24 @@ fn edge(data: &Data, index: usize) -> Option<Edge> {
     })
 }
 
-/// The document: `shapes` and `links` (the Luau editor's), else `document`.
-fn diagram(props: &Data) -> (Diagram, Data) {
+/// The document: `mermaid` or `dot` text, `shapes` and `links` (the Luau
+/// editor's), else `document`.
+fn diagram(props: &Data) -> (Result<Diagram, String>, Data) {
+    for language in ["mermaid", "dot"] {
+        if let Some(text) = text(props, language) {
+            let parsed = moonframe_diagram::parse::fenced(language, &text)
+                .map(|r| r.map_err(|e| e.to_string()));
+            return (
+                parsed.unwrap_or_else(|| Err(format!("no parser for `{language}`"))),
+                Data::String(text),
+            );
+        }
+    }
+    let (diagram, source) = document(props);
+    (Ok(diagram), source)
+}
+
+fn document(props: &Data) -> (Diagram, Data) {
     if props.get("shapes").is_some() {
         let source = Data::map([
             ("shapes", props.get("shapes").cloned().unwrap_or_default()),
@@ -245,6 +262,20 @@ pub(super) fn props(props: &Data) -> Props {
 mod tests {
     use super::*;
 
+    #[test]
+    fn mermaid_text_is_a_document_and_bad_text_says_why() {
+        let read = props(&Data::map([(
+            "mermaid",
+            Data::String("flowchart LR\n A --> B".into()),
+        )]));
+        assert_eq!(read.diagram.unwrap().nodes.len(), 2);
+        let read = props(&Data::map([(
+            "mermaid",
+            Data::String("pie\n \"a\" : 1".into()),
+        )]));
+        assert!(read.diagram.unwrap_err().contains("pie"));
+    }
+
     fn shape(id: &str, kind: &str) -> Data {
         Data::map([
             ("id", Data::String(id.into())),
@@ -275,10 +306,11 @@ mod tests {
             ("tool", Data::String("ellipse".into())),
         ]);
         let read = props(&given);
-        assert!(read.diagram.placed());
-        assert_eq!(read.diagram.nodes[0].kind, NodeKind::Note);
-        assert_eq!(read.diagram.nodes[1].kind, NodeKind::Circle);
-        assert_eq!(read.diagram.edges[0].kind, EdgeKind::Dashed);
+        let diagram = read.diagram.unwrap();
+        assert!(diagram.placed());
+        assert_eq!(diagram.nodes[0].kind, NodeKind::Note);
+        assert_eq!(diagram.nodes[1].kind, NodeKind::Circle);
+        assert_eq!(diagram.edges[0].kind, EdgeKind::Dashed);
         assert_eq!(read.mode, Mode::Edit);
         assert_eq!(read.tool, Tool::Create(NodeKind::Circle));
     }
@@ -293,8 +325,9 @@ mod tests {
             ),
         ]);
         let read = props(&Data::map([("document", doc)]));
-        assert_eq!(read.diagram.direction, Direction::Right);
-        assert!(!read.diagram.placed());
+        let diagram = read.diagram.unwrap();
+        assert_eq!(diagram.direction, Direction::Right);
+        assert!(!diagram.placed());
         assert_eq!(read.mode, Mode::View);
     }
 }
