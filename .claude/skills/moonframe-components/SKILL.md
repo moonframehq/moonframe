@@ -368,6 +368,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`country-code`](#country-code) | Data | Beside a country's name in lists of locations or settings, in place of a flag (no flag images ship). For any short label use `ui.badge` or `pill`. |
 | [`course-card`](#course-card) | Data | The one course, plan or program a page puts first, with where the reader is and a button to carry on. For a grid of guides use `guide-card`; for a figure with a trend use `stat-tile`; for a titled box of anything use `card`. |
 | [`date-tile`](#date-tile) | Data | Beside dated items in a list (deadlines, calls, distributions, events) where the date leads. For a date inside a line of text use plain text; for picking a day use `day-strip` or `month-grid`. |
+| [`diagram`](#diagram) | Data | An editable diagram the user draws: flows, architecture sketches, mind maps. The parent keeps `shapes`, `links` and `selected` and applies the edits it is sent. For a fixed system diagram on a grid use `flow-diagram`; for dependency arrows between dated bars use `gantt`. |
 | [`document-card`](#document-card) | Data | A home screen or a folder of notes shown as a grid. For a list beside an editor use `document-row`; for attached files use `file-card`; for reading material with progress use `guide-card`. |
 | [`dot-chart`](#dot-chart) | Data | A daily or weekly count compared with the period before (signups, orders), where the squares' rhythm reads better than smooth bars. For stacked counts by kind use `bar-chart`; for a balance against a floor use `forecast-chart`; for a trend line use `ui.line`. |
 | [`file-card`](#file-card) | Data | Attachments on a task, a comment or a message, in a grid of tiles or a list of rows, while they upload and after. For the area files are dropped on use `dropzone`; for a file in a tree use `tree` with `file-icon`; for a picture to look at closely use `image-viewer`. |
@@ -1730,6 +1731,31 @@ local date_tile = use "date-tile"
 
 date_tile { day = "9", month = "Nov", tone = "danger" }
 ```
+
+#### `diagram`
+
+**Diagram.** A freeform canvas of boxes, text and sticky notes wired by connectors: select, drag, resize, connect, pan and zoom; the document stays the parent's.
+
+**When:** An editable diagram the user draws: flows, architecture sketches, mind maps. The parent keeps `shapes`, `links` and `selected` and applies the edits it is sent. For a fixed system diagram on a grid use `flow-diagram`; for dependency arrows between dated bars use `gantt`.
+
+| Prop | Meaning |
+| --- | --- |
+| `id` | the instance's id (its pan and zoom are kept under it) |
+| `links` | list of { id, from, to (shape ids), label?, dashed? }: drawn as elbows that follow the shapes |
+| `selected` | ids of the chosen shapes and links |
+| `shapes` | list of { id, kind (box pill ellipse text sticky), x, y, w, h (world pixels), label?, fill? (a color) }, bottom first |
+| `tool` | select (default), hand, box, pill, ellipse, text, sticky or connector |
+| `version` | a number the parent bumps on each change to the document |
+
+**Styles:** `.diagram` `.diagram-box` `.diagram-canvas` `.diagram-ellipse` `.diagram-handle` `.diagram-label` `.diagram-link-label` `.diagram-link-label:selected` `.diagram-link-pad` `.diagram-link-pad:hover` `.diagram-link-pad:selected` `.diagram-marquee` `.diagram-pill` `.diagram-port` `.diagram-port:hover` `.diagram-selection` `.diagram-shape` `.diagram-sticky` `.diagram-text` `.diagram-text-label`
+
+```lua
+local diagram = use "diagram"
+
+diagram { id = "example", links = { { from = "a", id = "l1", to = "b" }, { from = "b", id = "l2", label = "yes", to = "c" } }, selected = { "b" }, shapes = { { fill = "#e2e8f0", h = 56, id = "a", kind = "box", label = "Cart", w = 130, x = 20, y = 40 }, { fill = "#ddd6fe", h = 56, id = "b", kind = "pill", label = "Signed in?", w = 140, x = 210, y = 40 }, { fill = "#bbf7d0", h = 60, id = "c", kind = "ellipse", label = "Receipt", w = 140, x = 210, y = 160 } } }
+```
+
+A whole mod using it, with state: `app/components/demos/diagram.luau`.
 
 #### `document-card`
 
