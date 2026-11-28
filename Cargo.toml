@@ -12,6 +12,7 @@ members = [
   "crates/moonframe-chat",
   "crates/moonframe-chat-view",
   "crates/moonframe-core",
+  "crates/moonframe-diagram",
   "crates/moonframe-docs",
   "crates/moonframe-documents",
   "crates/moonframe-forge",
@@ -116,6 +117,7 @@ moonframe-acp       = { path = "crates/moonframe-acp" }
 moonframe-chat      = { path = "crates/moonframe-chat" }
 moonframe-chat-view = { path = "crates/moonframe-chat-view" }
 moonframe-core      = { path = "crates/moonframe-core" }
+moonframe-diagram   = { default-features = false, path = "crates/moonframe-diagram" }
 moonframe-docs      = { path = "crates/moonframe-docs" }
 moonframe-documents = { path = "crates/moonframe-documents" }
 moonframe-forge     = { path = "crates/moonframe-forge" }

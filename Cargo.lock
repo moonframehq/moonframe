@@ -6593,6 +6593,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "moonframe-diagram"
+version = "1.8.0"
+dependencies = [
+ "gpui-kit",
+]
+
+[[package]]
 name = "moonframe-docs"
 version = "1.8.0"
 dependencies = [
