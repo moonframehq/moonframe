@@ -1,0 +1,27 @@
+{
+  "available": true,
+  "agents": "/Users/me/.cache/moonframe/diagrams",
+  "project": "/Users/me/code/shop/.moonframe/diagrams",
+  "diagrams": [
+    {
+      "key": "agent/plan",
+      "id": "plan",
+      "title": "What I am changing",
+      "from": "agent",
+      "path": "/Users/me/.cache/moonframe/diagrams/plan.json",
+      "revision": 2,
+      "updated": 1764316800,
+      "agent": "claude",
+      "language": "mermaid",
+      "text": "flowchart LR\n parser --> layout --> view",
+      "highlight": ["layout"],
+      "note": "working here",
+      "document": {
+        "kind": "flow",
+        "direction": "right",
+        "nodes": [{ "id": "parser", "label": "parser", "kind": "box" }, { "id": "layout", "label": "layout", "kind": "box" }],
+        "edges": [{ "id": "e0", "from": "parser", "to": "layout", "kind": "solid", "start": "none", "end": "arrow" }]
+      }
+    }
+  ]
+}

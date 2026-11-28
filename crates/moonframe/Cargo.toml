@@ -55,7 +55,7 @@ default = [
 crash = []
 # `ui.diagram`: diagrams drawn, laid out and edited by moonframe-diagram.
 # Off by default; the starter turns it on.
-diagram = ["dep:moonframe-diagram", "moonframe-diagram/view"]
+diagram = ["dep:moonframe-diagram", "dep:moonframe-diagrams", "moonframe-diagram/view"]
 # `app.displays`, and a mod's window placed with `display` and `fullscreen`.
 # Off by default; the starter turns it on.
 displays = []
@@ -210,6 +210,7 @@ moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
 moonframe-diagram             = { optional = true, workspace = true }
+moonframe-diagrams            = { optional = true, workspace = true }
 moonframe-docs                = { optional = true, workspace = true }
 moonframe-documents           = { optional = true, workspace = true }
 moonframe-forge               = { optional = true, workspace = true }

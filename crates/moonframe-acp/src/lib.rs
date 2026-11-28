@@ -82,6 +82,25 @@ const QUIT_WAIT: Duration = Duration::from_millis(1500);
 const MAX_TEXT: usize = 64 << 10;
 
 /// Makes the provider, for the app's registry.
+/// The MCP servers every agent session is offered, as ACP's `session/new`
+/// lists them (`{ name, command, args, env }`): the app's own tools for
+/// its agents, such as `moonframe mcp diagrams`.
+static MCP_SERVERS: Mutex<Vec<Value>> = Mutex::new(Vec::new());
+
+/// Offers `servers` to every session started from now on.
+pub fn offer_mcp_servers(servers: Vec<Value>) {
+    if let Ok(mut offered) = MCP_SERVERS.lock() {
+        *offered = servers;
+    }
+}
+
+pub(crate) fn mcp_servers() -> Vec<Value> {
+    MCP_SERVERS
+        .lock()
+        .map(|offered| offered.clone())
+        .unwrap_or_default()
+}
+
 pub fn native() -> Box<dyn Native> {
     Box::new(Acp::default())
 }
