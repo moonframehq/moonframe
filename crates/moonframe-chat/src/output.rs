@@ -22,11 +22,13 @@ pub(crate) struct Revisions {
 }
 
 impl Revisions {
+    #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) fn on_snapshot(&mut self) {
         self.epoch = self.epoch.wrapping_add(1);
         self.entries.clear();
     }
 
+    #[cfg_attr(not(unix), allow(dead_code))]
     pub(crate) fn on_change(&mut self, change: &Change) {
         match change {
             Change::Replace { entry } => {
