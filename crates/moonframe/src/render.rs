@@ -7,6 +7,7 @@
 //! Each element's look is, lowest first: its default here, the stylesheet's
 //! rules (`Stylesheet::resolve`), and its own keys such as `padding`.
 
+mod anchor;
 mod browser;
 pub(crate) mod cached;
 mod carry;
@@ -334,6 +335,9 @@ pub(crate) struct Painter<'w, 'm> {
     /// A pane or keyed child drawn so far is growing or shrinking: what
     /// moves the rows after it, unlike a spinner or an easing color.
     resizing: bool,
+    /// The scrolling columns being drawn that keep their first keyed child
+    /// in place, innermost last.
+    anchoring: Vec<Rc<anchor::Anchoring>>,
 }
 
 /// A list's rows a mod should build, which the app asks the workspace for
@@ -385,6 +389,7 @@ impl<'w, 'm> Painter<'w, 'm> {
             outside: Vec::new(),
             reveal: Vec::new(),
             resizing: false,
+            anchoring: Vec::new(),
         }
     }
 

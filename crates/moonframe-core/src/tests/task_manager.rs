@@ -530,6 +530,39 @@ return mod {{
 }
 
 #[test]
+fn a_tables_rows_are_keyed_by_their_ids_when_they_can_be() {
+    let (_dir, workspace) = fixture(
+        r#"
+local table_view = use "table"
+return mod {
+  view = function()
+    return table_view { height = 300, columns = { { key = "a" } }, rows = {
+      { id = "acme-1", a = "a" }, { id = 7, a = "b" }, { id = "acme-1", a = "c" },
+      { id = "two words", a = "d" }, { id = 1.5, a = "e" }, { a = "f" },
+    } }
+  end,
+}"#,
+        &["table"],
+    );
+    let Node::Stack(table) = tree(&workspace) else {
+        panic!("no table")
+    };
+    let Node::Stack(body) = &table.children[1] else {
+        panic!("no body")
+    };
+    let keys: Vec<Option<&str>> = body
+        .children
+        .iter()
+        .map(|row| match row {
+            Node::Stack(row) => row.key.as_deref(),
+            _ => panic!("not a row"),
+        })
+        .collect();
+    // A repeated id keys only its first row; one that can't be a key, none.
+    assert_eq!(keys, [Some("acme-1"), Some("7"), None, None, None, None]);
+}
+
+#[test]
 fn a_long_tables_list_takes_its_scroll_to() {
     let source = |scroll_to: &str| {
         format!(
