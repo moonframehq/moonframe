@@ -7,7 +7,7 @@ use {
     super::{Bands, Chain, Item, Turn},
     crate::{
         geometry::Point,
-        layout::{Layout, Route, placed},
+        layout::{Approx, Layout, Measure as _, Route, placed},
         model::{Diagram, NodeKind},
     },
     std::collections::HashMap,
@@ -17,6 +17,8 @@ use {
 const TRACK_STEP: f32 = 6.0;
 /// How far off its line a stand-in may be and still be put on it.
 const STRAIGHTEN: f32 = 8.0;
+/// A label's text size, for how much room it needs.
+const LABEL_SIZE: f32 = 12.0;
 /// The least length of the leg into a node that holds the label.
 const LABEL_LEG: f32 = 24.0;
 /// How far a self loop stands out from its node.
@@ -163,7 +165,7 @@ pub(super) fn edges(
         } else {
             let points = simplify(points);
             Route {
-                label: label_place(&points, chain.reversed),
+                label: label_place(&points, chain.reversed, edge.label.as_deref()),
                 points,
             }
         };
@@ -190,13 +192,17 @@ pub(super) fn edges(
 /// its source, for an edge drawn against the ranks), which is in that
 /// node's own column, so labels of edges bending in one gap don't meet;
 /// the middle of the route when that leg is too short.
-fn label_place(points: &[Point], reversed: bool) -> Option<Point> {
+fn label_place(points: &[Point], reversed: bool, label: Option<&str>) -> Option<Point> {
     let leg = if reversed {
         points.get(..2)
     } else {
         points.get(points.len().saturating_sub(2)..)
     };
+    // A label along a level leg needs the leg longer than itself; across
+    // an upright one, only room for its height.
+    let wide = label.map_or(0.0, |l| Approx.width(l, LABEL_SIZE)) + 16.0;
     match leg {
+        Some([a, b]) if (a.y - b.y).abs() < 0.5 && a.distance(*b) < wide => Route::middle(points),
         Some([a, b]) if a.distance(*b) >= LABEL_LEG => {
             Some(Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0))
         },

@@ -1187,7 +1187,7 @@ export type DiagramProps = {
 	-- Nodes and edges drawn in the accent.
 	highlight: { string }?,
 	-- Asked again with each new `seq`.
-	camera: { fit: boolean?, zoom: number?, zoom_by: number?, seq: number? }?,
+	camera: { fit: boolean?, zoom: number?, zoom_by: number?, seq: any }?,
 	-- "focus": scrolling pans only after a click inside (in a page that
 	-- scrolls, as a chat does).
 	scroll: "focus"?,
@@ -2329,6 +2329,7 @@ export type App = {
 	-- `agents`, ...), nil until it first publishes.
 	-- generated: provider fields (just provider-types) start
 	agents: ProviderAgentsPublished?,
+	diagrams: ProviderDiagramsPublished?,
 	system: ProviderSystemPublished?,
 	t3: ProviderT3Published?,
 	-- generated: provider fields end
@@ -2568,6 +2569,40 @@ type ProviderAgentsPublished = {
 	agents: { ProviderAgentsAgent },
 	count: number,
 }
+type ProviderDiagramsShown = {
+	-- Unique in the list: `agent/<file name>` or `project/<file name>`.
+	key: string,
+	id: string,
+	title: string,
+	from: "agent" | "project",
+	path: string,
+	-- Grows with each change.
+	revision: number,
+	-- Unix seconds.
+	updated: number,
+	-- What `ui.diagram`'s `document` takes; nil when it doesn't parse
+	-- (`error`) or past the publish's budget (`truncated`).
+	document: any?,
+	-- Node and edge ids the agent points at, and what it says of them.
+	highlight: { string },
+	note: string?,
+	agent: string?,
+	-- The text it came from, `mermaid` or `dot`.
+	language: string?,
+	text: string?,
+	error: string?,
+	truncated: boolean?,
+}
+type ProviderDiagramsPublished = {
+	available: boolean,
+	-- The folder agents' diagrams are written to.
+	agents: string,
+	-- The project's `.moonframe/diagrams`, nil without a project.
+	project: string?,
+	-- Newest first.
+	diagrams: { ProviderDiagramsShown },
+}
+type ProviderDiagramsMessage = { close: string }
 type ProviderSystemPublished = {
 	-- Fractions from 0 to 1.
 	cpu: number,
@@ -2624,7 +2659,8 @@ type ProviderT3Message = "refresh" | "connect" | ProviderT3Write
 -- is `{ to = "provider:desk", msg = { watch = id } }`, its `msg` typed
 -- by the provider's `Message` where it declares one.
 declare send:
-	((to: "provider:system") -> (msg: ProviderSystemMessage) -> Send)
+	((to: "provider:diagrams") -> (msg: ProviderDiagramsMessage) -> Send)
+	& ((to: "provider:system") -> (msg: ProviderSystemMessage) -> Send)
 	& ((to: "provider:t3") -> (msg: ProviderT3Message) -> Send)
 	& ((to: string) -> (msg: Data) -> Send)
 -- generated: provider types end
