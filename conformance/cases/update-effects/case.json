@@ -1,0 +1,89 @@
+{
+  "about": "init's sends, update changing state in place, replacing it, and sending with send and a plain table.",
+  "steps": [
+    {
+      "expect": {
+        "counter": {
+          "children": [
+            {
+              "text": "0",
+              "type": "text"
+            },
+            {
+              "label": "Add",
+              "msg": "add",
+              "type": "button"
+            }
+          ],
+          "type": "row"
+        },
+        "status": {
+          "text": "init:0",
+          "tone": "muted",
+          "type": "text"
+        }
+      }
+    },
+    {
+      "send": "add",
+      "to": "counter"
+    },
+    {
+      "send": "add",
+      "to": "counter"
+    },
+    {
+      "send": "tell",
+      "to": "counter"
+    },
+    {
+      "expect": {
+        "counter": {
+          "children": [
+            {
+              "text": "2",
+              "type": "text"
+            },
+            {
+              "label": "Add",
+              "msg": "add",
+              "type": "button"
+            }
+          ],
+          "type": "row"
+        },
+        "status": {
+          "text": "init:0,update:2,ping",
+          "tone": "muted",
+          "type": "text"
+        }
+      }
+    },
+    {
+      "send": "reset",
+      "to": "counter"
+    },
+    {
+      "send": "add",
+      "to": "counter"
+    },
+    {
+      "expect": {
+        "counter": {
+          "children": [
+            {
+              "text": "101",
+              "type": "text"
+            },
+            {
+              "label": "Add",
+              "msg": "add",
+              "type": "button"
+            }
+          ],
+          "type": "row"
+        }
+      }
+    }
+  ]
+}

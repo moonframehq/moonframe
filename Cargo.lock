@@ -6584,6 +6584,7 @@ dependencies = [
  "icu_locale_core",
  "intl-memoizer",
  "mlua",
+ "serde_json",
  "sys-locale",
  "tempfile",
  "thiserror 2.0.21",

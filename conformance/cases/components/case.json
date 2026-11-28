@@ -1,0 +1,55 @@
+{
+  "about": "component { build } and use; a stylesheet and a mod's styles both hosts read without a problem.",
+  "steps": [
+    {
+      "expect": {
+        "shell": {
+          "children": [
+            {
+              "children": [
+                {
+                  "class": "stat-label",
+                  "size": "small",
+                  "text": "Open",
+                  "tone": "muted",
+                  "type": "text"
+                },
+                {
+                  "size": "title",
+                  "text": "12",
+                  "type": "text",
+                  "weight": "bold"
+                }
+              ],
+              "class": "stat",
+              "gap": "small",
+              "type": "column"
+            },
+            {
+              "children": [
+                {
+                  "class": "stat-label",
+                  "size": "small",
+                  "text": "Merged",
+                  "tone": "muted",
+                  "type": "text"
+                },
+                {
+                  "size": "title",
+                  "text": "3",
+                  "type": "text",
+                  "weight": "bold"
+                }
+              ],
+              "class": "stat",
+              "gap": "small",
+              "type": "column"
+            }
+          ],
+          "gap": "large",
+          "type": "row"
+        }
+      }
+    }
+  ]
+}
