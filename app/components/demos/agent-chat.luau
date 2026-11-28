@@ -185,7 +185,11 @@ return mod {
 				step(state)
 			end
 		elseif msg == "ask" then
-			state.permissions = { question() }
+			-- Between turns only: its answer row would sit where `step`
+			-- expects the turn's own rows.
+			if state.status ~= "working" then
+				state.permissions = { question() }
+			end
 		elseif type(msg) ~= "table" then
 			return
 		elseif msg.prompt then
@@ -263,7 +267,7 @@ return mod {
 			ui.row {
 				gap = "small",
 				ui.button { "Next step", icon = "play", small = true, msg = "next", disabled = not working or #state.permissions > 0 },
-				ui.button { "Ask a question", icon = "circle-help", small = true, variant = "ghost", msg = "ask", disabled = #state.permissions > 0 },
+				ui.button { "Ask a question", icon = "circle-help", small = true, variant = "ghost", msg = "ask", disabled = working or #state.permissions > 0 },
 				ui.text { if working then "The agent is working: step it on, or answer it." else "Send a prompt, or try / for commands.", size = "small", tone = "muted" },
 			},
 			ui.column {
