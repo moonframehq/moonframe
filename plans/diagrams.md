@@ -401,18 +401,24 @@ As built:
   groups, a sequence's lifelines and notes, the highlight), in
   `export::Colors`; `view::export_colors` reads them from the theme, so
   an export matches the app, light or dark. Font families fall back to a
-  sans serif any renderer knows.
+  sans serif any renderer knows. Labels wrap and shorten to their boxes
+  as the view's do (`view::export_svg` measures them in the theme's
+  font), and a fill of a node's own gets light or dark text by its
+  lightness.
 - `ui.diagram { export = { format = "png" | "svg", seq } }` writes the
   diagram to the app's share folder (where `app:share` may take it, and
-  nowhere a mod names) and sends `{ exported = { path, format } }`; PNG
-  is the SVG rasterized at 2x by GPUI's SVG renderer. ⌘C in the view
+  nowhere a mod names) and sends `{ exported = { path, format } }`, or
+  `{ exported = { error, format } }`; PNG is the SVG rasterized at 2x by
+  GPUI's SVG renderer. An export waits for a big document's background
+  layout, and the file is drawn and written off the UI thread. ⌘C in the view
   copies it as Mermaid: the user's action, as a mod may not write the
   clipboard by itself.
 - Only strict `#rgb`/`#rrggbb` fills are taken (`model::is_hex_color`),
   and every SVG attribute is escaped, so text from an agent can't inject
   markup into an exported SVG.
 - `examples/diagram`: Document > Export PNG…, Export SVG… (handed to the
-  system's share menu).
+  system's share menu) export the diagram on show, the editor's or an
+  agent's; a failure shows in the top bar.
 - Light and dark: every PR's screenshots show both.
 - A parser fix found on the way: a node named before a subgraph and
   listed inside it joins it, as Mermaid has it.

@@ -28,8 +28,12 @@ type State = {
 	-- The agent's (or project's) diagram on show instead of the document,
 	-- by its key in `app.diagrams`.
 	live: string?,
-	-- An export asked of the view, each new `seq` once.
+	-- An export asked of the diagram on show, each new `seq` once, until
+	-- its answer comes back or another diagram is shown.
 	export: { [string]: any }?,
+	exports: number,
+	-- Why the last export failed, shown in the top bar until dismissed.
+	export_error: string?,
 	undo: { Doc },
 	redo: { Doc },
 }
@@ -293,7 +297,7 @@ local function apply(state: State, msg: any): boolean
 	return true
 end
 
-local function topbar(state: State): any
+local function topbar(state: State, problem: string?): any
 	return ui.row {
 		class = "editor-topbar",
 		drag = true,
@@ -302,6 +306,8 @@ local function topbar(state: State): any
 		button_group { small = true, selected = state.tool, event = "tool", buttons = TOOLS },
 		ui.spacer(),
 		ui.text { state.title, weight = "medium" },
+		problem and ui.text { `Export failed: {problem}`, tone = "danger", size = "small", truncate = true },
+		problem and icon_button { icon = "x", tooltip = "Dismiss", msg = { export_error = false }, size = "small" },
 		ui.spacer(),
 		icon_button { icon = "undo-2", tooltip = "Undo (⌘Z)", msg = "undo", size = "small", disabled = #state.undo == 0 },
 		icon_button { icon = "redo-2", tooltip = "Redo (⇧⌘Z)", msg = "redo", size = "small", disabled = #state.redo == 0 },
@@ -395,12 +401,18 @@ local function live(state: State, app: any): any
 end
 
 -- An agent's diagram: what it says over it, then the diagram, read-only.
-local function live_view(d: any, app: any): any
+local function live_view(state: State, d: any, app: any): any
 	local body = if d.error
 		then ui.text { `Not drawn: {d.error}`, tone = "danger" }
 		elseif not d.document then ui.text { "Too big to share: open its file.", tone = "muted" }
 		elseif not app.capabilities.diagram then ui.text { "Drawing it needs the `diagram` feature.", tone = "muted" }
-		else ui.diagram { id = "live", document = d.document, highlight = d.highlight, camera = { fit = true, seq = d.key } }
+		else ui.diagram {
+			id = "live",
+			document = d.document,
+			highlight = d.highlight,
+			camera = { fit = true, seq = d.key },
+			export = state.export,
+		}
 	return ui.column {
 		grow = true,
 		gap = "none",
@@ -448,6 +460,8 @@ return mod {
 		state.camera = nil
 		state.live = nil
 		state.export = nil
+		state.exports = 0
+		state.export_error = nil
 		-- History lives for the session only.
 		state.undo, state.redo = {}, {}
 		return state
@@ -504,17 +518,28 @@ return mod {
 		elseif msg.selected then
 			state.selected = msg.selected
 		elseif msg.export then
-			local seq = if state.export then (state.export.seq or 0) + 1 else 1
-			state.export = { format = msg.export, seq = seq }
+			-- Asked of the diagram on show: the editor's or a live one.
+			state.exports += 1
+			state.export = { format = msg.export, seq = state.exports }
+			state.export_error = nil
 		elseif msg.exported then
-			-- The file is in the app's share folder: offer it to the system.
-			if msg.exported.path then
+			-- Answered: no view asks again when it is drawn anew.
+			state.export = nil
+			if msg.exported.error then
+				state.export_error = msg.exported.error
+			elseif msg.exported.path then
+				-- The file is in the app's share folder: offer it to the system.
 				return state, { { to = "app:share", msg = { files = { msg.exported.path } } } }
 			end
+		elseif msg.export_error == false then
+			state.export_error = nil
+			state.export = nil
 		elseif msg.live ~= nil then
 			state.live = msg.live or nil
+			state.export = nil
 		elseif msg.close_live then
 			state.live = nil
+			state.export = nil
 			return state, { { to = "provider:diagrams", msg = { close = msg.close_live } } }
 		elseif msg.pick then
 			state.selected = { msg.pick }
@@ -539,10 +564,15 @@ return mod {
 	end,
 
 	view = function(state: State, app)
+		-- Only the app's own view exports; a live diagram it cannot draw
+		-- (or a build without it) never answers, so say so here.
+		local shown = live(state, app)
+		local drawn = app.capabilities.diagram and (not shown or (shown.document and not shown.error))
+		local problem = state.export_error or (state.export and not drawn and "this diagram is not drawn by the app") or nil
 		return ui.column {
 			grow = true,
 			gap = "none",
-			topbar(state),
+			topbar(state, problem),
 			ui.row {
 				grow = true,
 				gap = "none",
@@ -553,7 +583,7 @@ return mod {
 					gap = "none",
 					-- An agent's diagram, read-only, while one is picked.
 					if live(state, app)
-						then live_view(live(state, app), app)
+						then live_view(state, live(state, app), app)
 					-- The Rust view where the build has it, else the Luau canvas:
 					-- the same props, the same messages back.
 					elseif app.capabilities.diagram
