@@ -417,3 +417,56 @@ fn class_and_er_diagrams_take_their_direction() {
     let d = mermaid::parse("erDiagram\n  direction RL\n  A ||--o{ B : has").unwrap();
     assert_eq!(d.direction, Direction::Left);
 }
+
+#[test]
+fn states_named_start_or_end_stay_states() {
+    let d = mermaid::parse("stateDiagram-v2\n[*] --> start\nstart --> end\nend --> [*]").unwrap();
+    let ids: Vec<_> = d.nodes.iter().map(|n| n.id.as_str()).collect();
+    assert_eq!(ids.len(), 4, "{ids:?}");
+    assert!(d.edges.iter().all(|e| e.from != e.to), "{:?}", d.edges);
+    assert!(
+        d.nodes.iter().all(|n| !n.id.starts_with('\u{0}')),
+        "{ids:?}"
+    );
+}
+
+#[test]
+fn state_braces_open_and_close_in_pairs() {
+    let err = mermaid::parse("stateDiagram-v2\nstate A {\nB --> C").unwrap_err();
+    assert_eq!(err.line, 2);
+    let err = mermaid::parse("stateDiagram-v2\nB --> C\n}").unwrap_err();
+    assert_eq!(err.line, 3);
+}
+
+#[test]
+fn a_dot_subgraph_names_each_node_once() {
+    let d = dot::parse("digraph { { a -> b; b -> c; } -> d; }").unwrap();
+    let to_d = d.edges.iter().filter(|e| e.to == "d").count();
+    assert_eq!(to_d, 3);
+}
+
+#[test]
+fn labels_read_back_as_written() {
+    for text in [
+        "List<T>",
+        "a #quot; b",
+        "#35;lt;",
+        "**bold**",
+        "a\\nb",
+        "`tick`",
+        "x > y & \"z\"",
+    ] {
+        let mut d = Diagram::default();
+        let mut n = crate::model::Node::new("a", text);
+        n.kind = NodeKind::Box;
+        d.nodes.push(n);
+        let written = write::mermaid(&d);
+        let again = mermaid::parse(&written).unwrap_or_else(|e| panic!("{e}\n{written}"));
+        assert_eq!(again.nodes[0].label, text, "{written}");
+    }
+    // An entity read from text stays itself when written again.
+    let d = mermaid::parse("flowchart TD\nA[\"List#lt;T#gt;\"]").unwrap();
+    assert_eq!(d.nodes[0].label, "List<T>");
+    let again = mermaid::parse(&write::mermaid(&d)).unwrap();
+    assert_eq!(again.nodes[0].label, "List<T>");
+}
