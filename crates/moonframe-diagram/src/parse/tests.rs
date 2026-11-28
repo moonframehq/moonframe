@@ -114,7 +114,10 @@ fn fixtures_parse_as_their_snapshots_and_lay_out() {
         if std::env::var_os("UPDATE_SNAPSHOTS").is_some() {
             std::fs::write(&snap, &got).unwrap();
         }
-        let want = std::fs::read_to_string(&snap).unwrap_or_default();
+        // A Windows checkout may turn the snapshot's line ends into CRLF.
+        let want = std::fs::read_to_string(&snap)
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
         assert_eq!(got, want, "{} differs from its snapshot", path.display());
         if let Ok(d) = parsed {
             let out = layout(&d, &Approx, &Options::default(), None);
