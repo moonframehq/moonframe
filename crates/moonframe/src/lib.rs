@@ -44,6 +44,8 @@ mod color;
 mod crash;
 #[cfg(feature = "studio")]
 mod demos;
+#[cfg(feature = "diagram")]
+mod diagram;
 mod dock;
 mod doctor;
 #[cfg(all(test, unix, feature = "markdown"))]

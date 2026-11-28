@@ -31,6 +31,7 @@ default = [
   "browser",
   "chat",
   "crash",
+  "diagram",
   "displays",
   "dock",
   "docs",
@@ -74,6 +75,7 @@ browser   = ["moonframe/browser"]
 capture   = ["moonframe/capture"]
 chat      = ["moonframe/chat"]
 crash     = ["moonframe/crash"]
+diagram   = ["moonframe/diagram"]
 displays  = ["moonframe/displays"]
 dock      = ["moonframe/dock"]
 docs      = ["moonframe/docs"]

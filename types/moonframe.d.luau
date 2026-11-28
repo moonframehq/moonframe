@@ -1115,6 +1115,81 @@ export type DocumentProps = {
 -- `id`, so it lives across reloads and while hidden, and hands it `props`,
 -- telling it when they change. What the user does in it comes back to this
 -- mod's `update` as messages the view chooses.
+-- One node of a `ui.diagram` document. With `x`, `y`, `w` and `h` it stays
+-- where it is; without, the diagram is laid out.
+export type DiagramNode = {
+	id: string,
+	label: string?,
+	sublabel: string?,
+	-- box rounded pill diamond circle (ellipse) cylinder note (sticky) text
+	kind: string?,
+	tone: Tone?,
+	-- `#rrggbb`, over the card color.
+	fill: string?,
+	group: string?,
+	x: number?,
+	y: number?,
+	w: number?,
+	h: number?,
+}
+
+-- One edge of a `ui.diagram` document.
+export type DiagramEdge = {
+	id: string?,
+	from: string,
+	to: string,
+	label: string?,
+	kind: ("solid" | "dashed" | "dotted" | "thick" | "invisible")?,
+	dashed: boolean?,
+	-- none arrow open circle cross triangle diamond hollow-diamond
+	start: string?,
+	["end"]: string?,
+	tone: Tone?,
+}
+
+-- A diagram the view lays out: a flow of nodes, edges and groups, or a
+-- sequence of messages between participants (its `nodes`).
+export type DiagramDocument = {
+	kind: ("flow" | "sequence")?,
+	direction: ("down" | "up" | "right" | "left")?,
+	-- `DiagramNode`s and `DiagramEdge`s.
+	nodes: { any }?,
+	edges: { any }?,
+	groups: { { id: string, label: string?, parent: string?, tone: Tone? } }?,
+	messages: { { from: string, to: string, label: string?, kind: ("sync" | "async" | "reply")? } }?,
+	notes: { { over: { string }, text: string, before: number? } }?,
+}
+
+-- `ui.diagram` (the `diagram` feature): a diagram drawn, laid out and
+-- edited in Rust. The mod keeps the document and applies what it hears:
+-- `selected`, `moved`, `resized`, `created`, `connected`, `deleted`,
+-- `edited`, `opened`, `zoom`, `tool`.
+export type DiagramProps = {
+	id: string?,
+	class: Class?,
+	style: Style?,
+	-- The Luau `diagram` component's document: every shape placed. Each
+	-- is a `DiagramNode` and a `DiagramEdge` (typed `any`: a mod's own
+	-- record types would not pass, as Luau's lists are invariant).
+	shapes: { any }?,
+	links: { any }?,
+	-- Or a document to lay out.
+	document: DiagramDocument?,
+	-- "edit" changes it (the default with `shapes`), "view" only looks.
+	mode: ("view" | "edit")?,
+	-- select hand connector, or a node kind to draw.
+	tool: string?,
+	selected: { string }?,
+	-- Nodes and edges drawn in the accent.
+	highlight: { string }?,
+	-- Asked again with each new `seq`.
+	camera: { fit: boolean?, zoom: number?, zoom_by: number?, seq: number? }?,
+	-- "focus": scrolling pans only after a click inside (in a page that
+	-- scrolls, as a chat does).
+	scroll: "focus"?,
+	[string]: any,
+}
+
 export type ViewProps = {
 	class: Class?,
 	style: Style?,
@@ -1509,6 +1584,7 @@ declare ui: {
 	document: (props: string | DocumentProps) -> Element,
 	video: (props: string | VideoProps) -> Element,
 	view: (props: string | ViewProps) -> Element,
+	diagram: (props: DiagramProps) -> Element,
 	input: (props: InputProps) -> Element,
 	markdown: (props: string | MarkdownProps) -> Element,
 	divider: () -> Element,

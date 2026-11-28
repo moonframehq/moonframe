@@ -6486,6 +6486,7 @@ dependencies = [
  "moonframe-acp",
  "moonframe-chat",
  "moonframe-core",
+ "moonframe-diagram",
  "moonframe-docs",
  "moonframe-documents",
  "moonframe-forge",
