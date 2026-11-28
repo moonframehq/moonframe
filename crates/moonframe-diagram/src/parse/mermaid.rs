@@ -4,11 +4,13 @@
 //! styling becomes fills and tones where it maps, else it is dropped.
 //! Other diagram types (gantt, pie, mindmap...) are refused by name.
 
+// keep-sorted start
 mod class;
 mod er;
 mod flowchart;
 mod sequence;
 mod state;
+// keep-sorted end
 
 use {super::Unsupported, crate::model::Diagram};
 

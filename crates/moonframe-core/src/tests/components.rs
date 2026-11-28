@@ -303,3 +303,42 @@ fn component_file_names_are_checked() {
     let error = component.preview.as_ref().unwrap_err().to_string();
     assert!(error.contains("a-z"), "{error}");
 }
+
+#[test]
+fn a_diagram_card_keeps_a_short_distinct_view_id_for_a_long_key() {
+    fn view_ids(node: &Node, ids: &mut Vec<String>) {
+        match node {
+            Node::View(view) => ids.push(view.id.clone()),
+            Node::Stack(stack) => stack.children.iter().for_each(|child| view_ids(child, ids)),
+            _ => {},
+        }
+    }
+    let long = "a".repeat(64);
+    let source = format!(
+        r#"
+local diagram_card = use "diagram-card"
+local function card(key)
+    return diagram_card {{ diagram = {{ key = key, title = "T", revision = 1, highlight = {{}},
+        document = {{ nodes = {{ {{ id = "a", label = "A" }} }}, edges = {{}} }} }} }}
+end
+return mod {{ view = function()
+    return ui.column {{ card("agent/{long}.json"), card("agent/{long}b.json"), card("agent/plan.json") }}
+end }}
+"#
+    );
+    let dir = app(&[("cards", &source)]);
+    write(
+        dir.path(),
+        "components/diagram-card.luau",
+        include_str!("../../../../app/components/diagram-card.luau"),
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("cards").unwrap();
+    assert!(slot.error().is_none(), "{:?}", slot.error());
+    let mut ids = Vec::new();
+    view_ids(slot.view().unwrap(), &mut ids);
+    assert_eq!(ids.len(), 3);
+    assert_eq!(ids[2], "card-agent-plan-json");
+    assert_ne!(ids[0], ids[1]);
+    assert!(ids.iter().all(|id| id.len() <= 64), "{ids:?}");
+}

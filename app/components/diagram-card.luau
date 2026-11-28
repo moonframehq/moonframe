@@ -10,9 +10,20 @@ type Props = {
 	height: number?,
 }
 
--- A key as an element id takes it: letters, digits, `-` and `_`.
-local function id_of(key: string): string
-	return (string.gsub(key, "[^%w_-]", "-"))
+-- The id its hosted view keeps it by, from the diagram's key: letters,
+-- digits, `-` and `_`, at most 64 (the host's limit). A key too long for
+-- that keeps its start and ends in a hash of the whole key, so each card
+-- keeps an id of its own.
+local function view_id(key: string): string
+	local id = "card-" .. string.gsub(key, "[^%w_-]", "-")
+	if #id <= 64 then
+		return id
+	end
+	local hash = 5381
+	for i = 1, #key do
+		hash = bit32.band(hash * 33 + string.byte(key, i), 0xffffffff)
+	end
+	return string.sub(id, 1, 55) .. string.format("-%08x", hash)
 end
 
 return component {
@@ -61,7 +72,7 @@ return component {
 				height = props.height or 300,
 				gap = "none",
 				ui.diagram {
-					id = `card-{id_of(d.key or "diagram")}`,
+					id = view_id(d.key or "diagram"),
 					document = d.document,
 					highlight = d.highlight,
 					scroll = "focus",

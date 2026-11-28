@@ -270,23 +270,33 @@ impl Builder {
                 self.diagram.nodes[index].label = label(value);
             }
         }
-        for &(open, close, kind) in SHAPES {
-            if c.rest().starts_with(open) {
-                c.at += open.len();
-                let text = if c.rest().starts_with('"') {
-                    let quoted = c.quoted();
-                    c.until(close);
-                    quoted
-                } else {
-                    c.until(close).ok_or_else(|| {
-                        Unsupported::at(number, format!("`{open}` is never closed with `{close}`"))
-                    })?
-                };
-                let node = &mut self.diagram.nodes[index];
-                node.label = label(text);
-                node.kind = kind;
-                break;
-            }
+        // Trapezoids share openers: of the entries opening here, the one
+        // whose closer comes first.
+        let opening = SHAPES
+            .iter()
+            .find(|s| c.rest().starts_with(s.0))
+            .map(|s| s.0);
+        let shape = opening.and_then(|open| {
+            let after = &c.rest()[open.len()..];
+            SHAPES
+                .iter()
+                .filter(|s| s.0 == open)
+                .min_by_key(|s| after.find(s.1).unwrap_or(usize::MAX))
+        });
+        if let Some(&(open, close, kind)) = shape {
+            c.at += open.len();
+            let text = if c.rest().starts_with('"') {
+                let quoted = c.quoted();
+                c.until(close);
+                quoted
+            } else {
+                c.until(close).ok_or_else(|| {
+                    Unsupported::at(number, format!("`{open}` is never closed with `{close}`"))
+                })?
+            };
+            let node = &mut self.diagram.nodes[index];
+            node.label = label(text);
+            node.kind = kind;
         }
         if c.eat(":::") {
             let class = c.ident().to_owned();

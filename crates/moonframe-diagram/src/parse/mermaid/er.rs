@@ -15,9 +15,10 @@ const ATTRIBUTES: usize = 4;
 
 pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
     let mut d = Diagram::default();
-    let mut inside: Option<(String, Vec<String>)> = None;
+    // The entity whose `{ }` attributes are being read, and its line.
+    let mut inside: Option<(usize, String, Vec<String>)> = None;
     for &(number, line) in lines {
-        if let Some((entity, attributes)) = &mut inside {
+        if let Some((_, entity, attributes)) = &mut inside {
             if line == "}" {
                 let shown: Vec<String> = attributes.iter().take(ATTRIBUTES).cloned().collect();
                 let entity = entity.clone();
@@ -44,7 +45,7 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
                 .trim()
                 .to_owned();
             known(&mut d, &entity);
-            inside = Some((entity, Vec::new()));
+            inside = Some((number, entity, Vec::new()));
             continue;
         }
         let (head, text) = line
@@ -70,6 +71,12 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
         } else {
             return Err(Unsupported::at(number, format!("cannot read `{line}`")));
         }
+    }
+    if let Some((number, entity, _)) = inside {
+        return Err(Unsupported::at(
+            number,
+            format!("the `{{` after entity `{entity}` is never closed"),
+        ));
     }
     Ok(d)
 }

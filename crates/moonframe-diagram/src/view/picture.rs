@@ -6,6 +6,7 @@
 use {
     super::{camera::Camera, paint, scene::Scene, style::Palette},
     crate::{
+        geometry::Rect,
         layout::{Layout, Widths},
         model::Diagram,
     },
@@ -26,11 +27,10 @@ pub fn picture(diagram: Arc<Diagram>, layout: Arc<Layout>, most_height: f32) -> 
     canvas(
         |_, _, _| (),
         move |b, (), window, cx| {
-            let camera = Camera::fit(
+            let camera = fit(
                 layout.bounds,
                 f32::from(b.size.width),
                 f32::from(b.size.height),
-                MARGIN,
             );
             paint::paint(&scene, &shown, camera, b, Palette::of(cx), window, cx);
         },
@@ -38,6 +38,24 @@ pub fn picture(diagram: Arc<Diagram>, layout: Arc<Layout>, most_height: f32) -> 
     .w_full()
     .h(px(height))
     .into_any_element()
+}
+
+/// All of `content` in a box of `w` by `h`, never past 100 %. Unlike
+/// [`Camera::fit`] it shrinks as far as it takes: a picture has no
+/// controls to reach what a least zoom would cut off.
+fn fit(content: Rect, w: f32, h: f32) -> Camera {
+    let mut camera = Camera::fit(content, w, h, MARGIN);
+    if content.w <= 0.0 || content.h <= 0.0 || w <= 0.0 || h <= 0.0 {
+        return camera;
+    }
+    let zoom = ((w - MARGIN * 2.0) / content.w)
+        .min((h - MARGIN * 2.0) / content.h)
+        .clamp(f32::EPSILON, 1.0);
+    let center = content.center();
+    camera.x = center.x - w / 2.0 / zoom;
+    camera.y = center.y - h / 2.0 / zoom;
+    camera.zoom = zoom;
+    camera
 }
 
 /// Each label of `diagram` measured in the theme's font, for its layout.
@@ -55,4 +73,20 @@ pub fn measure(diagram: &Diagram, font_size: f32, window: &mut Window, cx: &App)
         }
     }
     Widths(widths)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use {super::fit, crate::geometry::Rect};
+
+    #[test]
+    fn a_tall_diagram_shrinks_past_the_views_least_zoom_to_show_both_ends() {
+        let content = Rect::new(0.0, 0.0, 120.0, 6_000.0);
+        let camera = fit(content, 600.0, 480.0);
+        let shown = camera.visible(600.0, 480.0);
+        assert!(camera.zoom < super::super::camera::MIN_ZOOM, "{camera:?}");
+        assert!(shown.y <= 0.0 && shown.bottom() >= 6_000.0, "{shown:?}");
+        assert_eq!(fit(Rect::new(0.0, 0.0, 50.0, 50.0), 600.0, 480.0).zoom, 1.0);
+    }
 }
