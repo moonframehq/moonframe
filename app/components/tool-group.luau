@@ -85,7 +85,7 @@ local function call_line(tool: any): any
 			},
 			status_icon(tool.status),
 		},
-		tool.detail and ui.text { tool.detail, class = "tool-group-detail", size = "small", wrap = false },
+		tool.detail and ui.text { tool.detail, class = "tool-group-detail", size = "small", wrap = true },
 		#files > 0 and ui.column { gap = "small", table.unpack(files) },
 	}
 end
