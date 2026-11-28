@@ -73,7 +73,9 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits, key: String) -
         .find(|step| running(step.status))
         .map(|step| text::head(&step.title, 300));
     ToolView {
-        output_key: output.filter(|_| running_step.is_none()).map(|_| key),
+        output_key: output
+            .filter(|_| !running(tool.status) && running_step.is_none())
+            .map(|_| key),
         id: text::head(&tool.call_id, 256),
         kind: kind_name(tool.kind),
         title: title(tool, limits),

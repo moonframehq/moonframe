@@ -414,6 +414,7 @@ fn commands_wait_for_a_starting_chat_and_answer_their_sender() {
         phase,
         context: None,
         transcript: None,
+        output_revisions: output::Revisions::default(),
         cursor: None,
         writer: None,
         held: Vec::new(),
@@ -477,6 +478,7 @@ fn the_start_context_goes_only_with_the_first_prompt_even_one_with_its_own() {
             phase: Phase::Starting,
             context: Some("You help with mail.".to_owned()),
             transcript: None,
+            output_revisions: output::Revisions::default(),
             cursor: None,
             writer: None,
             held: Vec::new(),
@@ -495,4 +497,109 @@ fn the_start_context_goes_only_with_the_first_prompt_even_one_with_its_own() {
         panic!("not a prompt")
     };
     assert_eq!(moonframe_chat_view::unframe(text), (Some("Its own"), "hi"));
+}
+
+#[test]
+fn tool_output_caches_pages_and_refreshes_on_replace() {
+    use herdr_chat_protocol::{Tool, ToolContent, ToolKind, ToolStatus};
+
+    let dir = tempfile::tempdir().unwrap();
+    let (mut chats, host, seen) = chats(
+        dir.path(),
+        r#"{ "starters": ["chat"], "store": "STORE", "program": "/nowhere/herdr-acp" }"#,
+    );
+    chats.receive(&host, "chat", message(r#"{ "start": "claude" }"#));
+    let id = replies(&seen)[0]["chat"].as_str().unwrap().to_owned();
+    let first_page = "a".repeat(4096);
+    let tool_entry = |text: String| Entry {
+        id: EntryId(2),
+        kind: EntryKind::Tool(Tool {
+            call_id: "call-1".to_owned(),
+            content: vec![ToolContent::Text { text }],
+            kind: ToolKind::Execute,
+            locations: Vec::new(),
+            parent: None,
+            started_ms: None,
+            status: ToolStatus::Completed,
+            title: "run".to_owned(),
+        }),
+    };
+    {
+        let mut state = lock(&chats.state);
+        let mut transcript = Transcript::new("Claude");
+        transcript
+            .apply(&Change::Push {
+                entry: tool_entry(format!("{first_page}tail")),
+            })
+            .unwrap();
+        let chat = state.chat_mut(&id).unwrap();
+        chat.transcript = Some(transcript);
+        chat.output_revisions.on_snapshot();
+    }
+
+    // First page populates the cache; second page hits the same cached index.
+    chats.receive(
+        &host,
+        "chat",
+        message(&format!(
+            r#"{{ "tool_output": "e2", "chat": "{id}", "page": 0, "id": "p0" }}"#
+        )),
+    );
+    assert!(chats.output_cache.is_some());
+    chats.receive(
+        &host,
+        "chat",
+        message(&format!(
+            r#"{{ "tool_output": "e2", "chat": "{id}", "page": 1, "id": "p1" }}"#
+        )),
+    );
+    // An unrelated entry change leaves the cached tool output intact.
+    {
+        let mut state = lock(&chats.state);
+        let chat = state.chat_mut(&id).unwrap();
+        let push = Change::Push {
+            entry: Entry {
+                id: EntryId(3),
+                kind: EntryKind::Agent {
+                    text: "done".to_owned(),
+                },
+            },
+        };
+        chat.transcript.as_mut().unwrap().apply(&push).unwrap();
+        chat.output_revisions.on_change(&push);
+        assert!(matches!(
+            output::lookup(chat, "e2", chats.output_cache.as_ref()),
+            Ok(output::Lookup::Cached)
+        ));
+    }
+    // Replacing e2 invalidates the cache and serves the updated text.
+    {
+        let mut state = lock(&chats.state);
+        let chat = state.chat_mut(&id).unwrap();
+        let replace = Change::Replace {
+            entry: tool_entry("updated".to_owned()),
+        };
+        chat.transcript.as_mut().unwrap().apply(&replace).unwrap();
+        chat.output_revisions.on_change(&replace);
+    }
+    chats.receive(
+        &host,
+        "chat",
+        message(&format!(
+            r#"{{ "tool_output": "e2", "chat": "{id}", "page": 0, "id": "p2" }}"#
+        )),
+    );
+
+    let answers = replies(&seen);
+    let reply = |tag: &str| answers.iter().find(|r| r["reply"] == tag).unwrap();
+    assert_eq!(reply("p0")["text"], first_page);
+    assert_eq!(reply("p0")["more"], true);
+    assert_eq!(reply("p1")["text"], "tail");
+    assert_eq!(reply("p1")["more"], false);
+    assert_eq!(reply("p2")["text"], "updated");
+    assert_eq!(reply("p2")["more"], false);
+
+    // Closing the chat clears its cached output.
+    chats.receive(&host, "chat", message(&format!(r#"{{ "close": "{id}" }}"#)));
+    assert!(chats.output_cache.is_none());
 }

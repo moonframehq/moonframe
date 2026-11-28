@@ -709,9 +709,11 @@ end
 		elseif type(msg) == "table" and msg.close_output then
 			state.output = nil
 		elseif type(msg) == "table" and msg.inspect then
-			state.output = { chat = id, key = msg.inspect, page = msg.page }
-			if msg.fetch then
-				chat_msg({ tool_output = msg.inspect, page = msg.page, id = { output = msg.inspect, page = msg.page, chat = id } })
+			local page = msg.page or 0
+			local fetch = msg.fetch == true
+			state.output = { chat = id, key = msg.inspect, page = page, fetch = fetch }
+			if fetch then
+				chat_msg({ tool_output = msg.inspect, page = page, id = { output = msg.inspect, page = page, chat = id } })
 			end
 		elseif type(msg) == "table" and type(msg.reply) == "table" and msg.reply.output then
 			local output = state.output
@@ -719,6 +721,7 @@ end
 				if msg.ok then
 					output.text = msg.text
 					output.more = msg.more
+					state.error = nil
 				else
 					state.error = msg.error
 					state.output = nil

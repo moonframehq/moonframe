@@ -62,11 +62,14 @@ end
 
 local function output_view(tool: any, props: Props): any
 	if not tool.detail then return nil end
-	local key = tool.output_key or tool.id
+	local running = tool.status == "running" or tool.status == "pending"
+	local fetchable = not running and tool.output_key ~= nil
+	local key = if fetchable then tool.output_key else tool.id
 	local output = props.output
-	local expanded = output and output.key == key
-	local function request(page: number): any
-		return { inspect = key, page = page, fetch = tool.output_key ~= nil }
+	local expanded = output and output.key == key and (output.fetch == nil or output.fetch == fetchable)
+	local page = if output then (output.page or 0) else 0
+	local function request(target: number): any
+		return { inspect = key, page = target, fetch = fetchable }
 	end
 	return ui.column {
 		gap = "none",
@@ -77,15 +80,15 @@ local function output_view(tool: any, props: Props): any
 			to = props.to,
 			tooltip = props.inspect and (if expanded then "Collapse output" else "Expand output") or nil,
 			ui.column { grow = true, ui.text {
-				if expanded then output.text or tool.detail else tool.detail,
+				if expanded and fetchable then output.text or tool.detail else tool.detail,
 				size = "small", wrap = true, lines = if expanded then nil else 3,
 			} },
 			props.inspect and ui.icon { name = if expanded then "chevron-up" else "chevron-down", size = "small" },
 		},
-		expanded and (output.page > 0 or output.more) and ui.row {
+		expanded and fetchable and (page > 0 or output.more) and ui.row {
 			gap = "small",
-			output.page > 0 and ui.button { "Previous", small = true, msg = request(output.page - 1), to = props.to },
-			output.more and ui.button { "Next", small = true, msg = request(output.page + 1), to = props.to },
+			page > 0 and ui.button { "Previous", small = true, msg = request(page - 1), to = props.to },
+			output.more and ui.button { "Next", small = true, msg = request(page + 1), to = props.to },
 		},
 	}
 end

@@ -109,6 +109,7 @@ pub(crate) struct Chat {
     /// The context `start` gave, put before the first prompt.
     pub(crate) context: Option<String>,
     pub(crate) transcript: Option<Transcript>,
+    pub(crate) output_revisions: output::Revisions,
     pub(crate) cursor: Option<Cursor>,
     #[cfg(unix)]
     pub(crate) writer: Option<UnixStream>,
@@ -205,6 +206,7 @@ pub struct Chats {
     store: Option<PathBuf>,
     default_agent: String,
     serial: u64,
+    output_cache: Option<output::Cached>,
 }
 
 impl Native for Chats {
@@ -348,20 +350,16 @@ impl Chats {
         let owner = owner(from);
         let result = match action {
             "tool_output" => {
-                let state = lock(&self.state);
-                state
-                    .chat(text("chat").unwrap_or_default())
-                    .filter(|chat| chat.owner == owner)
-                    .ok_or_else(|| "no such chat".to_owned())
-                    .and_then(|chat| {
-                        let page = message.get("page").and_then(Value::as_u64).unwrap_or(0);
-                        output::page(
-                            chat,
-                            text("tool_output").unwrap_or_default(),
-                            usize::try_from(page).unwrap_or(usize::MAX),
-                        )
-                        .map(Some)
-                    })
+                let page = message.get("page").and_then(Value::as_u64).unwrap_or(0);
+                output::page(
+                    &self.state,
+                    &mut self.output_cache,
+                    owner,
+                    text("chat").unwrap_or_default(),
+                    text("tool_output").unwrap_or_default(),
+                    usize::try_from(page).unwrap_or(usize::MAX),
+                )
+                .map(Some)
             },
             "start" => self
                 .start_chat(host, owner, message)
@@ -448,6 +446,7 @@ impl Chats {
                 phase: Phase::Starting,
                 context,
                 transcript: None,
+                output_revisions: output::Revisions::default(),
                 cursor: None,
                 #[cfg(unix)]
                 writer: None,
@@ -455,6 +454,13 @@ impl Chats {
                 closing: false,
             });
             trim(&mut state);
+            if self
+                .output_cache
+                .as_ref()
+                .is_some_and(|cached| state.chat(cached.chat_id()).is_none())
+            {
+                self.output_cache = None;
+            }
             state.focus = Some(id.clone());
             state.unsaved = true;
         }
@@ -562,6 +568,13 @@ impl Chats {
         end_chat(&mut chat);
         state.settle(host, id, "the chat was closed");
         state.unsaved = true;
+        if self
+            .output_cache
+            .as_ref()
+            .is_some_and(|cached| cached.chat_id() == id)
+        {
+            self.output_cache = None;
+        }
         Ok(Some(json!({ "chat": id })))
     }
 
@@ -763,6 +776,7 @@ impl Chats {
                 },
                 context: None,
                 transcript: None,
+                output_revisions: output::Revisions::default(),
                 cursor: None,
                 #[cfg(unix)]
                 writer: None,
