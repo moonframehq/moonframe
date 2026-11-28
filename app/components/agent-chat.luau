@@ -295,15 +295,26 @@ local function user_row(row: any): any
 end
 
 -- The group that draws each diagram's card among `rows`: the first to
--- show it, so a diagram the agent shows, explains and then patches draws
--- once.
-local function card_owners(rows: { any }, first: number): { [string]: string }
+-- show it as it stands now (by the run that last wrote it), so a diagram
+-- the agent shows, explains and then patches draws once, and one a
+-- resumed chat's new session shows again draws where it showed it.
+local function card_owners(rows: { any }, first: number, diagrams: { any }?): { [string]: string }
+	local runs: { [string]: string | boolean } = {}
+	for _, d in diagrams or {} do
+		if d.from == "agent" and d.id then
+			runs[d.id] = d.run or true
+		end
+	end
 	local owners: { [string]: string } = {}
 	for index = first, #rows do
 		local row = rows[index]
 		if row.type == "tools" then
 			for _, shown in row.diagrams or {} do
-				owners[shown.id] = owners[shown.id] or row.key
+				local run = runs[shown.id]
+				local current = run ~= nil and (shown.run == nil or shown.run == run)
+				if current and not owners[shown.id] then
+					owners[shown.id] = row.key
+				end
 			end
 		end
 	end
@@ -857,7 +868,7 @@ end
 				})
 			end
 			local diagrams = app.diagrams and app.diagrams.diagrams
-			local owners = card_owners(rows, first)
+			local owners = card_owners(rows, first, diagrams)
 			for index = first, #rows do
 				local element = row_element(rows[index], state, props, diagrams, owners)
 				if element then

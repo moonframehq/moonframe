@@ -342,3 +342,57 @@ end }}
     assert_ne!(ids[0], ids[1]);
     assert!(ids.iter().all(|id| id.len() <= 64), "{ids:?}");
 }
+
+#[test]
+fn a_resumed_chat_draws_a_diagram_its_new_session_showed_again() {
+    const CHAT: &str = r#"
+local agent_chat = use "agent-chat"
+local function tools(key, run)
+    return { type = "tools", key = key, title = "Diagram", status = "done", live = false, count = 1,
+        failed = 0, more = 0, files = {}, items = {}, diagrams = { { id = "plan", run = run } } }
+end
+return mod { view = function()
+    return agent_chat {
+        id = "test", chat = "c",
+        view = { id = "c", status = "live", view = {
+            status = "idle", accepts = true, permissions = {}, queue = {}, settings = {},
+            activities = {}, commands = {},
+            rows = { tools("g1", "old"), { type = "answer", key = "a1", text = "Resumed" }, tools("g2", "new") },
+        } },
+    }
+end }
+"#;
+    let dir = app(&[("chat", CHAT)]);
+    let components = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app/components");
+    for entry in fs::read_dir(&components).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|ext| ext == "luau") {
+            let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+            write(
+                dir.path(),
+                &format!("components/{name}"),
+                &fs::read_to_string(&path).unwrap(),
+            );
+        }
+    }
+    let mut workspace = Workspace::open(dir.path(), false);
+    let lua = mlua::Lua::new();
+    let diagrams = lua
+        .load(
+            r#"return { diagrams = { { id = "plan", key = "agent/plan.json", from = "agent", run = "new",
+                title = "Plan", revision = 2, highlight = {},
+                document = { nodes = { { id = "a", label = "A" } }, edges = {} } } } }"#,
+        )
+        .eval()
+        .unwrap();
+    workspace.set_host("diagrams", Data::read(&diagrams).unwrap());
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    // The old session's group no longer owns it: the new one draws it.
+    let slot = workspace.slot("chat/agent-chat#test").unwrap();
+    let drawn = format!("{:?}", slot.view().unwrap());
+    assert_eq!(drawn.matches("\"card-agent-plan-json\"").count(), 1);
+}
