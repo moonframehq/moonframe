@@ -26,22 +26,18 @@ const ARROWS: &[(&str, MessageKind)] = &[
     ("->", MessageKind::Sync),
 ];
 
+/// Words that open a block, closed by `end`.
+const BLOCKS: &[&str] = &[
+    "alt", "box", "break", "critical", "loop", "opt", "par", "rect",
+];
+
+/// Words that divide a block in parts, only inside one.
+const PARTS: &[&str] = &["and", "else", "option"];
+
 const IGNORED: &[&str] = &[
     "autonumber",
     "activate",
     "deactivate",
-    "loop",
-    "alt",
-    "else",
-    "opt",
-    "par",
-    "and",
-    "rect",
-    "critical",
-    "option",
-    "break",
-    "end",
-    "box",
     "title",
     "accTitle",
     "accDescr",
@@ -56,10 +52,22 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
         kind: DiagramKind::Sequence,
         ..Diagram::default()
     };
+    // The line each open block began on.
+    let mut blocks: Vec<usize> = Vec::new();
     for &(number, line) in lines {
         let word = line.split_whitespace().next().unwrap_or_default();
         let word = word.trim_end_matches(':');
-        if word == "participant" || word == "actor" {
+        if BLOCKS.contains(&word) {
+            blocks.push(number);
+        } else if word == "end" {
+            if blocks.pop().is_none() {
+                return Err(Unsupported::at(number, "an `end` with no block open"));
+            }
+        } else if PARTS.contains(&word) {
+            if blocks.is_empty() {
+                return Err(Unsupported::at(number, format!("`{word}` outside a block")));
+            }
+        } else if word == "participant" || word == "actor" {
             participant(&mut d, line[word.len()..].trim(), word == "actor");
         } else if word.eq_ignore_ascii_case("note") {
             note(&mut d, line, number)?;
@@ -67,6 +75,12 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
         } else {
             message(&mut d, line, number)?;
         }
+    }
+    if let Some(&number) = blocks.last() {
+        return Err(Unsupported::at(
+            number,
+            "a block is never closed with `end`",
+        ));
     }
     Ok(d)
 }

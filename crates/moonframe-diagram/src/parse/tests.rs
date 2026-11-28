@@ -470,3 +470,18 @@ fn labels_read_back_as_written() {
     let again = mermaid::parse(&write::mermaid(&d)).unwrap();
     assert_eq!(again.nodes[0].label, "List<T>");
 }
+
+#[test]
+fn sequence_blocks_open_and_close_in_pairs() {
+    let fine =
+        "sequenceDiagram\nloop every minute\nalt ok\nA->>B: hi\nelse not\nB->>A: no\nend\nend";
+    assert_eq!(mermaid::parse(fine).unwrap().messages.len(), 2);
+    let err = mermaid::parse("sequenceDiagram\nA->>B: hi\nloop again\nA->>B: hi").unwrap_err();
+    assert_eq!(err.line, 3);
+    let err = mermaid::parse("sequenceDiagram\nA->>B: hi\nend").unwrap_err();
+    assert_eq!(err.line, 3);
+    let err = mermaid::parse("sequenceDiagram\nelse\nA->>B: hi").unwrap_err();
+    assert_eq!(err.line, 2);
+    let err = mermaid::parse("erDiagram\n  A ||--o{ B : has\n  }").unwrap_err();
+    assert_eq!(err.line, 3);
+}

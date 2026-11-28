@@ -37,6 +37,9 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
             d.direction = direction;
             continue;
         }
+        if line == "}" {
+            return Err(Unsupported::at(number, "a `}` with no entity open"));
+        }
         if line.starts_with("title ") {
             continue;
         }
