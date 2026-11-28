@@ -28,6 +28,8 @@ const MOST_HEIGHT: f32 = 480.0;
 /// so a bigger one would hold the window up. Agents' diagrams are far
 /// smaller.
 const MOST_INLINE: usize = 300;
+/// The most edges, messages and notes a fence draws, for the same reason.
+const MOST_INLINE_LINES: usize = 600;
 /// Laid-out fences kept: a few long chats' worth.
 const KEPT: usize = 256;
 
@@ -89,9 +91,10 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
     });
     let result: Laid = match parsed {
         // Laid out as the document draws: bigger diagrams show as source.
-        Ok(diagram) if diagram.nodes.len() > MOST_INLINE => Err(format!(
-            "{} nodes, more than a document draws ({MOST_INLINE})",
-            diagram.nodes.len()
+        Ok(diagram) if too_big(&diagram) => Err(format!(
+            "{} nodes and {} lines, more than a document draws ({MOST_INLINE} and {MOST_INLINE_LINES})",
+            diagram.nodes.len() + diagram.groups.len(),
+            diagram.edges.len() + diagram.messages.len() + diagram.notes.len(),
         )),
         Ok(diagram) => {
             let options = Options::default();
@@ -116,6 +119,12 @@ fn laid(fence: &Fence, window: &mut Window, cx: &App) -> Laid {
         laid.insert(key, result.clone());
     });
     result
+}
+
+/// Whether `diagram` is more than a document lays out as it draws.
+fn too_big(diagram: &Diagram) -> bool {
+    diagram.nodes.len() + diagram.groups.len() > MOST_INLINE
+        || diagram.edges.len() + diagram.messages.len() + diagram.notes.len() > MOST_INLINE_LINES
 }
 
 /// The longest text laid out before in `language` that `source` grew
@@ -213,6 +222,16 @@ mod tests {
                 .push(moonframe_diagram::Node::new(format!("n{i}"), "x"));
         }
         Ok((Arc::new(diagram), Arc::new(Layout::default())))
+    }
+
+    #[test]
+    fn a_fence_with_few_nodes_but_many_lines_is_too_big() {
+        let mut diagram = Diagram::default();
+        for _ in 0..1_000 {
+            diagram.messages.push(moonframe_diagram::Message::default());
+        }
+        assert!(super::too_big(&diagram));
+        assert!(!super::too_big(&Diagram::default()));
     }
 
     #[test]
