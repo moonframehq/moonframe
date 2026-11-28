@@ -220,7 +220,8 @@ fn shell_items(menu: &AppMenu) -> Vec<MenuItem> {
             MenuEntry::Separator => MenuItem::separator(),
             MenuEntry::Item(item) => MenuItem::action(item.label.clone(), MenuSend {
                 id: item.id(&menu.title),
-            }),
+            })
+            .checked(item.checked),
         })
         .collect()
 }

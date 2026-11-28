@@ -46,6 +46,7 @@ default = [
   "map",
   "markdown",
   "math",
+  "notes",
   "pi",
   "planner",
   "procs",
@@ -96,6 +97,7 @@ map-benchmark = ["moonframe/map-benchmark"]
 map-vector    = ["moonframe/map-vector"]
 markdown      = ["moonframe/markdown"]
 math          = ["moonframe/math"]
+notes         = ["moonframe/notes"]
 pi            = ["moonframe/pi"]
 planner       = ["moonframe/planner"]
 procs         = ["moonframe/procs"]

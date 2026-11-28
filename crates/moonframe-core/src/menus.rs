@@ -7,6 +7,7 @@
 //!     menus = {
 //!         { title = "File", items = {
 //!             { label = "New Shell", msg = "new", to = "agent", shortcut = "secondary-t" },
+//!             { label = "Compact", msg = { density = "compact" }, checked = { density = "compact" } },
 //!             "-",
 //!             { label = "Close Window", command = "close-window", shortcut = "secondary-w" },
 //!         } },
@@ -52,6 +53,12 @@ pub struct MenuCommand {
     /// that types text (`j`), which works only while no text field or
     /// terminal has focus.
     pub shortcut: Option<Chord>,
+    /// Whether it shows a check mark now.
+    pub checked: bool,
+    /// `checked = { layout = "library" }`: checked while the shell's state
+    /// has each of these values, so a choice the shell keeps shows as
+    /// ticked. None for an item checked always or never.
+    pub check: Option<Vec<(String, crate::Data)>>,
 }
 
 impl MenuCommand {
@@ -131,7 +138,7 @@ impl Read for Menus {
     }
 }
 
-/// `"-"`, or `{ label, msg, to, command, shortcut }`.
+/// `"-"`, or `{ label, msg, to, command, shortcut, checked }`.
 fn entry(item: &mlua::Value, cx: &Cx) -> Result<MenuEntry, Error> {
     if let mlua::Value::String(text) = item {
         return match &*text.to_str().map_err(|error| cx.fail(error.to_string()))? {
@@ -139,7 +146,9 @@ fn entry(item: &mlua::Value, cx: &Cx) -> Result<MenuEntry, Error> {
             _ => Err(cx.fail("a menu item is \"-\" or { label, msg or command }")),
         };
     }
-    let fields = Fields::read(item, cx, &[&["label", "msg", "to", "command", "shortcut"]])?;
+    let fields = Fields::read(item, cx, &[&[
+        "label", "msg", "to", "command", "shortcut", "checked",
+    ]])?;
     let label: String = fields.need("label")?;
     let action = Action::from_fields(&fields)?
         .ok_or_else(|| cx.fail("a menu item needs `msg` (with `to`) or `command`"))?;
@@ -150,9 +159,34 @@ fn entry(item: &mlua::Value, cx: &Cx) -> Result<MenuEntry, Error> {
         .get::<String>("shortcut")?
         .map(|name| Chord::parse_typed(&name).map_err(|problem| cx.key("shortcut").fail(problem)))
         .transpose()?;
+    let (checked, check) = match fields.raw("checked") {
+        None | Some(mlua::Value::Nil) => (false, None),
+        Some(mlua::Value::Boolean(on)) => (*on, None),
+        Some(value @ mlua::Value::Table(_)) => {
+            let cx = cx.key("checked");
+            let crate::Data::Map(values) =
+                crate::Data::read(value).map_err(|error| cx.fail(error.to_string()))?
+            else {
+                return Err(
+                    cx.fail("checked is true, false, or { key = value } of the shell's state")
+                );
+            };
+            if values.is_empty() {
+                return Err(cx.fail("checked = { key = value } names at least one key"));
+            }
+            (false, Some(values.into_iter().collect()))
+        },
+        Some(_) => {
+            return Err(cx
+                .key("checked")
+                .fail("checked is true, false, or { key = value } of the shell's state"));
+        },
+    };
     Ok(MenuEntry::Item(MenuCommand {
         label,
         action,
         shortcut,
+        checked,
+        check,
     }))
 }

@@ -21,6 +21,7 @@ mod list_rows;
 mod list_scroll;
 mod markdown_scroll;
 mod markdown_tooltips;
+mod menu_checks;
 mod outside;
 mod overlay_letter_keys;
 mod overlay_scroll_to;

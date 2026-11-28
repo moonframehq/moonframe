@@ -2678,13 +2678,16 @@ export type WindowFrame = {
 
 -- A menu item in the shell's `menus`: it sends `msg` (to the shell, or to
 -- `to`) or runs `command`; `shortcut` is a key as `keys` take them, such as
--- "secondary-t". "-" between items draws a line.
+-- "secondary-t". "-" between items draws a line. `checked` ticks it: true,
+-- or `{ key = value }` to tick it while the shell's state has those values
+-- (`checked = { layout = "library" }`).
 export type MenuItem = {
 	label: string,
 	msg: Data?,
 	to: string?,
 	command: Command?,
 	shortcut: string?,
+	checked: (boolean | { [string]: Data })?,
 }
 
 -- `items` holds `MenuItem`s and "-"; typed loosely so items with `msg` and

@@ -33,6 +33,7 @@ mod lightbox;
 mod list_scroll;
 mod maps;
 mod markdown_tooltips;
+mod menu_checks;
 mod mods;
 mod motion;
 mod orbit;

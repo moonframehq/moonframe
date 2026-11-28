@@ -731,6 +731,11 @@ impl MoonframeApp {
         }
         // After the requests carried out above: whether the panel's item is there.
         cx.defer(panel::check);
+        // Whatever ran the mods (a click, a provider's data) may have
+        // ticked a menu item.
+        if self.workspace.take_menus_changed() {
+            crate::host_menus::install(self.workspace.menus(), cx);
+        }
     }
 
     /// Does what mods asked of the app (`to = "app:<what>"`), once the

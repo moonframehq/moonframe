@@ -1,0 +1,8 @@
+[app]
+# Commonplace: a second brain. Your notes, the sources you collect and a
+# wiki an LLM keeps, as markdown files Obsidian can open (plans/commonplace.md).
+# `moonframe --profile commonplace` opens it.
+keep     = ["feedback"]
+name     = "commonplace"
+requires = []
+title    = "Commonplace"
