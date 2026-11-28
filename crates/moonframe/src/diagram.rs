@@ -65,11 +65,11 @@ impl DiagramHost {
 }
 
 impl HostView for DiagramHost {
-    fn set_props(&mut self, props: &Data, cx: &mut Context<Self>) {
-        let props = read::props(props);
+    fn set_props(&mut self, given: &Data, cx: &mut Context<Self>) {
+        let props = read::props(given);
         if props.document != self.document {
             self.document = props.document.clone();
-            match props.diagram {
+            match read::diagram(given) {
                 Ok(diagram) => {
                     self.problem = None;
                     self.waiting = Some(diagram);
