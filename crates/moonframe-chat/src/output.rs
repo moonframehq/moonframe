@@ -56,12 +56,12 @@ mod tests {
         let first = "📩".repeat(PAGE_CHARS - 1);
         let parts = [first.as_str(), "second\n\npart"];
         assert_eq!(
-            text_page(parts.into_iter(), 0).unwrap(),
-            (first.clone() + "\n", true)
+            text_page(parts.into_iter(), 0),
+            Ok((format!("{first}\n"), true))
         );
         assert_eq!(
-            text_page(parts.into_iter(), 1).unwrap(),
-            ("second\n\npart".into(), false)
+            text_page(parts.into_iter(), 1),
+            Ok(("second\n\npart".into(), false))
         );
         assert!(text_page(parts.into_iter(), 2).is_err());
     }
