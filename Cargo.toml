@@ -139,7 +139,7 @@ moonframe-terminal       = { default-features = false, path = "crates/moonframe-
 moonframe-terminals      = { path = "crates/moonframe-terminals" }
 moonframe-transcripts    = { path = "crates/moonframe-transcripts" }
 moonframe-usage          = { path = "crates/moonframe-usage" }
-notify                   = "8"
+notify                   = "9"
 objc2                    = "0.6"
 objc2-app-kit            = { default-features = false, features = ["NSApplication", "NSImage", "NSResponder", "std"], version = "0.3" }
 objc2-foundation         = { default-features = false, features = ["NSArray", "NSAttributedString", "NSBundle", "NSData", "NSDictionary", "NSProcessInfo", "NSString", "std"], version = "0.3" }
