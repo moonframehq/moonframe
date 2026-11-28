@@ -284,8 +284,9 @@ export type StackProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- Reveal this direct child (one-based) when the index changes; or the
 	-- first row or column with this `key`, however deep, when the key (or
-	-- `seq`, to ask again) changes.
-	scroll_to: (number | string | { key: string, seq: any? })?,
+	-- `seq`, to ask again) changes; or scroll to the `y` (and `x`) its
+	-- `measure` told, as far as the content goes.
+	scroll_to: (number | string | { key: string?, x: number?, y: number?, seq: any? })?,
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,

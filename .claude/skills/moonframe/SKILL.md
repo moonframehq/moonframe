@@ -1541,7 +1541,10 @@ Text-like elements take their main value positionally:
   overlay's content as it opens): `12` the twelfth direct child, `"row-7"`
   the first row or column with `key = "row-7"` however deep (a row in a
   card in the list, once it is drawn), and `{ key = "row-7", seq = n }` the
-  same, asked again with each new `seq` (a link opened twice).
+  same, asked again with each new `seq` (a link opened twice), and `{ y =
+  state.y, seq = n }` (and `x`) scrolls back to how far `measure` told it
+  was (keep `msg.y` in state): a reader reopened where it was left, once
+  the host forgot the scroll of a stack it no longer drew.
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed. The rows, columns
   and panels inside a row or column that scrolls along its axis keep it

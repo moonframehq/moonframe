@@ -86,7 +86,7 @@ return component {
 		["reorder"] = "rows drag to another place: a drop on a row sends { [reorder] = its id, group, phase, carry = { row, group }, y } (before it when `y < 0.5`), on a group's heading { [reorder] = true, group, ... } (its end); `over` and `leave` come the same way",
 		["marker"] = "draw a drop line by a row: { id, after? }, or { group } for a group's end",
 		["measure"] = "with `height` or `grow`, the scrolling body's `measure`, sent to `to`: its `first`, `last`, `y`, ... count rows, not the header (with `groups`, headings and Add rows too; empty, `first` and `last` are 0); a body past 200 rows is a `ui.list`, which takes `range` instead",
-		["scroll_to"] = "with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes",
+		["scroll_to"] = "with `height` or `grow`, the scrolling body's `scroll_to`: reveals row n (one-based, counted as `measure` counts) when it changes, or `{ y = state.y, seq = n }` scrolls back to the `y` `measure` told",
 	},
 	styles = {
 		[".table"] = { gap = 0 },

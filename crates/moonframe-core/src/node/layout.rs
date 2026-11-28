@@ -128,6 +128,13 @@ pub enum ScrollTo {
     /// deep: a row in a card in the list. A new `seq` asks again for the
     /// same key.
     Key { key: String, seq: Data },
+    /// Points scrolled across (`x`) and down (`y`), as `measure` tells
+    /// them: back where it was. An axis not given stays as it is.
+    At {
+        x: Option<f32>,
+        y: Option<f32>,
+        seq: Data,
+    },
 }
 
 /// A titled section: a header with optional actions over a column body.

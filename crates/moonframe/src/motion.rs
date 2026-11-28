@@ -377,6 +377,7 @@ impl Motion {
             *pending = match target {
                 Some(ScrollTo::Child(index)) => Some(Rc::new(Pending::child(index - 1))),
                 Some(ScrollTo::Key { key, .. }) => Some(Rc::new(Pending::key(key.clone()))),
+                Some(ScrollTo::At { x, y, .. }) => Some(Rc::new(Pending::at(*x, *y))),
                 None => None,
             };
             *previous = target.cloned();
