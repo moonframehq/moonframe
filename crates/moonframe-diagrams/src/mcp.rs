@@ -339,6 +339,35 @@ mod tests {
     }
 
     #[test]
+    fn a_diagram_too_large_to_read_back_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut server = Server::new(dir.path(), None);
+        call(
+            &mut server,
+            1,
+            "diagram_show",
+            json!({ "id": "big", "mermaid": "graph TD; a-->b" }),
+        );
+        let label = "x".repeat(1024);
+        let nodes: Vec<Value> = (0..1200)
+            .map(|i| json!({ "id": format!("n{i}"), "label": label }))
+            .collect();
+        let shown = call(
+            &mut server,
+            2,
+            "diagram_show",
+            json!({ "id": "big", "graph": { "nodes": nodes } }),
+        );
+        assert_eq!(shown["isError"], true, "{shown}");
+        let kept = store::read(&store::path(dir.path(), "big")).unwrap();
+        assert_eq!(
+            kept.document["nodes"].as_array().unwrap().len(),
+            2,
+            "the one before stays"
+        );
+    }
+
+    #[test]
     fn a_diagram_the_user_closed_stays_closed() {
         let dir = tempfile::tempdir().unwrap();
         let mut server = Server::new(dir.path(), None);
