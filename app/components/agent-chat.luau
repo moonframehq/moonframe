@@ -502,6 +502,7 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 		ui.row {
 			gap = "small",
 			align = "center",
+			wrap = true,
 			#agents > 0 and dropdown {
 				icon = agent_icon(agent),
 				value = agent,
@@ -517,21 +518,28 @@ local function composer(props: Props, state: State, view: any, chat: any, servic
 			view and picker("model", view.model, state),
 			view and picker("effort", view.effort, state),
 			view and view.auto_accept and ui.button { "Auto-accept", icon = "zap", small = true, variant = "ghost", msg = { auto_accept = false }, tooltip = "Asks before acting again" },
-			ui.row { grow = true },
-			view and view.usage and ui.text {
-				view.usage.text .. (if view.usage.cost then " · " .. view.usage.cost else ""),
-				size = "small",
-				tone = "muted",
-				tooltip = `{view.usage.percent}% of the context window`,
-			},
-			working and ui.button { "Stop", icon = "square", small = true, variant = "outline", msg = "stop", tooltip = "Stop the turn (Esc)" },
-			ui.button {
-				icon = "arrow-up",
-				small = true,
-				variant = "primary",
-				msg = "send-draft",
-				disabled = not accepts,
-				tooltip = if working then "Queue it behind this turn (Enter)" else "Send (Enter)",
+			ui.spacer {},
+			ui.row {
+				class = "agent-chat-actions",
+				gap = "small",
+				align = "center",
+				justify = "end",
+				wrap = true,
+				view and view.usage and ui.text {
+					view.usage.text .. (if view.usage.cost then " · " .. view.usage.cost else ""),
+					size = "small",
+					tone = "muted",
+					tooltip = `{view.usage.percent}% of the context window`,
+				},
+				working and ui.button { "Stop", icon = "square", small = true, variant = "outline", msg = "stop", tooltip = "Stop the turn (Esc)" },
+				ui.button {
+					icon = "arrow-up",
+					small = true,
+					variant = "primary",
+					msg = "send-draft",
+					disabled = not accepts,
+					tooltip = if working then "Queue it behind this turn (Enter)" else "Send (Enter)",
+				},
 			},
 		},
 	}
