@@ -82,7 +82,7 @@ for the API, limits, caller identity and build policies.
 | `ui.paths { paths = { { points = { 0, 8, 40, 8, 40, 30 }, arrow = "end", radius = 6 } } }` | lines the view places in pixels from its top-left corner: arrows between dependent bars, connectors in a diagram; without `width` and `height` it fills its parent, so it floats over what it links (`float = "fill"` on a wrapper) | `paths` (each `points` flat x, y pairs, `color`, `stroke`, `dashed`, `radius` rounds its corners, `arrow` `end` `start` `both`), `width`, `height` |
 | `ui.map { pins = { { lat = 37.79, lon = -122.40, label = "1" } } }` | a street map from a tile provider with numbered pins and routes over it; drag pans, the wheel, a pinch, a two-finger double tap, a double click and its buttons zoom, and two fingers turn it (it settles on north within a few degrees); without `center`/`zoom` it frames the pins and routes. With `glide`, a new `center`, `zoom` or `bearing` eases the map there. Tiles come only from the listed providers, cached under the cache folder; the provider's credit shows in the corner. Built with the `map` feature (the starter and sealed apps using it have it; elsewhere it marks its spot) | `provider` (`openstreetmap`, the default, and `carto-light` `carto-dark` `carto-voyager` `esri-streets` need no key, nor do `vector-liberty` `vector-positron` `vector-streets` `vector-dark` `vector-graphite`, vector tiles drawn on the GPU by gpui-maps in builds with the `map-vector` feature; `stadia-smooth` `stadia-smooth-dark` `maptiler-streets` `mapbox-streets` `thunderforest-transport` need `key`), `center = { lat, lon }`, `zoom`, `bearing` (the compass direction up the box, degrees clockwise from north; a new one turns the map where it stands, so feed `move`'s back in and a compass shown while it is not 0 sets it to 0 on a click), `pins` (each `lat`, `lon`, `label` up to 3 characters or `icon`, `color`, `shape` `dot` `disc` `balloon`, `selected`, `pulse` (a halo breathes out of it: where the user is), `msg`), `routes` (each `points` flat lat, lon pairs drawn as they are, or `via` stops and `mode` `walk` `bike` `car` routed along streets by routing.openstreetmap.de; `color`, `stroke`, `dashed`; the style's `color` otherwise), `routed` (sent with `route`, `seconds`, `meters` when a `via` route is found or `routed`/`to` changes), `move` (sent with `lat`, `lon`, `zoom`, `bearing` after the user moves it, as they go), `select` (sent with `pin`, its index, on a click), `to`, `width`, `height`, `grow` |
 | `ui.video { source = "camera", white = 4095 }` | live frames from another process, from a ring in shared memory, in a 16-bit colour-managed native view that fills its space (macOS, the `video` feature); nothing draws over it, so `guides` draws crop frames and lines in the picture. `source`, `id`, `zoom`, `center`, `filter` (`auto` `nearest` `linear`), `color` (`srgb` `display-p3` `rec709` `rec2020` `linear-srgb` `linear-p3` `none`), `extended`, `black`, `white`, `gain`, `gamma`, `guides`, `probe`, `stats`, `probed`, `width`, `height`. Most apps want `video-viewer`; see `docs/video.md` |
-| `ui.diagram { id = "flow", document = { nodes = {...}, edges = {...} } }` | a diagram drawn in Rust in the theme's colors and font: boxes, rounded boxes, pills, diamonds, circles, cylinders, notes and text, joined by orthogonal edges with heads, in groups; or a sequence diagram. Nodes without a place are laid out in layers (`direction` down, up, right or left), and a new document keeps what stayed where it was; placed ones (`x`, `y`, `w`, `h`, as an editor's) stay put. Scroll pans, a pinch or ⌘-scroll zooms. With `mode = "edit"` (the default with `shapes`) a click selects (shift adds, a drag on empty space draws a marquee), a drag moves with snapping guides, corners resize, the blue ports connect, a double click edits the label, and a `tool` draws new nodes; it never changes the document itself but tells the mod each edit (`selected`, `moved`, `resized`, `created`, `connected`, `deleted`, `edited`; `opened` on a double click in `view` mode; `zoom`, `tool`). Built with the `diagram` feature (the starter has it; `app.capabilities.diagram` says so; elsewhere, and on Rune, it marks its spot). The `diagram` component is the same canvas in Luau | `mermaid` or `dot` (Mermaid flowchart, sequence, state, class and ER diagrams, or Graphviz DOT, parsed in Rust; text that does not parse shows why), `shapes` and `links` (the `diagram` component's document) or `document` (`kind` `flow` or `sequence`, `direction`, `nodes` each `id`, `label`, `sublabel`, `kind`, `tone`, `fill`, `group`, `x`/`y`/`w`/`h`; `edges` each `from`, `to`, `label`, `kind` `solid` `dashed` `dotted` `thick` `invisible`, `start`/`end` `none` `arrow` `open` `circle` `cross` `triangle` `diamond` `hollow-diamond`, `tone`; `groups` each `id`, `label`, `parent`; a sequence's `messages` each `from`, `to`, `label`, `kind` `sync` `async` `reply`, and `notes` each `over`, `text`, `before`), `mode`, `tool`, `selected`, `highlight` (ids drawn in the accent), `camera` (`fit`, `zoom` or `zoom_by`, acted on with each new `seq`), `scroll = "focus"` (pans only after a click inside, in a page that scrolls), `id`, `class`, `style` |
+| `ui.diagram { id = "flow", document = { nodes = {...}, edges = {...} } }` | a diagram drawn in Rust in the theme's colors and font: boxes, rounded boxes, pills, diamonds, circles, cylinders, notes and text, joined by orthogonal edges with heads, in groups; or a sequence diagram. Nodes without a place are laid out in layers (`direction` down, up, right or left), and a new document keeps what stayed where it was; placed ones (`x`, `y`, `w`, `h`, as an editor's) stay put. Scroll pans, a pinch or ⌘-scroll zooms. With `mode = "edit"` (the default with `shapes`) a click selects (shift adds, a drag on empty space draws a marquee), a drag moves with snapping guides, corners resize, the blue ports connect, a double click edits the label, and a `tool` draws new nodes; it never changes the document itself but tells the mod each edit (`selected`, `moved`, `resized`, `created`, `connected`, `deleted`, `edited`; `opened` on a double click in `view` mode; `zoom`, `tool`). Built with the `diagram` feature (the starter has it; `app.capabilities.diagram` says so; elsewhere, and on Rune, it marks its spot). The `diagram` component is the same canvas in Luau | `mermaid` or `dot` (Mermaid flowchart, sequence, state, class and ER diagrams, or Graphviz DOT, parsed in Rust; text that does not parse shows why), `shapes` and `links` (the `diagram` component's document) or `document` (`kind` `flow` or `sequence`, `direction`, `nodes` each `id`, `label`, `sublabel`, `kind`, `tone`, `fill`, `group`, `x`/`y`/`w`/`h`; `edges` each `from`, `to`, `label`, `kind` `solid` `dashed` `dotted` `thick` `invisible`, `start`/`end` `none` `arrow` `open` `circle` `cross` `triangle` `diamond` `hollow-diamond`, `tone`; `groups` each `id`, `label`, `parent`; a sequence's `messages` each `from`, `to`, `label`, `kind` `sync` `async` `reply`, and `notes` each `over`, `text`, `before`), `mode`, `tool`, `selected`, `highlight` (ids drawn in the accent), `camera` (`fit`, `zoom` or `zoom_by`, acted on with each new `seq`), `scroll = "focus"` (pans only after a click inside, in a page that scrolls), `export = { format = "png" | "svg", seq }` (writes the diagram in the app's colors to the share folder, once a big document is laid out, and sends `{ exported = { path, format, seq } }`, for `app:share`, or `{ exported = { error, format, seq } }`; each export writes a file of its own, and one waiting when the document changes, or asked of text that does not parse, is answered with its `error`) (⌘C in the diagram copies it as Mermaid: the user's action, not a mod's), `id`, `class`, `style` |
 | `ui.view { name = "chart", id = "sales", props = {...} }` | a view the app writes in Rust and registers by `name` (apps on the Moonframe library; the starter registers none): what Luau can't draw, such as an editor or a canvas. Kept by mod and `id`, it gets `props` again when they change, and sends this mod's `update` messages of its own | `name`, `id`, `props`, `class`, `style` |
 
 ### Controls
@@ -333,6 +333,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | Component | Category | Use it for |
 | --- | --- | --- |
 | [`agent-run`](#agent-run) | Agents | Show what an agent started through `app.acp` is doing or did, with Stop and the answers to its permission questions. For the Send feedback dialog, which lists runs with this, use `feedback`; for a chat transcript use `chat-message`. |
+| [`diagram-card`](#diagram-card) | Agents | In a chat or an agent run, for the `app.diagrams` entry its `diagram_*` tool calls showed (`tool-group` and `agent-run` draw it from their `diagrams` prop). For a diagram the mod owns use `ui.diagram`; for Mermaid in an answer a ```mermaid fence draws by itself. |
 | [`feedback`](#feedback) | Agents | Let the user ask for a change to the app itself, from inside it, and follow what the agent does (`app.acp`). For one run on its own use `agent-run`; for a plain form use `dialog`; for chatting with an agent use `composer`. |
 | [`accordion`](#accordion) | Containers | A stack of foldable sections of the same kind: a merge request's checks, files and activity, or groups of settings. The mod decides whether opening one closes the others. For one foldable block use `collapsible`; for sidebar groups use `sidebar-section`; for switching between views use `tabs`. |
 | [`card`](#card) | Containers | A titled box around related content inside a panel or page; for a whole sidebar section use `ui.panel`, for a plain heading use `section`. |
@@ -538,6 +539,7 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 
 | Prop | Meaning |
 | --- | --- |
+| `diagrams` | `app.diagrams.diagrams`: the diagrams this run showed through `moonframe mcp diagrams` draw as cards, in place of their tool calls |
 | `lines` | lines of the agent's message shown (default 6; 0 hides it) |
 | `request` | show the user's words above |
 | `run` | a run from `app.acp.runs` { id, agent, agent_title, text, status, started, finished, error, message, tools, tool_count, plan, question } |
@@ -550,6 +552,25 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 local agent_run = use "agent-run"
 
 agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id = "1", message = "The status bar is the row at the bottom of app/main.luau; I'll raise its height.", plan = { { content = "Find the status bar's row", status = "completed" }, { content = "Make it 36px tall", status = "in_progress" }, { content = "Run just check", status = "pending" } }, question = { options = { { id = "allow", kind = "allow_once", name = "Allow" }, { id = "always", kind = "allow_always", name = "Always allow" }, { id = "reject", kind = "reject_once", name = "Reject" } }, title = "Edit app/main.luau" }, started = 0, status = "waiting", text = "Make the status bar taller", tool_count = 3, tools = { { id = "a", kind = "read", status = "completed", title = "Read app/main.luau" }, { id = "b", kind = "edit", status = "pending", title = "Edit app/main.luau" } } } }
+```
+
+#### `diagram-card`
+
+**Diagram Card.** A diagram an agent shows through `moonframe mcp diagrams`, drawn in its chat and kept up to date as it patches it.
+
+**When:** In a chat or an agent run, for the `app.diagrams` entry its `diagram_*` tool calls showed (`tool-group` and `agent-run` draw it from their `diagrams` prop). For a diagram the mod owns use `ui.diagram`; for Mermaid in an answer a ```mermaid fence draws by itself.
+
+| Prop | Meaning |
+| --- | --- |
+| `diagram` | one of `app.diagrams.diagrams`: { key, title, agent?, note?, document?, highlight, revision, error? } |
+| `height` | the diagram's height in pixels (default 300) |
+
+**Styles:** `.diagram-card` `.diagram-card-detail` `.diagram-card-head` `.diagram-card-note` `.diagram-card-problem` `.diagram-card-title`
+
+```lua
+local diagram_card = use "diagram-card"
+
+diagram_card { diagram = { agent = "claude", document = { direction = "right", edges = { { from = "md", to = "parse" }, { from = "parse", to = "view" } }, nodes = { { id = "md", label = "Markdown" }, { id = "parse", label = "Parser" }, { id = "view", label = "View" } } }, highlight = { "parse" }, key = "agent/example", note = "Working on the parser", revision = 1, title = "What I am changing" } }
 ```
 
 #### `feedback`
@@ -566,6 +587,7 @@ agent_run { request = true, run = { agent = "claude", agent_title = "Claude", id
 | `copied` | show "Copied" with a check on the Copy button |
 | `copy` | msg the Copy button sends, as well as copying, e.g. to set `copied` |
 | `detach` | msg the chip's × sends |
+| `diagrams` | `app.diagrams.diagrams`: the diagrams a run showed draw in it (see `agent-run`) |
 | `dismiss` | msg sent by Cancel, Escape or a backdrop click |
 | `error` | why the last send failed, shown above the buttons |
 | `expanded` | id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open |
@@ -3053,14 +3075,16 @@ A whole mod using it, with state: `app/components/demos/timeline.luau`.
 
 | Prop | Meaning |
 | --- | --- |
-| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, items = { { type = "tool", id, kind, title, status, detail?, output_key?, files, steps } or { type = "thought", gist, text } } } |
+| `cards` | which group draws each diagram's card, its id to the group's `key`: a chat passes the first group to show it, so a diagram draws once however many groups change it |
+| `diagrams` | `app.diagrams.diagrams`: the diagrams its `diagram_*` calls showed (`group.diagrams`, each drawn while the run that showed it here is its latest writer) draw as cards, open or folded, in place of the calls |
+| `group` | a `ToolGroup` from `app.chat`: { key, title, status ("running" "done" "failed"), count, failed, current?, files = { { path, added?, removed?, new } }, more, diagrams? = { { id, run? } }, items = { { type = "tool", id, kind, title, status, detail?, output_key?, files, steps } or { type = "thought", gist, text } } } |
 | `inspect` | enable clicking a detail to send { inspect, page, fetch } or { close_output = true } |
 | `msg` | message a click on the header sends (the mod flips `open`) |
 | `open` | show its calls |
 | `output` | the expanded detail { key, page, text?, more? } |
 | `to` | mod to send it to, if not the drawing one |
 
-**Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`
+**Styles:** `.tool-group` `.tool-group-added` `.tool-group-body` `.tool-group-call-title` `.tool-group-cards` `.tool-group-current` `.tool-group-detail` `.tool-group-done` `.tool-group-failed` `.tool-group-file` `.tool-group-head` `.tool-group-head:hover` `.tool-group-kind` `.tool-group-removed` `.tool-group-running` `.tool-group-thought` `.tool-group-title`
 
 ```lua
 local tool_group = use "tool-group"

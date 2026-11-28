@@ -303,3 +303,96 @@ fn component_file_names_are_checked() {
     let error = component.preview.as_ref().unwrap_err().to_string();
     assert!(error.contains("a-z"), "{error}");
 }
+
+#[test]
+fn a_diagram_card_keeps_a_short_distinct_view_id_for_a_long_key() {
+    fn view_ids(node: &Node, ids: &mut Vec<String>) {
+        match node {
+            Node::View(view) => ids.push(view.id.clone()),
+            Node::Stack(stack) => stack.children.iter().for_each(|child| view_ids(child, ids)),
+            _ => {},
+        }
+    }
+    let long = "a".repeat(64);
+    let source = format!(
+        r#"
+local diagram_card = use "diagram-card"
+local function card(key)
+    return diagram_card {{ diagram = {{ key = key, title = "T", revision = 1, highlight = {{}},
+        document = {{ nodes = {{ {{ id = "a", label = "A" }} }}, edges = {{}} }} }} }}
+end
+return mod {{ view = function()
+    return ui.column {{ card("agent/{long}.json"), card("agent/{long}b.json"), card("agent/plan.json") }}
+end }}
+"#
+    );
+    let dir = app(&[("cards", &source)]);
+    write(
+        dir.path(),
+        "components/diagram-card.luau",
+        include_str!("../../../../app/components/diagram-card.luau"),
+    );
+    let workspace = Workspace::open(dir.path(), false);
+    let slot = workspace.slot("cards").unwrap();
+    assert!(slot.error().is_none(), "{:?}", slot.error());
+    let mut ids = Vec::new();
+    view_ids(slot.view().unwrap(), &mut ids);
+    assert_eq!(ids.len(), 3);
+    assert_eq!(ids[2], "card-agent-plan-json");
+    assert_ne!(ids[0], ids[1]);
+    assert!(ids.iter().all(|id| id.len() <= 64), "{ids:?}");
+}
+
+#[test]
+fn a_resumed_chat_draws_a_diagram_its_new_session_showed_again() {
+    const CHAT: &str = r#"
+local agent_chat = use "agent-chat"
+local function tools(key, run)
+    return { type = "tools", key = key, title = "Diagram", status = "done", live = false, count = 1,
+        failed = 0, more = 0, files = {}, items = {}, diagrams = { { id = "plan", run = run } } }
+end
+return mod { view = function()
+    return agent_chat {
+        id = "test", chat = "c",
+        view = { id = "c", status = "live", view = {
+            status = "idle", accepts = true, permissions = {}, queue = {}, settings = {},
+            activities = {}, commands = {},
+            rows = { tools("g1", "old"), { type = "answer", key = "a1", text = "Resumed" }, tools("g2", "new") },
+        } },
+    }
+end }
+"#;
+    let dir = app(&[("chat", CHAT)]);
+    let components = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app/components");
+    for entry in fs::read_dir(&components).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|ext| ext == "luau") {
+            let name = path.file_name().unwrap().to_str().unwrap().to_owned();
+            write(
+                dir.path(),
+                &format!("components/{name}"),
+                &fs::read_to_string(&path).unwrap(),
+            );
+        }
+    }
+    let mut workspace = Workspace::open(dir.path(), false);
+    let lua = mlua::Lua::new();
+    let diagrams = lua
+        .load(
+            r#"return { diagrams = { { id = "plan", key = "agent/plan.json", from = "agent", run = "new",
+                title = "Plan", revision = 2, highlight = {},
+                document = { nodes = { { id = "a", label = "A" } }, edges = {} } } } }"#,
+        )
+        .eval()
+        .unwrap();
+    workspace.set_host("diagrams", Data::read(&diagrams).unwrap());
+    assert!(
+        workspace.problems().is_empty(),
+        "{:?}",
+        workspace.problems()
+    );
+    // The old session's group no longer owns it: the new one draws it.
+    let slot = workspace.slot("chat/agent-chat#test").unwrap();
+    let drawn = format!("{:?}", slot.view().unwrap());
+    assert_eq!(drawn.matches("\"card-agent-plan-json\"").count(), 1);
+}

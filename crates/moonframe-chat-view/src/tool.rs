@@ -3,7 +3,7 @@
 use {
     crate::{
         Limits,
-        rows::{FileChange, ToolView},
+        rows::{DiagramRef, FileChange, ToolView},
         text,
     },
     herdr_chat_protocol::{EDIT_OMITTED, Tool, ToolContent, ToolKind, ToolStatus},
@@ -87,6 +87,41 @@ pub(crate) fn view(tool: &Tool, steps: &[&Tool], limits: &Limits, key: String) -
         steps: steps.len(),
         started_ms: tool.started_ms,
     }
+}
+
+/// The diagram a successful `moonframe mcp diagrams` call showed or
+/// changed: its answer names it first, in backticks ("Showing `plan` ...",
+/// "`plan`: ..."), and the run it is for on its last line (`[run ID]`).
+pub(crate) fn diagram(tool: &Tool) -> Option<DiagramRef> {
+    if tool.status == ToolStatus::Failed || !tool.title.contains("diagram_") {
+        return None;
+    }
+    let answer = tool.content.iter().find_map(|item| match item {
+        ToolContent::Text { text } => Some(text.as_str()),
+        _ => None,
+    })?;
+    let (_, rest) = answer.split_once('`')?;
+    let (id, _) = rest.split_once('`')?;
+    let run = answer
+        .trim_end()
+        .lines()
+        .last()
+        .and_then(|line| line.strip_prefix("[run ")?.strip_suffix(']'))
+        .filter(|run| safe(run))
+        .map(str::to_owned);
+    safe(id).then(|| DiagramRef {
+        id: id.to_owned(),
+        run,
+    })
+}
+
+/// An id a diagram or run may have: letters, digits, `-` and `_`.
+fn safe(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 /// A call's title, on one line; its kind's name when it has none.

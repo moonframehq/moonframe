@@ -87,16 +87,30 @@ const MAX_TEXT: usize = 64 << 10;
 static MCP_SERVERS: Mutex<Option<fn() -> Vec<Value>>> = Mutex::new(None);
 
 /// Offers what `servers` lists, asked again as each session starts (so a
-/// setting changed since is followed), to every session from now on.
+/// setting changed since is followed), to every session from now on;
+/// `{run}` and `{agent}` in their `args` are filled in per session.
 pub fn offer_mcp_servers(servers: fn() -> Vec<Value>) {
     if let Ok(mut offered) = MCP_SERVERS.lock() {
         *offered = Some(servers);
     }
 }
 
-pub(crate) fn mcp_servers() -> Vec<Value> {
-    let servers = MCP_SERVERS.lock().ok().and_then(|offered| *offered);
-    servers.map(|list| list()).unwrap_or_default()
+/// The servers offered to the session of `run`, by `agent`: `{run}` and
+/// `{agent}` in their arguments become those, so a server can tell whose
+/// work it does.
+pub(crate) fn mcp_servers(run: &str, agent: &str) -> Vec<Value> {
+    let offered = MCP_SERVERS.lock().ok().and_then(|offered| *offered);
+    let mut servers = offered.map(|list| list()).unwrap_or_default();
+    for server in &mut servers {
+        if let Some(Value::Array(args)) = server.get_mut("args") {
+            for arg in args {
+                if let Value::String(text) = arg {
+                    *text = text.replace("{run}", run).replace("{agent}", agent);
+                }
+            }
+        }
+    }
+    servers
 }
 
 /// Makes the provider, for the app's registry.
@@ -533,9 +547,14 @@ impl Acp {
         if context.to_string().len() > MAX_TEXT {
             return Err("the context is too large".to_owned());
         }
-        self.serial += 1;
+        // A warm agent's run already has its id: its MCP servers were told
+        // it as its session opened. Should the agent go before it is
+        // adopted, a new one starts under that id.
         let now = now();
-        let id = run_id(self.serial);
+        let id = self.warm_id(agent, &cwd).unwrap_or_else(|| {
+            self.serial += 1;
+            run_id(self.serial)
+        });
         // A run on the app itself: its agent is told about the app, and the
         // app is checked before and after it.
         let on_app = message.get("app").and_then(Value::as_bool) == Some(true);
@@ -579,13 +598,9 @@ impl Acp {
             installed: self.installed.clone(),
             now,
         };
-        let launched = match self.take_warm(agent, &cwd) {
-            Some(mut run) => {
-                run.adopt(start);
-                lock(&self.state).runs.push(run);
-                Ok(())
-            },
-            None => self.launch(Run::new(start, Some(host.clone())), &program, &args, false),
+        let launched = match self.adopt_warm(start) {
+            None => Ok(()),
+            Some(start) => self.launch(Run::new(start, Some(host.clone())), &program, &args, false),
         };
         let mut state = lock(&self.state);
         if let Err(error) = launched {

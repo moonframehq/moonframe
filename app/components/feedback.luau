@@ -22,6 +22,8 @@ type Props = {
 	send: any,
 	-- Runs from `app.acp.runs`, newest first.
 	runs: { any }?,
+	-- `app.diagrams.diagrams`: what the runs showed draws in them.
+	diagrams: { any }?,
 	-- The conversation shown open: its first run's id.
 	expanded: string?,
 	-- A button under an open conversation that changed the app: sends
@@ -202,7 +204,12 @@ local function conversation(turns: { any }, open: boolean, props: Props): any
 				table.insert(body, ui.text { turn.text, class = "feedback-said", wrap = true })
 			end
 			local latest = turn == run
-			table.insert(body, agent_run { run = turn, lines = if latest then 14 else 4, tools = if latest then 8 else 3 })
+			table.insert(body, agent_run {
+				run = turn,
+				lines = if latest then 14 else 4,
+				tools = if latest then 8 else 3,
+				diagrams = props.diagrams,
+			})
 			if turn.warning then
 				table.insert(body, ui.text { turn.warning, class = "feedback-error", wrap = true })
 			end
@@ -326,6 +333,7 @@ return component {
 		["error"] = "why the last send failed, shown above the buttons",
 		["change"] = "sent on each edit, with `value` set to the text",
 		["send"] = "sent by Send and ⌘↩, with `value` set to the text from ⌘↩",
+		["diagrams"] = "`app.diagrams.diagrams`: the diagrams a run showed draw in it (see `agent-run`)",
 		["runs"] = "runs from `app.acp.runs` the mod started, newest first; runs with a `thread` show under that run as one conversation. A row sends `{ expand = id }`; Remove under an open one that is not running sends `{ forget_thread = id }` (the mod forgets each run of it). A run's `warning` shows under it (a change that broke the app comes back undone, saying why), and `checking` shows while the provider checks the app after it",
 		["expanded"] = "id of the conversation shown open (its first run), each run with `agent-run`; one waiting on an answer is always open",
 		["undo"] = "show Undo these changes under an open conversation whose runs changed the app (`changed`, not yet `undone`): it sends `{ undo_thread = id }`; send the provider `{ undo = run }` for each of its runs, newest first",

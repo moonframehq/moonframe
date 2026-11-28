@@ -359,7 +359,34 @@ The plan as first written:
 - Edits the user makes to an agent's diagram stay local unless they press
   "Send to agent", which sends the new Mermaid as a prompt.
 
-### 6. Chats
+### 6. Chats (done)
+
+As built:
+
+- Every diagram knows the agent run that showed it: offered MCP servers'
+  arguments may hold `{run}` and `{agent}`, which moonframe-acp fills in
+  per session, and `moonframe mcp diagrams --run` stamps it on each
+  diagram, which `app.diagrams` carries as `run`.
+- `diagram-card`: a diagram from `app.diagrams` with its title, agent and
+  note over `ui.diagram` (`scroll = "focus"`, so the chat scrolls past
+  it until a click inside), fitted again with each revision, so a turn
+  shows one diagram growing.
+- `agent-run` (and the Send feedback dialog through `feedback`) takes
+  `diagrams`: the run's own draw as cards, and its `diagram_*` tool rows
+  go.
+- `tool-group` (and so `agent-chat`) takes `diagrams`: a `diagram_*`
+  call's answer names its diagram (`` Showing `plan` ... ``), so each
+  draws as one card, open or folded, and those rows leave the list. A
+  server the app gave no run stamps its diagrams with its own session and
+  every answer ends `[run ID]`, so a chat draws a diagram only while its
+  own session last wrote it, never another chat's of the same id; this
+  works for any agent given the server.
+- `tool-group` lost a `state` no rule styled, which redrew it each frame.
+- Not yet: herdr-acp (`agent-chat`'s agents) takes no MCP servers, so
+  its agents get the tools only when the user adds `moonframe mcp
+  diagrams` to their own settings; "Send to agent" of a user's edits.
+
+The plan as first written:
 
 - In `agent-chat` and `tool-group`, a `diagram_show` or `diagram_patch`
   tool call draws as the live diagram instead of a folded row; later
@@ -368,7 +395,39 @@ The plan as first written:
 - This is what Sheprd uses once it moves onto Moonframe's chats, with no
   diagram code of its own.
 
-### 7. Finish
+### 7. Finish (done)
+
+As built:
+
+- `moonframe_diagram::export::svg`: a laid-out diagram as SVG, drawn as
+  the view draws it (shapes, rounded edges and every head, labels,
+  groups, a sequence's lifelines and notes, the highlight), in
+  `export::Colors`; `view::export_colors` reads them from the theme, so
+  an export matches the app, light or dark. Font families fall back to a
+  sans serif any renderer knows. Labels wrap and shorten to their boxes
+  as the view's do (`view::export_svg` measures them in the theme's
+  font), and a fill of a node's own gets light or dark text by its
+  lightness.
+- `ui.diagram { export = { format = "png" | "svg", seq } }` writes the
+  diagram to the app's share folder (where `app:share` may take it, and
+  nowhere a mod names) and sends `{ exported = { path, format } }`, or
+  `{ exported = { error, format } }`; PNG is the SVG rasterized at 2x by
+  GPUI's SVG renderer. An export waits for a big document's background
+  layout (a new document first turns it down), and each file, its own,
+  is drawn and written off the UI thread. ⌘C in the view
+  copies it as Mermaid: the user's action, as a mod may not write the
+  clipboard by itself.
+- Only strict `#rgb`/`#rrggbb` fills are taken (`model::is_hex_color`),
+  and every SVG attribute is escaped, so text from an agent can't inject
+  markup into an exported SVG.
+- `examples/diagram`: Document > Export PNG…, Export SVG… (handed to the
+  system's share menu) export the diagram on show, the editor's or an
+  agent's; a failure shows in the top bar.
+- Light and dark: every PR's screenshots show both.
+- A parser fix found on the way: a node named before a subgraph and
+  listed inside it joins it, as Mermaid has it.
+
+The plan as first written:
 
 - Export PNG and SVG; copy as Mermaid; light and dark checked against
   style.luau.

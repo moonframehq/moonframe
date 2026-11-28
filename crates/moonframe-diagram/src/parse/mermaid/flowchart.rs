@@ -263,6 +263,11 @@ impl Builder {
             ));
         }
         let index = self.node_index(number, id)?;
+        // Named inside a subgraph, a node with none yet joins it, as
+        // Mermaid has it: `a --> b` first, then `subgraph g` listing `b`.
+        if self.diagram.nodes[index].group.is_none() {
+            self.diagram.nodes[index].group = self.open.last().map(|(g, _)| g.clone());
+        }
         // Mermaid 11's `A@{ shape: ..., label: ... }`: the label alone.
         if c.eat("@{") {
             let body = c.until("}").unwrap_or_default();
@@ -444,7 +449,7 @@ fn look(body: &str, name: &str) -> Look {
             && key.trim() == "fill"
         {
             let value = value.trim().trim_end_matches(';');
-            if value.starts_with('#') && matches!(value.len(), 4 | 7) {
+            if crate::model::is_hex_color(value) {
                 out.fill = Some(value.to_owned());
             }
         }

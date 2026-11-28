@@ -87,6 +87,11 @@ fn tools() -> Value {
 pub struct Server {
     dir: PathBuf,
     agent: Option<String>,
+    /// Whose diagrams these are, stamped on each it writes and named in
+    /// each answer: the app's agent run when the app started the agent,
+    /// else this server's own, as each agent session starts one. A chat
+    /// draws a diagram only while the latest to write it is its session.
+    run: String,
 }
 
 impl Server {
@@ -94,7 +99,16 @@ impl Server {
         Self {
             dir: dir.to_owned(),
             agent,
+            run: session(),
         }
+    }
+
+    /// Stamps its diagrams with the agent run `run`.
+    pub fn for_run(mut self, run: Option<String>) -> Self {
+        if let Some(run) = run.filter(|r| !r.is_empty()) {
+            self.run = run;
+        }
+        self
     }
 
     /// Serves requests from `input` until it ends.
@@ -149,7 +163,12 @@ impl Server {
                     .unwrap_or_default();
                 let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
                 match self.call(name, &arguments) {
-                    Ok(text) => json!({ "content": [{ "type": "text", "text": text }] }),
+                    // The run last: a chat reads the diagram from the
+                    // answer's first `id` and the run from this line.
+                    Ok(text) => {
+                        let text = format!("{text}\n[run {}]", self.run);
+                        json!({ "content": [{ "type": "text", "text": text }] })
+                    },
                     Err(text) => {
                         json!({ "content": [{ "type": "text", "text": text }], "isError": true })
                     },
@@ -186,6 +205,7 @@ impl Server {
                     title: text("title").unwrap_or_else(|| id.clone()),
                     id: id.clone(),
                     agent: self.agent.clone(),
+                    run: Some(self.run.clone()),
                     revision,
                     updated: store::now(),
                     document,
@@ -248,9 +268,22 @@ impl Server {
         store::read(&store::path(&self.dir, id)).ok()
     }
 
+    /// Writes `shown` as this server's: its run is now the one to draw it.
     fn save(&self, shown: &Shown) -> Result<(), String> {
-        store::write(&self.dir, shown).map_err(|e| format!("cannot write the diagram: {e}"))
+        let mut shown = shown.clone();
+        shown.run = Some(self.run.clone());
+        store::write(&self.dir, &shown).map_err(|e| format!("cannot write the diagram: {e}"))
     }
+}
+
+/// A run for a server the app did not name one: unique to this process.
+fn session() -> String {
+    let micros = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_micros());
+    static SERVERS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let serial = SERVERS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("session-{micros}-{}-{serial}", std::process::id())
 }
 
 fn error(id: Value, code: i64, message: &str) -> Value {
@@ -333,6 +366,15 @@ mod tests {
             json!({ "id": "arch", "remove_nodes": ["cache"] }),
         );
         assert!(patched.get("isError").is_none(), "{patched}");
+
+        // Patched by another session, the diagram is that session's now,
+        // and each answer names the run.
+        let file = store::read(&store::path(dir.path(), "arch")).unwrap();
+        assert_eq!(file.run.as_deref(), Some(again.run.as_str()));
+        assert_ne!(again.run, server.run);
+        let text = patched["content"][0]["text"].as_str().unwrap();
+        assert!(text.starts_with("`arch`: "), "{text}");
+        assert!(text.ends_with(&format!("\n[run {}]", again.run)), "{text}");
 
         call(&mut again, 6, "diagram_close", json!({ "id": "arch" }));
         assert!(!store::path(dir.path(), "arch").exists());

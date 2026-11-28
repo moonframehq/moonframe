@@ -94,11 +94,28 @@ impl Acp {
         Ok(())
     }
 
-    /// The warm agent, for a run of `agent` in `cwd`, if it fits.
-    pub(crate) fn take_warm(&self, agent: &Agent, cwd: &Path) -> Option<Run> {
-        lock(&self.state).warm.take_if(|run| {
-            run.agent.name == agent.name && run.cwd() == cwd && !run.status.finished()
-        })
+    /// The id of the warm agent's run, if it fits a run of `agent` in
+    /// `cwd`: left in place, so its replies still find it while the run is
+    /// prepared.
+    pub(crate) fn warm_id(&self, agent: &Agent, cwd: &Path) -> Option<String> {
+        lock(&self.state)
+            .warm
+            .as_ref()
+            .filter(|run| fits(run, agent, cwd))
+            .map(|run| run.id.clone())
+    }
+
+    /// Moves the warm agent, if it still fits, into the runs as `start`,
+    /// under one lock so none of its replies goes astray; else gives
+    /// `start` back to launch an agent for.
+    pub(crate) fn adopt_warm(&self, start: Start) -> Option<Start> {
+        let mut state = lock(&self.state);
+        let Some(mut run) = state.warm.take_if(|run| fits(run, start.agent, &start.cwd)) else {
+            return Some(start);
+        };
+        run.adopt(start);
+        state.runs.push(run);
+        None
     }
 
     /// Starts the agent `message` names (else the default) ahead of a run
@@ -132,7 +149,13 @@ impl Acp {
             | crate::agents::Found::Fetched(program, args) => (program, args),
             crate::agents::Found::Missing => return,
         };
-        let run = Run::new(waiting(agent, cwd), Some(host.clone()));
+        // Its id now, as its session (and the MCP servers it offers, told
+        // the run they work for) opens before the run comes.
+        self.serial += 1;
+        let run = Run::new(
+            waiting(agent, cwd, crate::run_id(self.serial)),
+            Some(host.clone()),
+        );
         if let Err(error) = self.launch(run, &program, &args, true) {
             tracing::warn!(provider = "acp", "cannot warm {}: {error}", agent.title);
         }
@@ -151,10 +174,16 @@ impl Acp {
     }
 }
 
-/// A run with no prompt yet, for a warm agent.
-fn waiting(agent: &'static Agent, cwd: PathBuf) -> Start {
+/// Whether the warm agent `run` can take a run of `agent` in `cwd`.
+fn fits(run: &Run, agent: &Agent, cwd: &Path) -> bool {
+    run.agent.name == agent.name && run.cwd() == cwd && !run.status.finished()
+}
+
+/// A run with no prompt yet, for a warm agent: the run that takes it
+/// keeps `id`.
+fn waiting(agent: &'static Agent, cwd: PathBuf, id: String) -> Start {
     Start {
-        id: String::new(),
+        id,
         owner: String::new(),
         request: Value::Null,
         agent,

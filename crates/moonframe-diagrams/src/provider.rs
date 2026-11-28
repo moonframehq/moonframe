@@ -263,6 +263,9 @@ fn entry(
                 if let Some(agent) = shown.agent {
                     out["agent"] = agent.into();
                 }
+                if let Some(run) = shown.run {
+                    out["run"] = run.into();
+                }
                 if let Some(note) = shown.note {
                     out["note"] = note.into();
                 }

@@ -34,7 +34,7 @@ pub use {
         ActivityView, ChoiceView, CommandView, PermissionChoice, PermissionView, Picker, PlanItem,
         PlanView, QueuedView, UsageView,
     },
-    rows::{FileChange, QuestionView, Row, ToolGroup, ToolItem, ToolView},
+    rows::{DiagramRef, FileChange, QuestionView, Row, ToolGroup, ToolItem, ToolView},
     text::{duration, tokens},
 };
 

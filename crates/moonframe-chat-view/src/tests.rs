@@ -203,6 +203,34 @@ fn a_sub_agents_steps_count_in_its_call_and_are_not_rows() {
 }
 
 #[test]
+fn a_sub_agents_diagrams_draw_in_its_parents_group() {
+    let mut shown = tool("s1", ToolKind::Other, "diagram_show", ToolStatus::Completed);
+    shown.parent = Some("task".to_owned());
+    shown.content = vec![ToolContent::Text {
+        text: "Showing `plan` (2 nodes) to the user.\n[run session-9]".to_owned(),
+    }];
+    let view = prepare(
+        &transcript(vec![
+            user("explore"),
+            EntryKind::Tool(tool(
+                "task",
+                ToolKind::Subagent,
+                "Explore the repo",
+                ToolStatus::Completed,
+            )),
+            EntryKind::Tool(shown),
+        ]),
+        &Limits::FULL,
+    );
+    let tools = group(&view.rows[1]);
+    assert_eq!(tools.items.len(), 1, "the step is no row");
+    assert_eq!(tools.diagrams, [DiagramRef {
+        id: "plan".to_owned(),
+        run: Some("session-9".to_owned()),
+    }]);
+}
+
+#[test]
 fn a_prompt_hides_its_context_frame_and_lists_its_files() {
     let framed = frame("The open message: Re: invoice", "Summarize it");
     let mut text = framed.clone();
@@ -326,6 +354,65 @@ fn rows_answers_and_groups_stay_within_their_limits() {
 
     let json = serde_json::to_value(prepare(&transcript(vec![]), &Limits::SHORT)).unwrap();
     assert_eq!(json["rows"], serde_json::json!([]));
+}
+
+#[test]
+fn a_group_keeps_the_diagrams_its_calls_showed_past_its_trim() {
+    let answer = |call: &str, title: &str, status: ToolStatus, text: &str| {
+        let mut shown = tool(call, ToolKind::Other, title, status);
+        shown.content = vec![ToolContent::Text {
+            text: text.to_owned(),
+        }];
+        EntryKind::Tool(shown)
+    };
+    let mut calls = vec![
+        answer(
+            "d1",
+            "mcp__moonframe-diagrams__diagram_show",
+            ToolStatus::Completed,
+            "Showing `plan` (3 nodes) to the user.\n[run session-1]",
+        ),
+        answer(
+            "d2",
+            "diagram_patch",
+            ToolStatus::Completed,
+            "`plan`: added 1 node.\n[run session-1]",
+        ),
+        answer(
+            "d3",
+            "diagram_show",
+            ToolStatus::Failed,
+            "Showing `broken` (0 nodes)",
+        ),
+        answer(
+            "d4",
+            "diagram_show",
+            ToolStatus::Completed,
+            "Showing `flow` (2 nodes) to the user.",
+        ),
+        answer(
+            "r1",
+            "Read notes.md",
+            ToolStatus::Completed,
+            "`notes` say hi",
+        ),
+    ];
+    calls.extend((0..8).map(|index| call(&format!("c{index}"), ToolKind::Read, "Read")));
+    let limits = Limits {
+        group: 3,
+        ..Limits::FULL
+    };
+    let view = prepare(&transcript(calls), &limits);
+    let tools = group(&view.rows[0]);
+    assert_eq!(tools.items.len(), 3);
+    let shown = |id: &str, run: Option<&str>| DiagramRef {
+        id: id.to_owned(),
+        run: run.map(str::to_owned),
+    };
+    assert_eq!(tools.diagrams, [
+        shown("plan", Some("session-1")),
+        shown("flow", None)
+    ]);
 }
 
 #[test]

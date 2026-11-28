@@ -33,6 +33,8 @@ type Props = {
 	-- Show the user's words above.
 	request: boolean?,
 	to: string?,
+	-- `app.diagrams.diagrams`: those this run showed draw as cards.
+	diagrams: { any }?,
 }
 
 -- How a status is drawn: its icon, the class tinting it, its words.
@@ -88,6 +90,8 @@ local function variant(kind: string): any
 	return "ghost"
 end
 
+local diagram_card = use "diagram-card"
+
 return component {
 	title = "Agent Run",
 	category = "Agents",
@@ -98,6 +102,7 @@ return component {
 		["run"] = "a run from `app.acp.runs` { id, agent, agent_title, text, status, started, finished, error, message, tools, tool_count, plan, question }",
 		["lines"] = "lines of the agent's message shown (default 6; 0 hides it)",
 		["tools"] = "tool calls listed, newest last (default 4)",
+		["diagrams"] = "`app.diagrams.diagrams`: the diagrams this run showed through `moonframe mcp diagrams` draw as cards, in place of their tool calls",
 		["request"] = "show the user's words above",
 		["to"] = "where its buttons send, default `provider:acp`",
 	},
@@ -194,7 +199,21 @@ return component {
 		end
 
 		local tools: { any } = {}
-		local list: { Tool } = run.tools or {}
+		local cards: { any } = {}
+		for _, d in props.diagrams or {} do
+			if d.run == run.id then
+				table.insert(cards, diagram_card { diagram = d, height = 260 })
+			end
+		end
+		-- Its `diagram_*` calls show as the diagrams they drew, below; a
+		-- failed one, or any while no card draws, stays a line.
+		local list: { Tool } = {}
+		for _, tool in run.tools or {} do
+			local drawn = #cards > 0 and tool.status ~= "failed" and string.find(tool.title or "", "diagram_", 1, true)
+			if not drawn then
+				table.insert(list, tool)
+			end
+		end
 		local first = math.max(1, #list - (props.tools or 4) + 1)
 		for i = first, #list do
 			local tool = list[i]
@@ -268,6 +287,7 @@ return component {
 			},
 			#plan > 0 and ui.column { class = "agent-run-plan", table.unpack(plan) },
 			#tools > 0 and ui.column { gap = "small", table.unpack(tools) },
+			#cards > 0 and ui.column { gap = "small", table.unpack(cards) },
 			question,
 			run.error ~= nil and ui.text { run.error, class = "agent-run-error", wrap = true, lines = 4 },
 			lines > 0 and run.message ~= nil and ui.text {

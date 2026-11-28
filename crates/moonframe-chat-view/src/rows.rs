@@ -110,6 +110,19 @@ pub struct ToolGroup {
     /// Items before the first one kept.
     pub more: usize,
     pub items: Vec<ToolItem>,
+    /// The diagrams its `moonframe mcp diagrams` calls showed, each once
+    /// in the order they came: kept whole, as `items` may drop them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub diagrams: Vec<DiagramRef>,
+}
+
+/// A diagram a call showed: its id, and the run its answer named, which
+/// tells it from another session's diagram of the same id.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct DiagramRef {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run: Option<String>,
 }
 
 /// A call in a group, or a thought between calls.
@@ -395,6 +408,10 @@ fn flush(
         .find(|tool| tool::running(tool.status))
         .and_then(|tool| text::first_line(&tool.title, 300));
     let files = totals(&items);
+    let mut diagrams: Vec<DiagramRef> = Vec::new();
+    for tool in &tools {
+        shown_diagrams(tool, steps, 0, &mut diagrams);
+    }
     let more = items.len().saturating_sub(limits.group);
     items.drain(..more);
     rows.push(Row::Tools(ToolGroup {
@@ -408,7 +425,30 @@ fn flush(
         files,
         more,
         items,
+        diagrams,
     }));
+}
+
+/// Adds the diagrams `tool` showed to `out`, each once, and those its
+/// sub-agent's steps showed (their own steps too, a few levels down): a
+/// step is no row, so its group draws its diagram.
+fn shown_diagrams(
+    tool: &Tool,
+    steps: &HashMap<&str, Vec<&Tool>>,
+    depth: usize,
+    out: &mut Vec<DiagramRef>,
+) {
+    if let Some(shown) = tool::diagram(tool)
+        && !out.contains(&shown)
+    {
+        out.push(shown);
+    }
+    if depth >= 4 {
+        return;
+    }
+    for step in steps.get(tool.call_id.as_str()).into_iter().flatten() {
+        shown_diagrams(step, steps, depth + 1, out);
+    }
 }
 
 /// The files a group changed, each once, its counts summed.

@@ -294,7 +294,34 @@ local function user_row(row: any): any
 	}
 end
 
-local function row_element(row: any, state: State, props: Props): any
+-- The group that draws each diagram's card among `rows`: the first to
+-- show it as it stands now (by the run that last wrote it), so a diagram
+-- the agent shows, explains and then patches draws once, and one a
+-- resumed chat's new session shows again draws where it showed it.
+local function card_owners(rows: { any }, first: number, diagrams: { any }?): { [string]: string }
+	local runs: { [string]: string | boolean } = {}
+	for _, d in diagrams or {} do
+		if d.from == "agent" and d.id then
+			runs[d.id] = d.run or true
+		end
+	end
+	local owners: { [string]: string } = {}
+	for index = first, #rows do
+		local row = rows[index]
+		if row.type == "tools" then
+			for _, shown in row.diagrams or {} do
+				local run = runs[shown.id]
+				local current = run ~= nil and (shown.run == nil or shown.run == run)
+				if current and not owners[shown.id] then
+					owners[shown.id] = row.key
+				end
+			end
+		end
+	end
+	return owners
+end
+
+local function row_element(row: any, state: State, props: Props, diagrams: { any }?, owners: { [string]: string }?): any
 	local kind = row.type
 	if kind == "user" then
 		return user_row(row)
@@ -327,6 +354,8 @@ local function row_element(row: any, state: State, props: Props): any
 				inspect = true,
 				output = if state.output and state.output.chat == chat_id(props, state) then state.output else nil,
 				msg = { fold = row.key, open = not open },
+				diagrams = diagrams,
+				cards = owners,
 			},
 		}
 	elseif kind == "turn" then
@@ -838,8 +867,10 @@ end
 					ui.text { `{earlier} earlier rows are not kept`, size = "small", tone = "muted" },
 				})
 			end
+			local diagrams = app.diagrams and app.diagrams.diagrams
+			local owners = card_owners(rows, first, diagrams)
 			for index = first, #rows do
-				local element = row_element(rows[index], state, props)
+				local element = row_element(rows[index], state, props, diagrams, owners)
 				if element then
 					table.insert(children, element)
 				end

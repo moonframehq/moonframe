@@ -157,6 +157,14 @@ node_kinds! {
     Text = "text",
 }
 
+/// Whether `color` is a plain `#rgb` or `#rrggbb`: the only fills taken
+/// from text an agent or a file wrote, as they end up in SVG and styles.
+pub fn is_hex_color(color: &str) -> bool {
+    color
+        .strip_prefix('#')
+        .is_some_and(|d| matches!(d.len(), 3 | 6) && d.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+
 /// A meaning a node or edge carries, drawn in the theme's color for it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tone {

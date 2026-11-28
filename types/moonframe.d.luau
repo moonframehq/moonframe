@@ -1191,6 +1191,11 @@ export type DiagramProps = {
 	-- "focus": scrolling pans only after a click inside (in a page that
 	-- scrolls, as a chat does).
 	scroll: "focus"?,
+	-- Writes the diagram, in the app's colors, to the share folder as
+	-- `format` ("png" or "svg"), once per new `seq`; the mod hears
+	-- `{ exported = { path, format } | { error, format } }` and may pass
+	-- the path to `app:share`.
+	export: { format: ("png" | "svg")?, seq: any }?,
 	[string]: any,
 }
 
@@ -2587,6 +2592,9 @@ type ProviderDiagramsShown = {
 	highlight: { string },
 	note: string?,
 	agent: string?,
+	-- The run that last wrote it: the `app.acp` run when the app started
+	-- the agent, else the agent session's own.
+	run: string?,
 	-- The text it came from, `mermaid` or `dot`.
 	language: string?,
 	text: string?,
@@ -2941,6 +2949,7 @@ type UseAgentRunProps = {
 	read tools: number?,
 	read request: boolean?,
 	read to: string?,
+	read diagrams: { any }?,
 }
 type UseAgentRunLook = any
 type UseAheadBehindProps = {
@@ -3358,6 +3367,10 @@ type UseDayStripProps = {
 	read event: string?,
 	read to: string?,
 }
+type UseDiagramCardProps = {
+	read diagram: any,
+	read height: number?,
+}
 type UseDiagramShape = any
 type UseDiagramLink = any
 type UseDiagramProps = {
@@ -3544,6 +3557,7 @@ type UseFeedbackProps = {
 	read change: any,
 	read send: any,
 	read runs: { any }?,
+	read diagrams: { any }?,
 	read expanded: string?,
 	read undo: boolean?,
 	read follow: boolean?,
@@ -5030,6 +5044,8 @@ type UseToolGroupProps = {
 	read open: boolean?,
 	read msg: any,
 	read to: string?,
+	read diagrams: { any }?,
+	read cards: { [string]: string }?,
 }
 type UseToolbarButton = any
 type UseToolbarProps = {
@@ -5200,6 +5216,7 @@ type UseProps = {
 	["date-picker"]: UseDatePickerProps,
 	["date-tile"]: UseDateTileProps,
 	["day-strip"]: UseDayStripProps,
+	["diagram-card"]: UseDiagramCardProps,
 	["diagram"]: UseDiagramProps,
 	["dialog"]: UseDialogProps,
 	["dictation"]: UseDictationProps,
