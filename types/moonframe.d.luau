@@ -3059,6 +3059,26 @@ type UseChatMessageProps = {
 	read text: string?,
 	read [number]: any,
 }
+type UseChatQuestionProps = {
+	read id: string?,
+	read permission: any,
+}
+type UseChatQuestionState = any
+type UseChatWaitingProps = {
+	read view: any,
+	read chat: string?,
+	read plan_open: boolean?,
+	read plan_toggle: any,
+}
+type UseChatWorkingProps = {
+	read working: boolean?,
+	read waiting: boolean?,
+	read step: string?,
+	read working_for: string?,
+	read activities: { any }?,
+	read open: boolean?,
+	read toggle: any,
+}
 type UseCheckboxProps = {
 	read checked: boolean?,
 	read indeterminate: boolean?,
@@ -5142,6 +5162,9 @@ type UseProps = {
 	["change-tree"]: UseChangeTreeProps,
 	["chat-markdown"]: UseChatMarkdownProps,
 	["chat-message"]: UseChatMessageProps,
+	["chat-question"]: UseChatQuestionProps,
+	["chat-waiting"]: UseChatWaitingProps,
+	["chat-working"]: UseChatWorkingProps,
 	["checkbox"]: UseCheckboxProps,
 	["checks"]: UseChecksProps,
 	["chips"]: UseChipsProps,

@@ -163,6 +163,9 @@ pub struct ActivityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
     pub started_ms: u64,
+    /// How long it has run, `3m 05s`, once [`crate::clock`] filled it in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub running_for: Option<String>,
     /// The agent can end it alone: `{ stop_activity = call_id, chat }`.
     pub stoppable: bool,
 }
@@ -487,6 +490,7 @@ pub(crate) fn activities(transcript: &Transcript) -> Vec<ActivityView> {
                 .as_deref()
                 .map(|detail| text::head(detail, 300)),
             started_ms: activity.started_ms,
+            running_for: None,
             stoppable: activity.stoppable,
         })
         .collect()

@@ -364,6 +364,9 @@ Call one with `local name = use "name"`, then `name { ... }` wherever an element
 | [`avatar-stack`](#avatar-stack) | Data | Who is in a group, in a card or a row (38 investors, 3 reviewers), when their names matter less than how many. For one person use `avatar`; for a list of people use `list` or `table`. |
 | [`bar-chart`](#bar-chart) | Data | Counts over time or per category: tokens per day, runs per hour, alerts per device, stacked by kind. For a tiny live trend in a status bar use `sparkline`; for one fraction use `meter`; for one headline number use `stat-tile`. |
 | [`chat-message`](#chat-message) | Data | Each turn of a conversation with an agent or a person, stacked in a scrolling column over a `composer`. For a comment on a pull request use `comment-card`; for a notification use `toast`. |
+| [`chat-question`](#chat-question) | Data | A permission in `app.chat`'s view that carries a `question`; `agent-chat` draws it already. For a yes/no permission use the permission's options as buttons; for a form of your own use `form-grid`. |
+| [`chat-waiting`](#chat-waiting) | Data | Between an agent conversation from `app.chat`'s view and its composer; `agent-chat` draws it already. For one run's question use `agent-run`; for a plain confirmation use `confirm`. |
+| [`chat-working`](#chat-working) | Data | Under an agent conversation drawn from `app.chat`'s view; `agent-chat` draws it already. For one run's status use `agent-run`; for a plain spinner use `loading`. |
 | [`code-view`](#code-view) | Data | Show code or a log read-only: a file at a line, a snippet in a comment, a test's output. For changes use `diff-view`; for a live shell use `terminal`. |
 | [`comment-card`](#comment-card) | Data | Comments in a pull request conversation, review threads, notes left by agents or people. Stack them in a column. For a numbered review note with a remove button use `note-card`; for events in order use `timeline`. |
 | [`contribution-graph`](#contribution-graph) | Data | Daily activity over months or a year, GitHub style: commits, agent runs, posts, workouts, a streak. Pass one count per day and the first day's date. For weekly or arbitrary buckets without dates use `heat-grid`; for counts with an axis use `bar-chart`; for picking a day use `month-grid`. |
@@ -1334,7 +1337,7 @@ A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 
 #### `agent-chat`
 
-**Agent Chat.** A whole conversation with a coding agent through herdr-acp: transcript with folded tool runs, permission questions, queue, Stop and Resume, mode/model/effort pickers and a multiline composer with history, / commands and attachments.
+**Agent Chat.** A whole conversation with a coding agent through Sheprd's sheprd-acp: transcript with folded tool runs and handoffs, what the agent is doing with its stoppable sub-agents and shells, permission questions and questions with choices, a queue to steer or send now, Stop and Resume, pull requests, pickers for the agent (switched mid-conversation), mode, model, effort and other settings, auto-accept, and a multiline composer with history, / commands and attachments.
 
 **When:** Give an app a chat with Claude, Codex, OpenCode, pi or Gemini on the `chat` provider (crates/moonframe-chat) in a few lines; the mod must be in providers/chat's `starters`. For one run of an agent the app starts itself use `agent-run`; for a static message use `chat-message`; for a send box alone use `composer`.
 
@@ -1353,7 +1356,7 @@ A whole mod using it, with state: `app/components/demos/toolbar.luau`.
 | `to` | where its commands go (default "provider:chat"; "parent" sends them to the mod, as a demo does) |
 | `view` | stands in for the `app.chat` chat { id, status, error?, session?, view }, for a preview or demo |
 
-**Styles:** `.agent-chat` `.agent-chat-bottom` `.agent-chat-composer` `.agent-chat-context` `.agent-chat-empty-icon` `.agent-chat-ended` `.agent-chat-error` `.agent-chat-field` `.agent-chat-file` `.agent-chat-notice` `.agent-chat-notice:error` `.agent-chat-notice:warning` `.agent-chat-permission` `.agent-chat-permission-icon` `.agent-chat-permission-tool` `.agent-chat-plan` `.agent-chat-plan-done` `.agent-chat-plan-running` `.agent-chat-queued` `.agent-chat-transcript` `.agent-chat-turn` `.agent-chat-turn:cancelled` `.agent-chat-turn:failed` `.agent-chat-user` `.agent-chat-working`
+**Styles:** `.agent-chat` `.agent-chat-auto-accept` `.agent-chat-bottom` `.agent-chat-composer` `.agent-chat-context` `.agent-chat-empty-icon` `.agent-chat-ended` `.agent-chat-error` `.agent-chat-field` `.agent-chat-file` `.agent-chat-guest` `.agent-chat-handoff` `.agent-chat-handoff-line` `.agent-chat-notice` `.agent-chat-notice:error` `.agent-chat-notice:warning` `.agent-chat-notice-details` `.agent-chat-transcript` `.agent-chat-turn` `.agent-chat-turn:cancelled` `.agent-chat-turn:failed` `.agent-chat-user` `.agent-chat-working`
 
 ```lua
 local agent_chat = use "agent-chat"
@@ -1517,6 +1520,70 @@ chat_message {
 	author = "Sales agent", text = "Start with Lumen Retail: the biggest deal at risk.",
 	thinking { seconds = 4, open = state.thought, msg = "toggle-thought" },
 }
+```
+
+#### `chat-question`
+
+**Chat Question.** A question a coding agent asks with choices: each choice with its description, one click to answer (or tick several, then Send), and a field for the user's own words.
+
+**When:** A permission in `app.chat`'s view that carries a `question`; `agent-chat` draws it already. For a yes/no permission use the permission's options as buttons; for a form of your own use `form-grid`.
+
+| Prop | Meaning |
+| --- | --- |
+| `id` | the instance's id, one per question (such as `q-<permission id>`) |
+| `permission` | the view's permission: { id, title, question = { header?, text, multiple, options = { { label, description? } } } } |
+
+**Styles:** `.chat-question` `.chat-question-choice` `.chat-question-choice:picked` `.chat-question-field` `.chat-question-header`
+
+```lua
+local chat_question = use "chat-question"
+
+chat_question { id = "example", permission = { id = 1, question = { header = "Tab detail", multiple = false, options = { { description = "Shortest; best for many tabs", label = "Title only" }, { description = "Shows which agent runs there", label = "Title and agent" } }, text = "How much should each tab show?" }, title = "How should tabs show?" } }
+```
+
+#### `chat-waiting`
+
+**Chat Waiting.** What waits on the user above an agent's composer: its plan, permission questions with the agent's options, questions with choices, guests' prompts to allow, and queued prompts to take back, steer into the turn or send now.
+
+**When:** Between an agent conversation from `app.chat`'s view and its composer; `agent-chat` draws it already. For one run's question use `agent-run`; for a plain confirmation use `confirm`.
+
+| Prop | Meaning |
+| --- | --- |
+| `chat` | the chat's id, which keeps each question's instance its own |
+| `plan_open` | the plan is listed item by item rather than folded |
+| `plan_toggle` | message sent when the plan's line is clicked |
+| `view` | the chat's view: its `plan`, `permissions`, `queue`, `status` and `can_steer` |
+
+**Styles:** `.chat-waiting` `.chat-waiting-guest` `.chat-waiting-permission` `.chat-waiting-permission-icon` `.chat-waiting-permission-tool` `.chat-waiting-plan` `.chat-waiting-plan-done` `.chat-waiting-plan-running` `.chat-waiting-queued` `.chat-waiting-queued:held`
+
+```lua
+local chat_waiting = use "chat-waiting"
+
+chat_waiting { chat = "example", plan_open = false, view = { can_steer = true, permissions = { { id = 7, options = { { allows = true, id = "yes", kind = "allow_once", name = "Allow" }, { allows = false, id = "no", kind = "reject_once", name = "Reject" } }, title = "Run a command?", tool = "rm -rf build" } }, plan = { current = "Write the tests", done = 1, items = {  }, total = 3 }, queue = { { held = false, id = "q1", steered = false, text = "Also update the README" }, { held = false, id = "q2", steered = true, text = "Use tabs, not spaces" } }, status = "working" } }
+```
+
+#### `chat-working`
+
+**Chat Working.** What a coding agent is doing now: a spinner with its current step and how long the turn has run, or "Waiting for you", and its running sub-agents and background shells with their times and Stop buttons.
+
+**When:** Under an agent conversation drawn from `app.chat`'s view; `agent-chat` draws it already. For one run's status use `agent-run`; for a plain spinner use `loading`.
+
+| Prop | Meaning |
+| --- | --- |
+| `activities` | `view.activities`: { call_id, kind, label, detail?, running_for?, stoppable } |
+| `open` | the activities are listed one per line rather than counted |
+| `step` | what the agent is doing, such as the running tool's title |
+| `toggle` | message sent when the activity count is clicked |
+| `waiting` | a question waits for the user, so the agent is paused |
+| `working` | a turn runs now |
+| `working_for` | how long the turn has run (`view.working_for`) |
+
+**Styles:** `.chat-working` `.chat-working-activity` `.chat-working-list` `.chat-working-time`
+
+```lua
+local chat_working = use "chat-working"
+
+chat_working { activities = { { call_id = "a", detail = "Reading lib.rs", kind = "subagent", label = "Explore the chat crates", running_for = "1m 05s", stoppable = true }, { call_id = "b", kind = "shell", label = "npm run dev", running_for = "3m 12s", stoppable = false } }, open = true, step = "Running cargo test", working = true, working_for = "42s" }
 ```
 
 #### `code-view`

@@ -622,3 +622,35 @@ fn tool_output_caches_pages_and_refreshes_on_replace() {
     chats.receive(&host, "chat", message(&format!(r#"{{ "close": "{id}" }}"#)));
     assert!(chats.output_cache.is_none());
 }
+
+#[cfg(unix)]
+#[test]
+fn only_a_live_chat_working_keeps_its_clock_ticking() {
+    let chat = |phase| {
+        let mut transcript = Transcript::new("Claude");
+        transcript.status = herdr_chat_protocol::Status::Working;
+        Chat {
+            id: "c".to_owned(),
+            owner: "chat".to_owned(),
+            agent: "claude".to_owned(),
+            cwd: "/".to_owned(),
+            created: 0,
+            pid: None,
+            endpoint: None,
+            session: None,
+            phase,
+            context: None,
+            transcript: Some(transcript),
+            output_revisions: output::Revisions::default(),
+            cursor: None,
+            writer: None,
+            held: Vec::new(),
+            closing: false,
+        }
+    };
+    assert!(project::ticking(&chat(Phase::Live)));
+    // The program died mid-turn: its last transcript still says working.
+    assert!(!project::ticking(&chat(Phase::Ended("gone".to_owned()))));
+    assert!(!project::ticking(&chat(Phase::Failed("broke".to_owned()))));
+    assert!(!project::ticking(&chat(Phase::Reconnecting)));
+}
