@@ -146,6 +146,8 @@ fn append(text: &str, line: &str) -> String {
 /// One list item of the inbox, by its line, with the lines under it.
 struct Item {
     first: usize,
+    /// The bytes of indentation before its bullet.
+    indent: usize,
     /// Lines past the item (exclusive).
     end: usize,
     text: String,
@@ -170,9 +172,16 @@ fn item_at(lines: &[&str], line: usize) -> Option<Item> {
     }
     Some(Item {
         first,
+        indent,
         end,
         text: content.trim().to_string(),
     })
+}
+
+/// `line` less `indent` bytes of leading whitespace, as far as it has them.
+fn unindent(line: &str, indent: usize) -> String {
+    let spaces = line.len() - line.trim_start().len();
+    line[spaces.min(indent)..].to_string()
 }
 
 /// The inbox's review: `keep` moves an item to the top, `drop` removes it,
@@ -209,12 +218,12 @@ fn inbox(vault: &mut Vault, review: &Value, today: &str) -> Result<Value, Error>
         "task" => {
             let path = format!("journal/{today}.md");
             let day = read_or_empty(vault, &path)?;
-            vault.write(
-                &path,
-                &append(&day, &format!("- [ ] {}", item.text)),
-                Some(&day),
-                &stamp(),
-            )?;
+            // The lines under the item go with it, still under the task.
+            let task = std::iter::once(format!("- [ ] {}", item.text))
+                .chain(moved[1..].iter().map(|line| unindent(line, item.indent)))
+                .collect::<Vec<_>>()
+                .join("\n");
+            vault.write(&path, &append(&day, &task), Some(&day), &stamp())?;
             answer["path"] = json!(path);
             without
         },
@@ -395,6 +404,43 @@ mod tests {
         )
         .unwrap();
         assert_eq!(vault.read(INBOX).unwrap(), "");
+        // A task keeps the lines under its item, still under it.
+        vault
+            .write(
+                INBOX,
+                "- x\n  - call Ana\n    first\n  more on x\n- y\n",
+                None,
+                "s",
+            )
+            .unwrap();
+        act(
+            &mut vault,
+            &json!({ "inbox": { "op": "task", "line": 1, "text": "x" } }),
+            "2026-11-10",
+        )
+        .unwrap();
+        assert_eq!(
+            vault.read("journal/2026-11-10.md").unwrap(),
+            "- [ ] a\n- [ ] x\n  - call Ana\n    first\n  more on x\n"
+        );
+        assert_eq!(vault.read(INBOX).unwrap(), "- y\n");
+        // A nested item's lines come out under the task as they were under it.
+        vault
+            .write(INBOX, "- z\n  - nested\n    under nested\n", None, "s")
+            .unwrap();
+        act(
+            &mut vault,
+            &json!({ "inbox": { "op": "task", "line": 2, "text": "nested" } }),
+            "2026-11-10",
+        )
+        .unwrap();
+        assert!(
+            vault
+                .read("journal/2026-11-10.md")
+                .unwrap()
+                .ends_with("- [ ] nested\n  under nested\n")
+        );
+        assert_eq!(vault.read(INBOX).unwrap(), "- z\n");
         // A stale review does nothing.
         vault.write(INBOX, "- x\n", None, "s").unwrap();
         assert!(

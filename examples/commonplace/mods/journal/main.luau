@@ -13,7 +13,36 @@ type State = {
 	pick: number?,
 	-- Bumped after each capture, so the field starts empty again.
 	round: number,
+	-- A change the provider refused or could not write, and the card it
+	-- was made from ("today" or "inbox").
+	notice: { text: string, card: string }?,
+	-- The last line captured from each card, until it is answered: given
+	-- back to its field when the capture failed.
+	sent: { [string]: string },
+	-- A failed capture's line, back in its card's field.
+	retry: { text: string, card: string }?,
 }
+
+-- The text a card's field starts with: the line a failed capture gives back.
+local function retry_text(state: State, card: string): string?
+	return if state.retry and state.retry.card == card then state.retry.text else nil
+end
+
+-- The notice for `card`, in its header.
+local function notice_text(state: State, card: string): Element?
+	local notice = state.notice
+	if not notice or notice.card ~= card then
+		return nil
+	end
+	return ui.row {
+		align = "center",
+		gap = "small",
+		max_width = 260,
+		tooltip = notice.text,
+		ui.icon { "circle-alert", tone = "danger", size = "small" },
+		ui.text { notice.text, tone = "danger", size = "small", truncate = true },
+	}
+end
 
 local RAIL: { any } = {
 	{ icon = "sun", tooltip = "Journal (⌥⌘2)", layout = "journal" },
@@ -64,7 +93,7 @@ local function journal(state: State)
 					style = { margin = { 0, 24 } },
 					align = "center",
 					ui.icon { "plus", class = "muted" },
-					ui.input { id = `today-{state.round}`, placeholder = "Add a line to today…", submit = { capture = "today" }, grow = true, class = "bare-input" },
+					ui.input { id = `today-{state.round}`, value = retry_text(state, "today"), placeholder = "Add a line to today…", submit = { capture = "today" }, grow = true, class = "bare-input" },
 				}
 			)
 		end
@@ -81,7 +110,7 @@ local function journal(state: State)
 			align = "center",
 			ui.icon { "sun", class = "muted" },
 			ui.row { grow = true, gap = "none", ui.text { "Journal", class = "card-title" } },
-			ui.text { "journal/", class = "muted small" },
+			notice_text(state, "today") or ui.text { "journal/", class = "muted small" },
 		},
 		ui.column { grow = true, scroll = true, ui.column { max_width = 760, self_align = "center", grow = true, table.unpack(blocks) } },
 	}
@@ -115,7 +144,7 @@ local function inbox(state: State)
 			align = "center",
 			ui.icon { "inbox" },
 			ui.row { grow = true, gap = "none", ui.text { "Inbox", class = "card-title" } },
-			ui.text { `{#list}`, class = "muted small" },
+			notice_text(state, "inbox") or ui.text { `{#list}`, class = "muted small" },
 		},
 		ui.row {
 			padding = "normal",
@@ -124,7 +153,7 @@ local function inbox(state: State)
 				grow = true,
 				align = "center",
 				ui.icon { "plus", class = "muted" },
-				ui.input { id = `inbox-{state.round}`, placeholder = "Write anything…", submit = { capture = "inbox" }, grow = true, class = "bare-input" },
+				ui.input { id = `inbox-{state.round}`, value = retry_text(state, "inbox"), placeholder = "Write anything…", submit = { capture = "inbox" }, grow = true, class = "bare-input" },
 			},
 		},
 		#rows == 0 and ui.column { padding = "large", ui.text { "Empty. Capture anything above.", class = "muted" } },
@@ -151,8 +180,11 @@ return mod {
 	title = "Journal",
 
 	init = function(previous: State?): (State, { any })
-		local state: State = previous or { views = {}, round = 1 }
+		local state: State = previous or { views = {}, round = 1, sent = {} }
 		state.views = {}
+		state.notice = nil
+		state.sent = {}
+		state.retry = nil
 		return state, watches()
 	end,
 
@@ -169,13 +201,29 @@ return mod {
 			return
 		end
 		if msg.reply ~= nil then
+			-- A capture or review answered: say why when it was not done.
+			local card = if msg.reply == "capture-today" then "today" else "inbox"
+			local line = if msg.reply == "capture-today" or msg.reply == "capture-inbox" then state.sent[card] else nil
+			state.sent[card] = nil
+			if msg.ok == false then
+				state.notice = { text = msg.error or "Not saved", card = card }
+				if line then
+					-- The line back in a fresh field, to send again.
+					state.round += 1
+					state.retry = { text = line, card = card }
+				end
+			elseif state.notice and state.notice.card == card then
+				state.notice = nil
+			end
 			return
 		end
 		if msg.pick then
 			state.pick = msg.pick
 		elseif msg.capture and type(msg.value) == "string" and string.match(msg.value, "%S") then
 			state.round += 1
-			return state, { { to = "provider:notes", msg = { capture = { text = msg.value, to = msg.capture }, id = "capture" } } }
+			state.retry = nil
+			state.sent[msg.capture] = msg.value
+			return state, { { to = "provider:notes", msg = { capture = { text = msg.value, to = msg.capture }, id = `capture-{msg.capture}` } } }
 		elseif msg.review then
 			local list = items((state.views.inbox or {}).text or "")
 			local index = state.pick or #list

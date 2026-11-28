@@ -14,8 +14,11 @@
 //!
 //! Changes, only from the mods in `[settings] writers`, each answered
 //! `{ reply = id, action, ok, ... | error }` (see `actions`):
-//! `save = { path, text }` (written once typing stops, merged with changes
-//! made elsewhere since the editor's view of the note last had its text),
+//! `save = { path, text, base? }` (written once typing stops, merged with
+//! changes made elsewhere since `base`, the text the edit changed, else
+//! since the text this editor last had; a write that fails is answered
+//! `ok = false, kept = true` and tried again, and edits still waiting are
+//! written when the provider stops; see `save`),
 //! `create = { path, text? }`, `rename = { from, to }`, `trash = path`,
 //! `capture = { text, to? = "inbox" | "today" }`, `inbox = { op = "keep" |
 //! "task" | "note" | "drop", line }`, `today = true`, `import = { source =
@@ -28,17 +31,21 @@
 //! with `open_vault`, else `~/Commonplace`, made with a starting layout the
 //! first time. Its index is in the cache folder, or at `[settings] index`.
 
+// keep-sorted start
 mod actions;
 mod enhance;
+mod save;
 #[cfg(test)]
 mod tests;
 mod views;
 mod watch;
+// keep-sorted end
 
 use {
     crate::Vault,
     moonframe_core::Data,
     moonframe_providers::{Handle, Native, profile, to_json},
+    save::Pending,
     serde_json::{Value, json},
     std::{
         collections::{BTreeMap, HashMap},
@@ -59,15 +66,6 @@ const RESCAN: Duration = Duration::from_secs(300);
 
 pub fn native() -> Box<dyn Native> {
     Box::new(Provider::default())
-}
-
-/// An edit waiting for typing to stop.
-struct Pending {
-    text: String,
-    base: Option<String>,
-    from: String,
-    reply: Value,
-    since: Instant,
 }
 
 /// An import running on a thread of its own.
@@ -93,14 +91,23 @@ pub(crate) struct Provider {
     /// Bumped each time the index changes.
     version: u64,
     views: BTreeMap<(String, String), View>,
-    pending: HashMap<String, Pending>,
-    /// The hash of what this provider last wrote to each note, so its own
-    /// writes coming back from the watcher are not sent to the editor
-    /// that typed them (which would undo keystrokes made since).
-    written: HashMap<String, String>,
-    /// The text each open note was last known to have, on disk and in its
-    /// editor: the base an edit is merged from.
-    known: HashMap<String, String>,
+    /// Edits waiting to be written, by editor and note.
+    pending: BTreeMap<save::Key, Pending>,
+    /// The hash of what this provider last wrote to each note and the
+    /// editor it wrote for, so that write coming back from the watcher is
+    /// not sent to that editor (which would undo keystrokes made since);
+    /// every other editor showing the note gets the new text.
+    written: HashMap<String, (String, String)>,
+    /// The text each editor was last known to have of each note, by
+    /// editor and note: the base its next edit is merged from when it
+    /// sends none.
+    known: HashMap<save::Key, String>,
+    /// The day views were last run for, so date-bound views (today's
+    /// journal) move on at midnight.
+    day: String,
+    /// The day in tests, in place of the clock.
+    #[cfg(test)]
+    clock: Option<String>,
     import: Arc<Mutex<ImportState>>,
     enhance: Arc<Mutex<enhance::Enhancing>>,
     last_import: Option<String>,
@@ -128,6 +135,10 @@ impl Provider {
         self.vault = None;
         self.watch = None;
         self.views.values_mut().for_each(|view| view.sent = None);
+        // Paths are the old vault's: none of it applies to another.
+        self.pending.clear();
+        self.written.clear();
+        self.known.clear();
         if !root.exists()
             && let Err(problem) = actions::starter(&root)
         {
@@ -162,7 +173,7 @@ impl Provider {
         };
         let index = vault.index();
         let count = |folder: &str| index.count(folder).unwrap_or(0);
-        let today = today();
+        let today = self.today();
         let import = self
             .import
             .lock()
@@ -196,10 +207,13 @@ impl Provider {
 
     /// Runs the views again and sends those whose answer changed.
     fn refresh_views(&mut self, host: &Handle, only: Option<&(String, String)>) {
+        let today = self.today();
+        if only.is_none() {
+            self.day.clone_from(&today);
+        }
         let Some(vault) = &self.vault else {
             return;
         };
-        let today = today();
         for (key, view) in self.views.iter_mut() {
             if only.is_some_and(|only| only != key) {
                 continue;
@@ -221,24 +235,26 @@ impl Provider {
             }
             let first = view.sent.is_none();
             view.sent = Some(print);
-            // A note whose new text is what this provider just wrote: the
-            // editor has it (or newer), so leave its text alone.
+            // A note whose new text is what this provider just wrote for
+            // this same editor: it has it (or newer), so leave its text
+            // alone. Any other editor showing the note takes the new text.
             let path = answer
                 .get("path")
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .to_string();
-            let hash = answer
-                .get("hash")
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            let own_write = !first && hash.is_some() && self.written.get(&path) == hash.as_ref();
+            let hash = answer.get("hash").and_then(Value::as_str);
+            let own_write = !first
+                && self.written.get(&path).is_some_and(|(written, by)| {
+                    Some(written.as_str()) == hash && *by == view.owner
+                });
             let mut answer = answer;
             if own_write && let Some(object) = answer.as_object_mut() {
                 object.remove("text");
                 object.insert("own".to_string(), Value::Bool(true));
             } else if let Some(text) = answer.get("text").and_then(Value::as_str) {
-                self.known.insert(path.clone(), text.to_string());
+                self.known
+                    .insert((view.owner.clone(), path.clone()), text.to_string());
             }
             let message = json!({ "view": view.id, "data": answer });
             tracing::debug!(target: "commonplace", view = %view.id, owner = %view.owner, bytes = message.to_string().len(), "sent");
@@ -246,61 +262,19 @@ impl Provider {
         }
     }
 
-    /// Writes edits that have waited long enough (all of them with `all`).
-    fn flush(&mut self, host: &Handle, all: bool) -> bool {
-        let ready: Vec<String> = self
-            .pending
-            .iter()
-            .filter(|(_, pending)| all || pending.since.elapsed() >= QUIET)
-            .map(|(path, _)| path.clone())
-            .collect();
-        let mut wrote = false;
-        for path in ready {
-            let Some(pending) = self.pending.remove(&path) else {
-                continue;
-            };
-            let Some(vault) = &mut self.vault else {
-                continue;
-            };
-            let stamp = chrono::Local::now().format("%Y-%m-%d %H%M").to_string();
-            match vault.write(&path, &pending.text, pending.base.as_deref(), &stamp) {
-                Ok(saved) => {
-                    let value = serde_json::to_value(&saved).unwrap_or(Value::Null);
-                    match &saved {
-                        // The editor gets merged text in this answer.
-                        crate::Saved::Merged { text, hash } => {
-                            self.known.insert(path.clone(), text.clone());
-                            self.written.insert(path.clone(), hash.clone());
-                        },
-                        crate::Saved::Written { hash }
-                        | crate::Saved::Conflict { hash, .. }
-                        | crate::Saved::Unchanged { hash } => {
-                            self.known.insert(path.clone(), pending.text.clone());
-                            self.written.insert(path.clone(), hash.clone());
-                        },
-                    }
-                    let mut answer = json!({ "reply": pending.reply, "action": "save", "ok": true, "path": path });
-                    if let (Some(answer), Some(saved)) = (answer.as_object_mut(), value.as_object())
-                    {
-                        answer.extend(saved.clone());
-                    }
-                    send(host, &pending.from, answer);
-                    wrote = true;
-                },
-                Err(problem) => send(
-                    host,
-                    &pending.from,
-                    json!({ "reply": pending.reply, "action": "save", "ok": false, "path": path, "error": problem.to_string() }),
-                ),
-            }
-        }
-        wrote
-    }
-
     fn changed(&mut self, host: &Handle) {
         self.version += 1;
         self.refresh_views(host, None);
         self.publish(host);
+    }
+
+    /// Today, `2026-11-10`: the clock's, or in tests the one set.
+    fn today(&self) -> String {
+        #[cfg(test)]
+        if let Some(day) = &self.clock {
+            return day.clone();
+        }
+        today()
     }
 }
 
@@ -351,12 +325,16 @@ impl Provider {
             changed = true;
         }
         changed |= self.flush(host, false);
+        // Past midnight: today's views (the journal, Today) move on.
+        if self.day != self.today() {
+            changed = true;
+        }
         let mut rescan = self.scanned.is_some_and(|at| at.elapsed() >= RESCAN);
         if let (Some(watch), Some(vault)) = (&self.watch, &mut self.vault) {
             let seen = watch.drain();
             rescan |= seen.rescan;
             for path in &seen.notes {
-                if self.pending.contains_key(path) {
+                if self.pending.keys().any(|(_, pending)| pending == path) {
                     continue;
                 }
                 if vault.refresh(path).is_ok() {
@@ -440,24 +418,8 @@ impl Provider {
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .to_string();
-            // The base is the text last known to be on disk and in the
-            // editor; a mod's own `base` only when this provider has none.
-            let base = self
-                .known
-                .get(&path)
-                .cloned()
-                .or_else(|| save.get("base").and_then(Value::as_str).map(str::to_string));
-            let base = self
-                .pending
-                .get(&path)
-                .map_or(base.clone(), |earlier| earlier.base.clone().or(base));
-            self.pending.insert(path, Pending {
-                text,
-                base,
-                from: from.to_string(),
-                reply,
-                since: Instant::now(),
-            });
+            let base = save.get("base").and_then(Value::as_str).map(str::to_string);
+            self.hold(from, path, text, base, reply);
             return;
         }
         if let Some(path) = message.get("open_vault").and_then(Value::as_str) {
@@ -481,6 +443,7 @@ impl Provider {
         }
         // Everything else changes files now: write waiting edits first.
         self.flush(host, true);
+        let today = self.today();
         let Some(vault) = &mut self.vault else {
             send(
                 host,
@@ -489,7 +452,7 @@ impl Provider {
             );
             return;
         };
-        let answer = actions::act(vault, &message, &today());
+        let answer = actions::act(vault, &message, &today);
         let mut answer = match answer {
             Ok(answer) => answer,
             Err(problem) => json!({ "ok": false, "error": problem.to_string() }),

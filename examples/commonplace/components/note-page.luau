@@ -69,17 +69,78 @@ end
 
 type State = {
 	-- The note being edited and the block's place: the text before and after
-	-- it, kept as they were when editing began, so the note's text coming
-	-- back from a save (split differently) never moves the edit.
+	-- it, so the note's text coming back from a save (split differently)
+	-- never moves the edit. When the note changes elsewhere meanwhile, the
+	-- block is found again in the new text and these follow it.
 	path: string?,
 	editing: number?,
 	before: string,
 	after: string,
 	draft: string,
+	-- The note's text the edit was last put together from (`before`, the
+	-- block as `shown`, `after`): the base sent with each change, so the
+	-- notes provider merges it with whatever changed elsewhere since.
+	base: string,
+	shown: string,
+	-- The block is a new one after the last, not one the note had.
+	created: boolean,
 	-- A link was just clicked: the click on the block around it is not an
 	-- edit.
 	linked: boolean,
 }
+
+-- The note's whole text with `draft` as the block. A new block left empty
+-- changes nothing; a block the note had, emptied, is deleted.
+local function compose(state: State, draft: string): string
+	if state.created then
+		return if draft == "" then state.before else ending(state.before) .. draft
+	end
+	return state.before .. draft .. state.after
+end
+
+-- The note's text changed elsewhere (another layout, another app): find the
+-- block again in `fresh`, as it was last shown, and take the text around it
+-- from there. False when the block itself changed.
+local function reanchor(state: State, fresh: string): boolean
+	local old = state.shown
+	if old == "" then
+		if state.created then
+			state.before = fresh
+			state.after = ""
+			return true
+		end
+		-- An emptied block: where the text before it still ends, or the text
+		-- after it still starts.
+		if string.sub(fresh, 1, #state.before) == state.before then
+			state.after = string.sub(fresh, #state.before + 1)
+			return true
+		elseif #state.after > 0 and string.sub(fresh, -#state.after) == state.after then
+			state.before = string.sub(fresh, 1, #fresh - #state.after)
+			return true
+		end
+		return false
+	end
+	-- The block's text where it occurs nearest to where it was.
+	local was = #(if state.created then ending(state.before) else state.before) + 1
+	local best: number? = nil
+	local from = 1
+	while true do
+		local at = string.find(fresh, old, from, true)
+		if not at then
+			break
+		end
+		if not best or math.abs(at - was) < math.abs(best - was) then
+			best = at
+		end
+		from = at + 1
+	end
+	if not best then
+		return false
+	end
+	state.before = string.sub(fresh, 1, best - 1)
+	state.after = string.sub(fresh, best + #old)
+	return true
+end
 
 local function wikify(text: string): string
 	-- [[Title|alias]] and [[Title]] become markdown links to `note:Title`;
@@ -246,7 +307,7 @@ return component {
 	init = function(previous: any): State
 		local state = previous or {}
 		-- An edit doesn't outlive the app: the text is saved as it is typed.
-		return { editing = nil, before = "", after = "", draft = "", linked = false, path = state.path }
+		return { editing = nil, before = "", after = "", draft = "", base = "", shown = "", created = false, linked = false, path = state.path }
 	end,
 
 	update = function(state: State, msg: any, props: any)
@@ -267,27 +328,36 @@ return component {
 			local parts = split(text)
 			local part = parts[msg.block]
 			state.path = note.path
+			state.base = text
 			if part then
 				state.editing = msg.block
+				state.created = false
 				state.before = string.sub(text, 1, part.from - 1)
 				state.after = string.sub(text, part.to + 1)
 				state.draft = string.sub(text, part.from, part.to)
 			else
 				-- After the last block: a new one.
 				state.editing = #parts + 1
-				state.before = ending(text)
+				state.created = true
+				state.before = text
 				state.after = ""
 				state.draft = ""
 			end
-		elseif msg.draft and state.editing then
+			state.shown = state.draft
+		elseif msg.draft and state.editing and state.path == note.path then
 			state.draft = msg.value or ""
-			local whole = state.before .. state.draft .. state.after
-			if state.draft == "" and state.after == "" then
-				-- A new block left empty changes nothing.
-				whole = text
+			if text ~= state.base and reanchor(state, text) then
+				state.base = text
 			end
-			if whole ~= text then
-				return state, { { to = "parent", msg = { edit = true, value = whole } } }
+			-- When the block itself changed elsewhere, the edit still goes
+			-- with the text it was made on as its base: the provider keeps
+			-- both versions rather than losing either.
+			local whole = compose(state, state.draft)
+			if whole ~= state.base then
+				local base = state.base
+				state.base = whole
+				state.shown = state.draft
+				return state, { { to = "parent", msg = { edit = true, value = whole, base = base } } }
 			end
 		elseif msg.done then
 			state.editing = nil
@@ -300,15 +370,24 @@ return component {
 		local text: string = note.text or ""
 		local favicons: { [string]: string } = note.favicons or {}
 		local editing = state.editing ~= nil and state.path == note.path
+		-- The note changed elsewhere since the last keystroke: the blocks
+		-- around the edit as they are now (as they were, when the block
+		-- itself changed: the next keystroke's save keeps both versions).
+		local around: State = state
+		if editing and text ~= state.base then
+			local moved = table.clone(state)
+			if reanchor(moved, text) then
+				around = moved
+			end
+		end
 		local body: { Element } = {}
 		if editing then
-			-- The blocks around the edit as they were when it began.
-			for index, part in split(state.before) do
-				table.insert(body, block_view(index, string.sub(state.before, part.from, part.to), favicons))
+			for index, part in split(around.before) do
+				table.insert(body, block_view(index, string.sub(around.before, part.from, part.to), favicons))
 			end
 			table.insert(body, field(state))
 			-- `after` has no frontmatter of its own: split it as a body.
-			local rest = "---\n---\n" .. state.after
+			local rest = "---\n---\n" .. around.after
 			for _, part in split(rest) do
 				local chunk = string.sub(rest, part.from, part.to)
 				table.insert(

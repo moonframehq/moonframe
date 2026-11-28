@@ -77,9 +77,12 @@ pub(super) fn run(vault: &Vault, query: &Value, today: &str) -> Result<Value, Er
         },
         "note" => note(vault, &text(query, "path"))?,
         "resolve" => {
-            // Where a wikilink written in `from` leads; `path` nil when nowhere yet.
+            // Where a wikilink written in `from` leads; `path` nil when nowhere
+            // yet. `target` is the note's name alone (no `#heading`), the
+            // name a missing note is made with.
             let target = text(query, "target");
-            json!({ "target": target, "path": index.resolve_path(&target, &text(query, "from"))? })
+            let path = index.resolve_path(&target, &text(query, "from"))?;
+            json!({ "target": note_name(&target), "path": path })
         },
         "context" => {
             // Everything a side panel shows of one note, in one answer.
@@ -110,9 +113,7 @@ pub(super) fn run(vault: &Vault, query: &Value, today: &str) -> Result<Value, Er
             let days = number(query, "days", 3).clamp(1, 31);
             let mut rows = Vec::new();
             let today_path = format!("journal/{today}.md");
-            let listed = index.list("journal", Order::Title, 0, days + 1)?;
-            let mut paths: Vec<String> = listed.into_iter().map(|row| row.path).collect();
-            paths.sort_by(|a, b| b.cmp(a));
+            let mut paths = newest_days(vault, days + 1)?;
             if !paths.contains(&today_path) {
                 paths.insert(0, today_path.clone());
             }
@@ -128,6 +129,27 @@ pub(super) fn run(vault: &Vault, query: &Value, today: &str) -> Result<Value, Er
         },
         other => return Err(Error::Invalid(format!("no view of kind {other:?}"))),
     })
+}
+
+/// A wikilink target's note name: without its `#heading` or `#^block`.
+fn note_name(target: &str) -> &str {
+    target
+        .split_once('#')
+        .map_or(target, |(name, _)| name)
+        .trim()
+}
+
+/// The paths of the `limit` newest daily notes (`journal/YYYY-MM-DD.md`),
+/// newest first. Picked newest first before the limit, so a long journal
+/// still shows its latest days.
+fn newest_days(vault: &Vault, limit: usize) -> Result<Vec<String>, Error> {
+    let mut statement = vault.index().db().prepare_cached(
+        "SELECT path FROM notes
+         WHERE path_key GLOB 'journal/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+         ORDER BY path_key DESC, path DESC LIMIT ?1",
+    )?;
+    let rows = statement.query_map([limit as i64], |row| row.get::<_, String>(0))?;
+    Ok(rows.collect::<Result<_, _>>()?)
 }
 
 /// A note's text and details; `exists = false` when there is no such file.
@@ -155,4 +177,72 @@ fn note(vault: &Vault, path: &str) -> Result<Value, Error> {
 /// A short digest of an answer, to tell whether it changed.
 pub(super) fn fingerprint(value: &Value) -> String {
     digest(&value.to_string())[..16].to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    #[test]
+    fn a_resolved_target_is_the_notes_name_alone() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("notes")).unwrap();
+        std::fs::write(temp.path().join("notes/A.md"), "# A\n").unwrap();
+        let index = temp.path().with_extension("index.sqlite");
+        let mut vault = Vault::open_with_index(temp.path(), &index).unwrap();
+        vault.scan().unwrap();
+        let resolve = |target: &str| {
+            run(
+                &vault,
+                &json!({ "kind": "resolve", "target": target, "from": "notes/A.md" }),
+                "2026-11-28",
+            )
+            .unwrap()
+        };
+        let missing = resolve("B#Heading");
+        assert_eq!(missing["target"], "B");
+        assert!(missing["path"].is_null(), "{missing}");
+        assert_eq!(resolve(" B #^block")["target"], "B");
+        let found = resolve("A#Heading");
+        assert_eq!(
+            (found["target"].as_str(), found["path"].as_str()),
+            (Some("A"), Some("notes/A.md"))
+        );
+        assert_eq!(resolve("B")["target"], "B");
+    }
+
+    #[test]
+    fn the_journal_shows_the_newest_days_of_a_long_journal() {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("journal")).unwrap();
+        for day in 1..=20 {
+            let path = temp.path().join(format!("journal/2026-11-{day:02}.md"));
+            std::fs::write(path, format!("day {day}\n")).unwrap();
+        }
+        // Not a day: never one of the journal's rows.
+        std::fs::write(temp.path().join("journal/Ideas.md"), "x\n").unwrap();
+        let index = temp.path().with_extension("index.sqlite");
+        let mut vault = Vault::open_with_index(temp.path(), &index).unwrap();
+        vault.scan().unwrap();
+        let dates = |today: &str| -> Vec<String> {
+            let answer = run(&vault, &json!({ "kind": "journal", "days": 3 }), today).unwrap();
+            answer["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["date"].as_str().unwrap().to_string())
+                .collect()
+        };
+        assert_eq!(dates("2026-11-28"), [
+            "2026-11-28",
+            "2026-11-20",
+            "2026-11-19"
+        ]);
+        assert_eq!(dates("2026-11-20"), [
+            "2026-11-20",
+            "2026-11-19",
+            "2026-11-18"
+        ]);
+    }
 }

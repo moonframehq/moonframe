@@ -10,11 +10,13 @@
 //! conflict? }` or `{ ok = false, error }`. A url that cannot be fetched
 //! is skipped.
 
+// keep-sorted start
 mod fetch;
 mod html;
 #[cfg(test)]
 mod tests;
 mod urls;
+// keep-sorted end
 
 use {
     super::{Provider, send},

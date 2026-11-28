@@ -408,3 +408,111 @@ fn a_lost_index_is_rebuilt_and_journaled_writes_finish() {
     assert_eq!(report.parsed, 13);
     assert_eq!(vault.index().backlinks(SPACED, 0, 50).unwrap().len(), 4);
 }
+
+#[test]
+fn relative_links_heading_targets_and_aliases_resolve() {
+    let (_temp, mut vault) = vault();
+    vault
+        .create(
+            "notes/deep/Relative.md",
+            "See [the curve](../../wiki/Forgetting%20curve.md) and [here](./Local.md).\n",
+        )
+        .unwrap();
+    vault.create("notes/deep/Local.md", "x\n").unwrap();
+    // An alias in the linking note's folder does not beat a real file name.
+    vault
+        .create(
+            "wiki/Alias holder.md",
+            "---\naliases: [Anki workflow]\n---\nx\n",
+        )
+        .unwrap();
+    let index = vault.index();
+    let outgoing = index.outgoing("notes/deep/Relative.md").unwrap();
+    let paths: Vec<Option<&str>> = outgoing.iter().map(|link| link.path.as_deref()).collect();
+    assert_eq!(paths, vec![
+        Some("wiki/Forgetting curve.md"),
+        Some("notes/deep/Local.md")
+    ]);
+    assert_eq!(
+        index
+            .resolve_path("Anki workflow", "wiki/Desirable difficulties.md")
+            .unwrap()
+            .as_deref(),
+        Some("notes/Anki workflow.md")
+    );
+    assert_eq!(
+        index
+            .resolve_path("Spaced repetition#Why it works", "wiki/Duplicate.md")
+            .unwrap()
+            .as_deref(),
+        Some(SPACED)
+    );
+    assert_eq!(
+        index
+            .resolve_path("#Why it works", SPACED)
+            .unwrap()
+            .as_deref(),
+        Some(SPACED)
+    );
+    assert_eq!(index.resolve_path("#x", "nowhere.md").unwrap(), None);
+}
+
+#[test]
+fn a_moved_note_keeps_its_own_relative_links() {
+    let (temp, mut vault) = vault();
+    let read = |path: &str| fs::read_to_string(temp.path().join(path)).unwrap();
+    vault
+        .create(
+            "notes/Pic.md",
+            "![c](../raw/assets/curve.png) [me](Pic.md#top) [root](/wiki/Duplicate.md)\n",
+        )
+        .unwrap();
+    vault.rename("notes/Pic.md", "Pic").unwrap();
+    let pic = read("Pic.md");
+    assert!(
+        pic.ends_with("\n![c](raw/assets/curve.png) [me](Pic.md#top) [root](/wiki/Duplicate.md)\n"),
+        "{pic}"
+    );
+
+    vault.rename(SPACED, "notes/sub/Spaced repetition").unwrap();
+    let moved = read("notes/sub/Spaced repetition.md");
+    assert!(
+        moved.contains("[the Anki way](../Anki%20workflow.md)"),
+        "{moved}"
+    );
+    assert!(
+        vault
+            .index()
+            .outgoing("notes/sub/Spaced repetition.md")
+            .unwrap()
+            .iter()
+            .any(|link| link.path.as_deref() == Some("notes/Anki workflow.md"))
+    );
+}
+
+#[test]
+fn a_case_only_rename_never_replaces_another_note() {
+    let (temp, mut vault) = vault();
+    let root = temp.path();
+    vault
+        .rename("notes/Duplicate.md", "notes/duplicate")
+        .unwrap();
+    assert!(
+        fs::read_dir(root.join("notes"))
+            .unwrap()
+            .flatten()
+            .any(|entry| entry.file_name() == "duplicate.md")
+    );
+    // On a disk that tells case apart, `B.md` beside `b.md` is another note.
+    fs::write(root.join("notes/Other.md"), "upper\n").unwrap();
+    fs::write(root.join("notes/other.md"), "lower\n").unwrap();
+    let case_sensitive = fs::read_to_string(root.join("notes/Other.md")).unwrap() == "upper\n";
+    vault.scan().unwrap();
+    if case_sensitive {
+        assert!(vault.rename("notes/Other.md", "notes/other").is_err());
+        assert_eq!(
+            fs::read_to_string(root.join("notes/other.md")).unwrap(),
+            "lower\n"
+        );
+    }
+}

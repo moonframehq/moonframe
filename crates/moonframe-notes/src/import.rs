@@ -5,9 +5,11 @@
 //! `.commonplace/imports/<source>.json`, so importing again updates what
 //! changed at the source and never overwrites a note edited since.
 
+// keep-sorted start
 pub(crate) mod apple_notes;
 pub(crate) mod export;
 mod html;
+// keep-sorted end
 
 use {
     crate::{Error, STATE, text, write::atomic_write},
@@ -148,6 +150,23 @@ struct Imported {
     /// The hash of what was written, to tell whether the note was edited since.
     hash: String,
     modified: Option<String>,
+    /// The `id` written in its frontmatter, kept when the note is updated.
+    #[serde(default)]
+    id: Option<String>,
+    /// A digest of the source's text, to tell a change when the source
+    /// gives no modification date (a Markdown export).
+    #[serde(default)]
+    source: Option<String>,
+}
+
+/// A digest of what `note` holds at the source: its title and body.
+fn source_digest(note: &SourceNote) -> String {
+    let body = note
+        .markdown
+        .as_deref()
+        .or(note.html.as_deref())
+        .unwrap_or("");
+    text::digest(&format!("{}\n{body}", note.title))
 }
 
 /// Where imported notes go: `into` (a vault folder) and the source's
@@ -233,6 +252,8 @@ pub(crate) fn safe_name(name: &str, fallback: &str) -> String {
 struct Job {
     index: usize,
     path: String,
+    /// The note's `id`: the one it was given when first imported.
+    id: String,
     update: bool,
 }
 
@@ -263,25 +284,26 @@ fn run_jobs(
                     for job in part {
                         let note = &notes[job.index];
                         let mut pictures = 0;
-                        let outcome = match guarded(note, source, root, dry_run, &mut pictures)? {
-                            Some(rendered) => {
-                                if !dry_run {
-                                    let file = root.join(&job.path);
-                                    atomic_write(&file, rendered.as_bytes())?;
-                                    if let Some(when) =
-                                        note.modified.as_deref().and_then(text::parse_time)
-                                    {
-                                        // Finder, Obsidian and the index sort by it.
-                                        let _ = fs::File::options()
-                                            .write(true)
-                                            .open(&file)
-                                            .and_then(|file| file.set_modified(when));
+                        let outcome =
+                            match guarded(note, &job.id, source, root, dry_run, &mut pictures)? {
+                                Some(rendered) => {
+                                    if !dry_run {
+                                        let file = root.join(&job.path);
+                                        atomic_write(&file, rendered.as_bytes())?;
+                                        if let Some(when) =
+                                            note.modified.as_deref().and_then(text::parse_time)
+                                        {
+                                            // Finder, Obsidian and the index sort by it.
+                                            let _ = fs::File::options()
+                                                .write(true)
+                                                .open(&file)
+                                                .and_then(|file| file.set_modified(when));
+                                        }
                                     }
-                                }
-                                Some((text::digest(&rendered), pictures))
-                            },
-                            None => None,
-                        };
+                                    Some((text::digest(&rendered), pictures))
+                                },
+                                None => None,
+                            };
                         out.push(outcome);
                         let _ = sender.send(1);
                     }
@@ -315,6 +337,7 @@ fn run_jobs(
 /// user's doing) left out rather than stopping the whole import.
 fn guarded(
     note: &SourceNote,
+    id: &str,
     source: &str,
     root: &Path,
     dry_run: bool,
@@ -322,7 +345,7 @@ fn guarded(
 ) -> Result<Option<String>, Error> {
     let mut counted = *pictures;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        render(note, source, root, dry_run, &mut counted)
+        render(note, id, source, root, dry_run, &mut counted)
     }));
     match result {
         Ok(rendered) => {
@@ -333,10 +356,11 @@ fn guarded(
     }
 }
 
-/// The note as the markdown file it becomes, with its pictures saved (or,
-/// in a dry run, counted).
+/// The note as the markdown file it becomes, with `id` in its frontmatter
+/// and its pictures saved (or, in a dry run, counted).
 fn render(
     note: &SourceNote,
+    id: &str,
     source: &str,
     root: &Path,
     dry_run: bool,
@@ -356,7 +380,7 @@ fn render(
             }
             *pictures += 1;
         }
-        return Ok(frontmatter(note, source) + &without_title(markdown, &note.title));
+        return Ok(frontmatter(note, id, source) + &without_title(markdown, &note.title));
     }
     let (body, found) = html::to_markdown(note.html.as_deref().unwrap_or(""));
     let mut body = body;
@@ -396,7 +420,7 @@ fn render(
         };
         body = body.replace(&picture.placeholder, &replacement);
     }
-    Ok(frontmatter(note, source) + &without_title(&body, &note.title))
+    Ok(frontmatter(note, id, source) + &without_title(&body, &note.title))
 }
 
 /// `body` without its first line when that line is the note's title (as
@@ -438,11 +462,11 @@ fn without_title(body: &str, title: &str) -> String {
     }
 }
 
-/// The frontmatter an imported note starts with: a new id, its dates, and
+/// The frontmatter an imported note starts with: its id, its dates, and
 /// where it came from.
-fn frontmatter(note: &SourceNote, source: &str) -> String {
+fn frontmatter(note: &SourceNote, id: &str, source: &str) -> String {
     let mut front = String::from("---\n");
-    front.push_str(&format!("id: {}\n", text::ulid()));
+    front.push_str(&format!("id: {id}\n"));
     if let Some(created) = &note.created {
         front.push_str(&format!("created: {created}\n"));
     }
@@ -526,7 +550,11 @@ pub fn write(
             .cloned();
         match known {
             Some(known) => {
-                if known.modified == note.modified && root.join(&known.path).exists() {
+                // Without a date from the source, only its text tells a change.
+                let same = known.modified == note.modified
+                    && (note.modified.is_some()
+                        || known.source.as_deref() == Some(source_digest(note).as_str()));
+                if same && root.join(&known.path).exists() {
                     report.unchanged += 1;
                     continue;
                 }
@@ -538,9 +566,20 @@ pub fn write(
                     report.kept.push(known.path.clone());
                     continue;
                 }
+                // The note keeps the id it was imported with.
+                let id = known
+                    .id
+                    .clone()
+                    .or_else(|| {
+                        current
+                            .as_deref()
+                            .and_then(|current| crate::parse::parse(&known.path, current).id)
+                    })
+                    .unwrap_or_else(text::ulid);
                 jobs.push(Job {
                     index,
                     path: known.path,
+                    id,
                     update: true,
                 });
             },
@@ -549,6 +588,7 @@ pub fn write(
                 jobs.push(Job {
                     index,
                     path,
+                    id: text::ulid(),
                     update: false,
                 });
             },
@@ -573,6 +613,8 @@ pub fn write(
             path: job.path.clone(),
             hash,
             modified: note.modified.clone(),
+            id: Some(job.id.clone()),
+            source: Some(source_digest(note)),
         });
         if job.update {
             report.updated.push(job.path.clone());
@@ -695,6 +737,7 @@ mod tests {
         assert!(groceries.ends_with("---\nmilk\n"), "{groceries}");
         let trip = fs::read_to_string(root.join("notes/Travel/Trip.md")).unwrap();
         assert!(trip.contains("Lisbon ![[raw/assets/apple-notes/"), "{trip}");
+        let trip_id = id_of(&trip);
 
         // Again, unchanged: nothing written.
         let again = write(root, "apple-notes", "notes", &first, false, |_, _| {}).unwrap();
@@ -728,11 +771,70 @@ mod tests {
             fs::read_to_string(root.join("notes/Groceries.md")).unwrap(),
             "mine now\n"
         );
-        assert!(
-            fs::read_to_string(root.join("notes/Travel/Trip.md"))
-                .unwrap()
-                .ends_with("Porto\n")
-        );
+        let trip = fs::read_to_string(root.join("notes/Travel/Trip.md")).unwrap();
+        assert!(trip.ends_with("Porto\n"));
+        // Updated, it is still the same note.
+        assert_eq!(id_of(&trip), trip_id);
+    }
+
+    fn id_of(text: &str) -> String {
+        crate::parse::parse("x.md", text).id.unwrap()
+    }
+
+    /// A note of a Markdown export: no date, its body already markdown.
+    fn exported(id: &str, title: &str, markdown: &str) -> SourceNote {
+        SourceNote {
+            html: None,
+            markdown: Some(markdown.to_string()),
+            created: None,
+            modified: None,
+            ..note(id, title, &["Notes"], "", "")
+        }
+    }
+
+    #[test]
+    fn reimporting_an_export_follows_its_text() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let first = [exported("export:a", "Plan", "# Plan\nstep one\n")];
+        let report = write(root, "apple-notes", "notes", &first, false, |_, _| {}).unwrap();
+        assert_eq!(report.created, vec!["notes/Plan.md"]);
+        let id = id_of(&fs::read_to_string(root.join("notes/Plan.md")).unwrap());
+
+        // The same text again: nothing to do.
+        let again = write(root, "apple-notes", "notes", &first, false, |_, _| {}).unwrap();
+        assert_eq!((again.updated.len(), again.unchanged), (0, 1));
+
+        // New text in the export, still without a date: updated, same id.
+        let changed = [exported("export:a", "Plan", "# Plan\nstep two\n")];
+        let report = write(root, "apple-notes", "notes", &changed, false, |_, _| {}).unwrap();
+        assert_eq!(report.updated, vec!["notes/Plan.md"]);
+        let plan = fs::read_to_string(root.join("notes/Plan.md")).unwrap();
+        assert!(plan.ends_with("---\nstep two\n"), "{plan}");
+        assert_eq!(id_of(&plan), id);
+        assert!(!plan.contains("updated:"), "{plan}");
+    }
+
+    #[test]
+    fn a_manifest_from_before_ids_keeps_the_notes_id() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let first = [exported("export:a", "Plan", "step one\n")];
+        write(root, "apple-notes", "notes", &first, false, |_, _| {}).unwrap();
+        let id = id_of(&fs::read_to_string(root.join("notes/Plan.md")).unwrap());
+        // An older manifest: no id, no digest of the source.
+        let file = root.join(STATE).join("imports/apple-notes.json");
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+        let entry = manifest["notes"]["export:a"].as_object_mut().unwrap();
+        entry.remove("id");
+        entry.remove("source");
+        fs::write(&file, serde_json::to_vec(&manifest).unwrap()).unwrap();
+        // Written again (nothing tells it is the same), with the id it had.
+        let report = write(root, "apple-notes", "notes", &first, false, |_, _| {}).unwrap();
+        assert_eq!(report.updated, vec!["notes/Plan.md"]);
+        let plan = fs::read_to_string(root.join("notes/Plan.md")).unwrap();
+        assert_eq!(id_of(&plan), id);
     }
 
     #[test]

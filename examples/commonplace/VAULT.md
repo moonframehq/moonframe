@@ -100,8 +100,13 @@ Obsidian) and tags come only from the `tags` key.
 `[[Target]]` resolves in this order, case-insensitively:
 
 1. a path relative to the vault root (with or without `.md`)
-2. a file name
-3. an alias
+2. a path relative to the linking note's folder (`../wiki/Target.md`),
+   the way markdown links are usually written
+3. a file name
+4. an alias, only when no file name matches
+
+`Target#Heading` and `Target#^block` lead to Target; `#Heading` stays in
+the linking note.
 
 When several notes match, the one closest to the linking note's folder
 wins, then the shortest path. The engine reports the ambiguity, and the
@@ -150,5 +155,12 @@ Obsidian.
   - the changes don't overlap: merge them
   - they do: keep both, the other version as `Title (conflict YYYY-MM-DD
     HHMM).md`, and show the conflict
+- Each editor's write carries its own starting text, so two views of one
+  note (two layouts, two windows) merge with each other as with any other
+  editor.
+- An edit is written once typing stops, and at once when the app quits. A
+  write that fails is kept and tried again, and the page says it was not
+  saved until it is.
 - A rename rewrites every link to the note in one journaled batch, which
-  is one undo step.
+  is one undo step. A note moved to another folder takes its own relative
+  links with it, and a note edited while the rename runs keeps its edit.

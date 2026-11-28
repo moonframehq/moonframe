@@ -41,6 +41,26 @@ pub(crate) struct Pending {
     pub text: String,
 }
 
+/// A batch of moves and writes (a rename and the links it rewrites),
+/// journaled whole before any file changes so a run that stops part way
+/// can finish it.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct Batch {
+    /// Vault paths moved, from and to.
+    pub moves: Vec<(String, String)>,
+    pub writes: Vec<BatchWrite>,
+}
+
+/// One write of a batch.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct BatchWrite {
+    /// Where the file is once the batch's moves are done.
+    pub path: String,
+    /// The digest of the text the write was planned against.
+    pub base: String,
+    pub text: String,
+}
+
 pub(crate) struct Journal {
     folder: PathBuf,
 }
@@ -64,6 +84,47 @@ impl Journal {
 
     pub(crate) fn clear(&self, path: &str) {
         let _ = fs::remove_file(self.entry(path));
+    }
+
+    fn batches(&self) -> PathBuf {
+        self.folder.join("batches")
+    }
+
+    /// Records `batch`, returning the entry to clear once it is done.
+    pub(crate) fn record_batch(&self, batch: &Batch) -> Result<PathBuf, Error> {
+        let folder = self.batches();
+        fs::create_dir_all(&folder)?;
+        let json = serde_json::to_vec(batch).map_err(|error| Error::Invalid(error.to_string()))?;
+        let entry = folder.join(format!("{}.json", text::ulid()));
+        atomic_write(&entry, &json)?;
+        Ok(entry)
+    }
+
+    pub(crate) fn clear_batch(&self, entry: &Path) {
+        let _ = fs::remove_file(entry);
+    }
+
+    /// Batches still in the journal, oldest first, with their entries.
+    pub(crate) fn pending_batches(&self) -> Vec<(PathBuf, Option<Batch>)> {
+        let Ok(entries) = fs::read_dir(self.batches()) else {
+            return Vec::new();
+        };
+        let mut out: Vec<(PathBuf, Option<Batch>)> = entries
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "json")
+            })
+            .map(|path| {
+                let batch = fs::read(&path)
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice(&bytes).ok());
+                (path, batch)
+            })
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
     }
 
     /// Writes still in the journal, from a run that stopped part way.
@@ -165,6 +226,31 @@ pub(crate) fn write_journaled(
     journal.record(&pending)?;
     atomic_write(&root.join(relative), text_in.as_bytes())?;
     journal.clear(relative);
+    Ok(())
+}
+
+/// Finishes a batch a run left part way: each move whose source is still
+/// there and whose target is free, then each write whose file still holds
+/// the text it was planned against. A file edited since keeps its edit.
+pub(crate) fn finish_batch(root: &Path, batch: &Batch) -> Result<(), Error> {
+    for (from, to) in &batch.moves {
+        let (source, target) = (root.join(from), root.join(to));
+        if source.is_file() && !target.exists() {
+            if let Some(folder) = target.parent() {
+                fs::create_dir_all(folder)?;
+            }
+            fs::rename(&source, &target)?;
+        }
+    }
+    for write in &batch.writes {
+        let file = root.join(&write.path);
+        let Ok(disk) = fs::read_to_string(&file) else {
+            continue;
+        };
+        if text::digest(&disk) == write.base {
+            atomic_write(&file, write.text.as_bytes())?;
+        }
+    }
     Ok(())
 }
 
@@ -341,6 +427,46 @@ mod tests {
             "a\nB\nc\nD\n"
         );
         assert_eq!(merge("x\n", "y\n", "y\n").unwrap(), "y\n");
+    }
+
+    #[test]
+    fn an_interrupted_batch_finishes_but_keeps_later_edits() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let journal = Journal::new(root.join(".commonplace/journal"));
+        fs::write(root.join("A.md"), "a\n").unwrap();
+        fs::write(root.join("L.md"), "[[A]]\n").unwrap();
+        fs::write(root.join("M.md"), "[[A]] edited since\n").unwrap();
+        let batch = Batch {
+            moves: vec![("A.md".into(), "sub/B.md".into())],
+            writes: vec![
+                BatchWrite {
+                    path: "L.md".into(),
+                    base: text::digest("[[A]]\n"),
+                    text: "[[B]]\n".into(),
+                },
+                BatchWrite {
+                    path: "M.md".into(),
+                    base: text::digest("[[A]]\n"),
+                    text: "[[B]]\n".into(),
+                },
+            ],
+        };
+        let entry = journal.record_batch(&batch).unwrap();
+        // Single writes and batches share the journal without mixing.
+        assert!(journal.pending().is_empty());
+        let pending = journal.pending_batches();
+        assert_eq!(pending, vec![(entry.clone(), Some(batch.clone()))]);
+        finish_batch(root, &batch).unwrap();
+        journal.clear_batch(&entry);
+        assert!(!root.join("A.md").exists());
+        assert_eq!(fs::read_to_string(root.join("sub/B.md")).unwrap(), "a\n");
+        assert_eq!(fs::read_to_string(root.join("L.md")).unwrap(), "[[B]]\n");
+        assert_eq!(
+            fs::read_to_string(root.join("M.md")).unwrap(),
+            "[[A]] edited since\n"
+        );
+        assert!(journal.pending_batches().is_empty());
     }
 
     #[test]

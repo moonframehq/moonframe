@@ -621,7 +621,12 @@ impl Index {
 
     /// The path of the note `target` (as a link would write it) resolves to.
     pub fn resolve_path(&self, target: &str, from: &str) -> Result<Option<String>, Error> {
-        let key = crate::text::key(target);
+        // `B#Heading` and `B#^block` lead to B; `#Heading` stays in `from`.
+        let name = target.split_once('#').map_or(target, |(name, _)| name);
+        if name.trim().is_empty() {
+            return Ok(self.row_of(from)?.map(|_| from.to_string()));
+        }
+        let key = crate::text::key(name);
         let tx = self.db.unchecked_transaction()?;
         let resolver = super::Resolver::load(&tx)?;
         let found = match resolver.resolve(&key, from) {

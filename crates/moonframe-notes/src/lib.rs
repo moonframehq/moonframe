@@ -309,6 +309,22 @@ impl Vault {
 
     /// Finishes writes left in the journal by a run that stopped part way.
     fn recover(&self) -> Result<(), Error> {
+        for (entry, batch) in self.journal.pending_batches() {
+            let valid = batch.filter(|batch| {
+                batch
+                    .moves
+                    .iter()
+                    .all(|(from, to)| self.file(from).is_ok() && self.file(to).is_ok())
+                    && batch
+                        .writes
+                        .iter()
+                        .all(|write| self.file(&write.path).is_ok())
+            });
+            if let Some(batch) = valid {
+                write::finish_batch(&self.root, &batch)?;
+            }
+            self.journal.clear_batch(&entry);
+        }
         for pending in self.journal.pending() {
             if self.file(&pending.path).is_ok() {
                 write::atomic_write(&self.root.join(&pending.path), pending.text.as_bytes())?;

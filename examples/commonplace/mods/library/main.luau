@@ -13,11 +13,19 @@ type State = {
 	query: string,
 	open: string?,
 	tab: string,
-	-- An enhance of the open note running, and what the last one said.
+	-- An enhance of the open note running, and what the last action said:
+	-- `open` is a note to open from it (a conflict copy), `save` the note
+	-- whose save failed.
 	enhancing: boolean?,
-	notice: string?,
+	notice: { text: string, tone: string?, open: string?, save: string? }?,
+	-- The first row of the list's window: a vault's notes come a page at a
+	-- time, moved as the list scrolls.
+	offset: number,
 	views: { [string]: any },
 }
+
+-- Rows the list asks for at a time.
+local PAGE = 200
 
 local SECTIONS: { any } = {
 	{ id = "inbox", label = "Inbox", icon = "inbox", folder = nil },
@@ -49,20 +57,44 @@ local function note_watches(state: State): { any }
 	}
 end
 
--- The views this state needs, as messages to the provider. `again` asks
--- for answers already sent (after a reload, when the mod has none).
-local function watches(state: State, again: boolean?): { any }
+-- The list's view: the section's notes or the search's, one page from
+-- `offset`.
+local function list_watch(state: State): any
 	local list: any
 	if state.query ~= "" or state.tag then
 		local q = state.query
 		if state.tag then
 			q = `tag:{state.tag} {q}`
 		end
-		list = { id = "list", kind = "search", q = q, limit = 100 }
+		list = { id = "list", kind = "search", q = q, offset = state.offset, limit = PAGE }
 	else
-		list = { id = "list", kind = "list", folder = folder_of(state.section), limit = 200 }
+		list = { id = "list", kind = "list", folder = folder_of(state.section), offset = state.offset, limit = PAGE }
 	end
-	local sends: { any } = { { to = "provider:notes", msg = { watch = list } } }
+	return { to = "provider:notes", msg = { watch = list } }
+end
+
+-- Where the list's window should start so rows `first` to `last` are
+-- there; nil when they are, or while a move is on its way.
+local function window(view: any, offset: number, first: number, last: number): number?
+	if not view or (view.offset or 0) ~= offset then
+		return nil
+	end
+	local count = #(view.rows or {})
+	local more = if view.total then view.total > offset + count else count >= PAGE
+	if (first <= offset and offset > 0) or (last > offset + count and more) then
+		local start = math.max(0, first - PAGE // 4)
+		start -= start % 20
+		if start ~= offset then
+			return start
+		end
+	end
+	return nil
+end
+
+-- The views this state needs, as messages to the provider. `again` asks
+-- for answers already sent (after a reload, when the mod has none).
+local function watches(state: State, again: boolean?): { any }
+	local sends: { any } = { list_watch(state) }
 	for _, send in note_watches(state) do
 		table.insert(sends, send)
 	end
@@ -75,11 +107,20 @@ local function watches(state: State, again: boolean?): { any }
 end
 
 local function open(state: State, path: string)
+	if state.open == path and state.views.note then
+		-- Already showing it: keep the page as it is.
+		return state, {} :: { any }
+	end
 	state.open = path
 	state.notice = nil
 	state.views.note = nil
 	state.views.context = nil
 	local sends = note_watches(state)
+	-- Asked again: the provider sends nothing for a view it has already
+	-- answered unchanged (the same note opened again after another).
+	for _, send in sends do
+		send.msg.again = true
+	end
 	-- The agent chat works on the note in view.
 	table.insert(sends, { to = "topic:commonplace/open", msg = { path = path } })
 	return state, sends
@@ -90,6 +131,47 @@ local function plain(text: string?): string
 	local out = string.gsub(text or "", "[\1\2]", "")
 	out = string.gsub(out, "%s+", " ")
 	return out
+end
+
+-- A save's answer: the merged text for the note it was for, and what the
+-- user must know: a write that failed (kept and tried again), a conflict.
+local function saved(state: State, msg: any)
+	local note: any = state.views.note
+	if not msg.ok then
+		local where = if msg.path == state.open then "" else ` {msg.path}`
+		state.notice = {
+			text = `Not saved{where}: {msg.error or "the write failed"}{if msg.kept then " (trying again)" else ""}`,
+			tone = "danger",
+			save = msg.path,
+			open = if msg.path == state.open then nil else msg.path,
+		}
+		return
+	end
+	if state.notice and state.notice.save == msg.path then
+		state.notice = nil
+	end
+	if msg.outcome == "merged" and note and note.path == msg.path and msg.path == state.open and type(msg.text) == "string" then
+		note.text = msg.text
+	elseif msg.outcome == "conflict" and msg.copy then
+		state.notice = { text = `Also changed elsewhere: their version is in {msg.copy}`, tone = "warning", open = msg.copy }
+	end
+end
+
+-- What the last action said, in the page's header; a click opens the note
+-- it names.
+local function notice_row(notice: any): Element?
+	if not notice then
+		return nil
+	end
+	return ui.row {
+		class = "head-notice",
+		align = "center",
+		max_width = 420,
+		msg = if notice.open then { open = notice.open } else nil,
+		tooltip = if notice.open then `Open {notice.open}` else notice.text,
+		notice.tone and ui.icon { if notice.tone == "danger" then "circle-alert" else "triangle-alert", tone = notice.tone :: any, size = "small" },
+		ui.text { notice.text, tone = (notice.tone or "muted") :: any, size = "small", truncate = true },
+	}
 end
 
 local function sidebar(state: State, notes: any)
@@ -174,6 +256,10 @@ local function list(state: State)
 	local view = state.views.list or {}
 	local searching = state.query ~= "" or state.tag ~= nil
 	local rows: { any } = view.rows or {}
+	local offset: number = view.offset or 0
+	-- The whole list, of which only a page is loaded; a search, which
+	-- knows no total, grows by a row while pages keep coming full.
+	local count: number = view.total or (offset + #rows + (if #rows >= PAGE then 1 else 0))
 	local title = if state.tag then `#{state.tag}` elseif searching then "Search" else "Notes"
 	for _, section in SECTIONS do
 		if section.id == state.section and not searching then
@@ -191,14 +277,19 @@ local function list(state: State)
 			view.total and ui.text { `{view.total}`, class = "muted small" },
 			icon_button { icon = "square-pen", tooltip = "New note", size = "small", msg = "new" },
 		},
-		#rows == 0 and ui.column { padding = "large", ui.text { if searching then "Nothing found." else "No notes here yet.", class = "muted" } },
-		#rows > 0 and ui.list {
+		count == 0 and ui.column { padding = "large", ui.text { if searching then "Nothing found." else "No notes here yet.", class = "muted" } },
+		count > 0 and ui.list {
 			id = "notes",
-			count = #rows,
+			count = count,
 			row_height = ROW_HEIGHT,
 			grow = true,
+			range = { page = true },
 			row = function(i)
-				local note = rows[i]
+				local note = rows[i - offset]
+				if not note then
+					-- Outside the page loaded: it comes as the window moves.
+					return ui.column { class = "note-row", height = ROW_HEIGHT - 6, ui.text { "…", class = "muted" } }
+				end
 				return ui.column {
 					class = "note-row",
 					selected = note.path == state.open,
@@ -223,7 +314,7 @@ local function editor(state: State)
 			class = "card-head",
 			align = "center",
 			ui.row { grow = true, gap = "none", ui.text { state.open or "", class = "muted small", truncate = true } },
-			state.notice and ui.text { state.notice, class = "muted small", truncate = true },
+			notice_row(state.notice),
 			state.open and ui.row {
 				class = "head-action",
 				align = "center",
@@ -287,11 +378,12 @@ return mod {
 	title = "Library",
 
 	init = function(previous: State?): (State, { any })
-		local state: State = previous or { section = "notes", query = "", tab = "links", views = {} }
+		local state: State = previous or { section = "notes", query = "", tab = "links", offset = 0, views = {} }
 		-- Views come again from the provider; keep none from before.
 		state.views = {}
 		state.enhancing = nil
 		state.notice = nil
+		state.offset = 0
 		return state, watches(state, true)
 	end,
 
@@ -326,8 +418,12 @@ return mod {
 		if msg.view then
 			local data = msg.data
 			local current = state.views[msg.view]
+			-- An answer for the note open before this one, still on its way.
+			if (msg.view == "note" or msg.view == "context") and data and data.path and data.path ~= state.open then
+				return
+			end
 			-- The editor's own save coming back carries no text: keep ours.
-			if msg.view == "note" and data and data.own and current then
+			if data and data.own and current then
 				data.text = current.text
 			end
 			state.views[msg.view] = data
@@ -348,16 +444,31 @@ return mod {
 			return
 		end
 		if msg.reply ~= nil then
-			local note: { text: string? }? = state.views.note
-			if (msg.action == "create" or msg.action == "today") and msg.ok and msg.path then
-				return open(state, msg.path)
+			if msg.action == "save" then
+				saved(state, msg)
 			elseif msg.action == "enhance" then
 				state.enhancing = nil
-				state.notice = if msg.ok
-					then `{msg.titled or 0} titles, {msg.icons or 0} icons`
-					else msg.error or "Enhance failed"
-			elseif msg.action == "save" and msg.outcome == "merged" and note then
-				note.text = msg.text
+				local done = `{msg.titled or 0} titles, {msg.icons or 0} icons`
+				if not msg.ok then
+					state.notice = { text = msg.error or "Enhance failed", tone = "danger" }
+				elseif msg.conflict then
+					-- The note changed meanwhile where the titles went: both kept.
+					state.notice = { text = `{done}; also changed elsewhere: their version is in {msg.conflict}`, tone = "warning", open = msg.conflict }
+				else
+					state.notice = { text = done }
+				end
+			elseif msg.ok == false then
+				state.notice = { text = msg.error or `{msg.action or "That"} failed`, tone = "danger" }
+			elseif (msg.action == "create" or msg.action == "today") and msg.path then
+				return open(state, msg.path)
+			end
+			return
+		end
+		if msg.page then
+			local start = window(state.views.list, state.offset, msg.first or 1, msg.last or 1)
+			if start then
+				state.offset = start
+				return state, { list_watch(state) }
 			end
 			return
 		end
@@ -365,6 +476,7 @@ return mod {
 			state.section = msg.section
 			state.tag = nil
 			state.query = ""
+			state.offset = 0
 			if msg.section == "inbox" then
 				return open(state, "inbox.md")
 			elseif msg.section == "today" then
@@ -373,9 +485,11 @@ return mod {
 			return state, watches(state)
 		elseif msg.tag then
 			state.tag = if state.tag == msg.tag then nil else msg.tag
+			state.offset = 0
 			return state, watches(state)
 		elseif msg.query then
 			state.query = if msg.clear then "" else msg.value or ""
+			state.offset = 0
 			return state, watches(state)
 		elseif msg.open then
 			return open(state, msg.open)
@@ -385,7 +499,8 @@ return mod {
 			if state.views.note then
 				state.views.note.text = msg.value
 			end
-			return state, { { to = "provider:notes", msg = { save = { path = state.open, text = msg.value }, id = "save" } } }
+			-- `base`: the text the edit was made on, merged with changes since.
+			return state, { { to = "provider:notes", msg = { save = { path = state.open, text = msg.value, base = msg.base }, id = "save" } } }
 		elseif msg.msg == "link" and type(msg.url) == "string" then
 			local target = string.match(msg.url, "^note:(.*)$")
 			if target then

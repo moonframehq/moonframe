@@ -4,9 +4,11 @@
 //! mask (code, math, HTML); Obsidian's own syntax is then read from the
 //! raw text around them (see `inline`).
 
+// keep-sorted start
 mod frontmatter;
 mod inline;
 mod web;
+// keep-sorted end
 
 #[cfg(feature = "provider")]
 pub(crate) use web::{is_web, web_links};

@@ -76,6 +76,24 @@ pub(crate) fn strip_md(name: &str) -> &str {
     }
 }
 
+/// `target` read as a path from the folder of the note at `from` (both
+/// vault paths), with `.` and `..` worked out. None when it climbs out of
+/// the vault.
+pub(crate) fn from_folder(target: &str, from: &str) -> Option<String> {
+    let mut parts: Vec<&str> = from.split('/').collect();
+    parts.pop();
+    for part in target.split('/') {
+        match part {
+            "" | "." => {},
+            ".." => {
+                parts.pop()?;
+            },
+            part => parts.push(part),
+        }
+    }
+    Some(parts.join("/"))
+}
+
 /// The file name of a vault path without folders or `.md`: a note's title.
 pub fn stem(path: &str) -> &str {
     let name = path.rsplit('/').next().unwrap_or(path);
@@ -200,6 +218,20 @@ pub(crate) fn clip(text: &str, max: usize) -> String {
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
+
+    #[test]
+    fn paths_from_a_notes_folder_climb_and_stay_in_the_vault() {
+        assert_eq!(
+            from_folder("../wiki/B.md", "Notes/A.md").as_deref(),
+            Some("wiki/B.md")
+        );
+        assert_eq!(
+            from_folder("sub/./c", "notes/A.md").as_deref(),
+            Some("notes/sub/c")
+        );
+        assert_eq!(from_folder("../../x", "notes/A.md"), None);
+        assert_eq!(from_folder("b", "A.md").as_deref(), Some("b"));
+    }
 
     #[test]
     fn lines_map_offsets() {

@@ -60,6 +60,9 @@ return style {
 		[".card-head"] = { padding = { 12, 16 }, gap = 8, border = "bottom", border_color = "border" },
 		[".head-action"] = { gap = 6, padding = { 3, 8 }, radius = 6, color = "muted-foreground" },
 		[".head-action:hover"] = { background = "list-hover", color = "foreground" },
+		-- What the last action said (a save that failed, a conflict copy).
+		[".head-notice"] = { gap = 6, padding = { 3, 8 }, radius = 6 },
+		[".head-notice:hover"] = { background = "list-hover" },
 		[".chat-toggle"] = { background = "card", border = true, border_color = "border", radius = 16, color = "accent", shadow = "0 2px 8px #0000001a" },
 		[".chat-toggle:hover"] = { background = "list-hover" },
 		[".card-title"] = { weight = "semibold" },

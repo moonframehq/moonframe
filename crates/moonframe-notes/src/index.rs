@@ -4,8 +4,10 @@
 //! can be deleted at any time: a schema it does not know is dropped and
 //! rebuilt, never migrated.
 
+// keep-sorted start
 mod query;
 mod resolve;
+// keep-sorted end
 
 pub use query::{
     Backlink, Hit, Listed, MATCH_END, MATCH_START, Mention, NoteInfo, Order, Outgoing, TagCount,

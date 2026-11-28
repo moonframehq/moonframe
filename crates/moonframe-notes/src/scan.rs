@@ -111,12 +111,11 @@ pub(crate) fn scan(root: &Path, index: &mut Index) -> Result<Report, Error> {
             _ => to_read.push((relative, file, mtime, size)),
         }
     }
-    let removed: Vec<String> = known
+    let mut removed: Vec<String> = known
         .keys()
         .filter(|path| !seen.contains(*path))
         .cloned()
         .collect();
-    report.removed = removed.len();
 
     let results = read_all(to_read);
     let mut changed: Vec<(Note, Stamp)> = Vec::new();
@@ -133,10 +132,17 @@ pub(crate) fn scan(root: &Path, index: &mut Index) -> Result<Report, Error> {
                     changed.push((*note, stamp));
                 }
             },
-            Read::Skipped(path) => report.skipped.push(path),
+            Read::Skipped(path) => {
+                // Indexed before, too large or not UTF-8 now: its old text goes.
+                if known.contains_key(&path) {
+                    removed.push(path.clone());
+                }
+                report.skipped.push(path);
+            },
         }
     }
     report.parsed = changed.len();
+    report.removed = removed.len();
     index.apply(&changed, &removed, &touched)?;
     report.skipped.sort();
     Ok(report)
@@ -219,7 +225,32 @@ fn read_all(files: Vec<(String, PathBuf, i64, i64)>) -> Vec<Read> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
     use super::*;
+
+    #[test]
+    fn a_full_scan_drops_notes_that_became_unreadable() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        fs::write(root.join("a.md"), "# A\nkeep me\n").unwrap();
+        fs::write(root.join("b.md"), "# B\nbinary soon\n").unwrap();
+        let mut index = Index::in_memory().unwrap();
+        scan(root, &mut index).unwrap();
+        assert_eq!(index.stamps().unwrap().len(), 2);
+        // Not UTF-8 any more, and a different size so the scan reads it.
+        fs::write(root.join("b.md"), b"\xff\xfe not text at all").unwrap();
+        let report = scan(root, &mut index).unwrap();
+        assert_eq!(report.skipped, vec!["b.md"]);
+        assert_eq!(report.removed, 1);
+        let paths: Vec<String> = index
+            .stamps()
+            .unwrap()
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        assert_eq!(paths, vec!["a.md"]);
+        assert!(index.search("binary", 0, 10).unwrap().is_empty());
+    }
 
     #[test]
     fn notes_are_markdown_outside_hidden_folders() {

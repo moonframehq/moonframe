@@ -1,7 +1,8 @@
 //! Which note a link points at (VAULT.md, "Resolving a link"): a path
-//! from the vault's root, else a file name, else an alias, ignoring case.
-//! Of several notes with one name, the one nearest the linking note's
-//! folder wins, then the shortest path.
+//! from the vault's root, else a path from the linking note's folder
+//! (`../wiki/B.md`), else a file name, else an alias, ignoring case. Of
+//! several notes with one name, the one nearest the linking note's folder
+//! wins, then the shortest path.
 
 use {
     crate::Error,
@@ -12,8 +13,10 @@ use {
 pub(super) struct Resolver {
     /// path key -> row
     paths: HashMap<String, i64>,
-    /// title or alias key -> rows with their paths
-    names: HashMap<String, Vec<(i64, String)>>,
+    /// title key -> rows with their paths
+    titles: HashMap<String, Vec<(i64, String)>>,
+    /// alias key -> rows with their paths, tried only when no title matches
+    aliases: HashMap<String, Vec<(i64, String)>>,
     /// Every (path key, row), for `folder/name` targets that are not from the root.
     all: Vec<(String, i64, String)>,
 }
@@ -21,7 +24,8 @@ pub(super) struct Resolver {
 impl Resolver {
     pub(super) fn load(tx: &Transaction) -> Result<Self, Error> {
         let mut paths = HashMap::new();
-        let mut names: HashMap<String, Vec<(i64, String)>> = HashMap::new();
+        let mut titles: HashMap<String, Vec<(i64, String)>> = HashMap::new();
+        let mut aliases: HashMap<String, Vec<(i64, String)>> = HashMap::new();
         let mut all = Vec::new();
         {
             let mut statement = tx.prepare("SELECT id, path, path_key, title_key FROM notes")?;
@@ -36,7 +40,10 @@ impl Resolver {
             for row in rows {
                 let (id, path, path_key, title_key) = row?;
                 paths.insert(path_key.clone(), id);
-                names.entry(title_key).or_default().push((id, path.clone()));
+                titles
+                    .entry(title_key)
+                    .or_default()
+                    .push((id, path.clone()));
                 all.push((path_key, id, path));
             }
         }
@@ -51,13 +58,18 @@ impl Resolver {
             })?;
             for row in rows {
                 let (id, key, path) = row?;
-                let entry = names.entry(key).or_default();
+                let entry = aliases.entry(key).or_default();
                 if !entry.iter().any(|(seen, _)| *seen == id) {
                     entry.push((id, path));
                 }
             }
         }
-        Ok(Self { paths, names, all })
+        Ok(Self {
+            paths,
+            titles,
+            aliases,
+            all,
+        })
     }
 
     /// The row `target_key` (from a note at `from`) points at.
@@ -68,11 +80,18 @@ impl Resolver {
         if let Some(&id) = self.paths.get(target_key) {
             return Some(id);
         }
-        if let Some(candidates) = self.names.get(target_key) {
-            return nearest(
-                candidates.iter().map(|(id, path)| (*id, path.as_str())),
-                from,
-            );
+        if let Some(&id) = crate::text::from_folder(target_key, from)
+            .and_then(|path| self.paths.get(&path.to_lowercase()))
+        {
+            return Some(id);
+        }
+        for names in [&self.titles, &self.aliases] {
+            if let Some(candidates) = names.get(target_key) {
+                return nearest(
+                    candidates.iter().map(|(id, path)| (*id, path.as_str())),
+                    from,
+                );
+            }
         }
         if target_key.contains('/') {
             let suffix = format!("/{target_key}");

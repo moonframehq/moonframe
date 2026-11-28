@@ -10,6 +10,8 @@ use {
 /// byte where the body starts.
 pub(crate) struct Fenced<'a> {
     pub yaml: &'a str,
+    /// The byte where the YAML starts, past the opening line's break.
+    pub yaml_start: usize,
     pub body_start: usize,
 }
 
@@ -29,6 +31,7 @@ pub(crate) fn find(source: &str) -> Option<Fenced<'_>> {
         if bare == "---" || bare == "..." {
             return Some(Fenced {
                 yaml: &source[yaml_start..at],
+                yaml_start,
                 body_start: at + line.len(),
             });
         }
@@ -119,19 +122,23 @@ pub(crate) fn with_id(source: &str, id: &str) -> String {
             if read(fenced.yaml).contains_key("id") {
                 return source.to_string();
             }
-            let newline = if source.starts_with("---\r\n") {
+            // Right after the opening line, whatever follows its `---`.
+            let at = fenced.yaml_start;
+            let newline = if source[..at].ends_with("\r\n") {
                 "\r\n"
             } else {
                 "\n"
             };
-            let yaml_start = source.len() - source[3..].trim_start_matches(['\r', '\n']).len();
-            format!(
-                "{}id: {id}{newline}{}",
-                &source[..yaml_start],
-                &source[yaml_start..]
-            )
+            format!("{}id: {id}{newline}{}", &source[..at], &source[at..])
         },
-        None => format!("---\nid: {id}\n---\n{source}"),
+        None => {
+            let newline = if source.contains("\r\n") {
+                "\r\n"
+            } else {
+                "\n"
+            };
+            format!("---{newline}id: {id}{newline}---{newline}{source}")
+        },
     }
 }
 
@@ -184,5 +191,33 @@ mod tests {
             with_id("---\r\ntags: a\r\n---\r\nHi", "01X"),
             "---\r\nid: 01X\r\ntags: a\r\n---\r\nHi"
         );
+    }
+
+    #[test]
+    fn an_id_goes_after_the_whole_opening_line() {
+        // Spaces after the opening `---`: the id still starts a line.
+        assert_eq!(
+            with_id("--- \ntags: a\n---\nHi", "01X"),
+            "--- \nid: 01X\ntags: a\n---\nHi"
+        );
+        assert_eq!(
+            with_id("---  \r\ntags: a\r\n---\r\nHi", "01X"),
+            "---  \r\nid: 01X\r\ntags: a\r\n---\r\nHi"
+        );
+        // A blank first line of YAML stays where it was.
+        assert_eq!(
+            with_id("---\n\ntags: a\n---\nHi", "01X"),
+            "---\nid: 01X\n\ntags: a\n---\nHi"
+        );
+        // Empty frontmatter, and new frontmatter in a CRLF note.
+        assert_eq!(with_id("---\n---\nHi", "01X"), "---\nid: 01X\n---\nHi");
+        assert_eq!(
+            with_id("Hi\r\nthere\r\n", "01X"),
+            "---\r\nid: 01X\r\n---\r\nHi\r\nthere\r\n"
+        );
+        for source in ["--- \ntags: a\n---\nHi", "---\t\r\nx: 1\r\n---\r\n"] {
+            let props = read(find(&with_id(source, "01X")).unwrap().yaml);
+            assert_eq!(props["id"], "01X", "{source:?}");
+        }
     }
 }
