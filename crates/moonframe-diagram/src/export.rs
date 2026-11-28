@@ -158,13 +158,15 @@ pub fn svg(
                 r.w,
                 r.h
             );
+            // Shortened to the group's width, as the view's is.
+            let title = shorten(measure, &group.label, 11.0, r.w - 20.0);
             let _ = write!(
                 out,
                 r#"<text x="{:.1}" y="{:.1}" fill="{}" font-size="11" font-weight="500">{}</text>"#,
                 r.x + dx + 10.0,
                 r.y + dy + 16.0,
                 colors.quiet,
-                escape(&group.label)
+                escape(&title)
             );
         }
     }
@@ -510,23 +512,8 @@ fn text(
     if words.is_empty() {
         return;
     }
+    let words = shorten(measure, words, ink.size, room);
     let size = ink.size;
-    let mut words = words.to_owned();
-    if measure(&words, size) > room {
-        // Cut at characters, by halves, to the longest start that fits.
-        let chars: Vec<char> = words.chars().collect();
-        let (mut lo, mut hi) = (0, chars.len());
-        while lo < hi {
-            let mid = (lo + hi).div_ceil(2);
-            let cut: String = chars[..mid].iter().collect::<String>() + "…";
-            if measure(&cut, size) <= room {
-                lo = mid;
-            } else {
-                hi = mid - 1;
-            }
-        }
-        words = chars[..lo].iter().collect::<String>() + "…";
-    }
     let color = escape(ink.color);
     let weight = if ink.bold {
         r#" font-weight="500""#
@@ -540,6 +527,26 @@ fn text(
         at.y,
         escape(&words)
     );
+}
+
+/// `words` cut with an ellipsis, at characters, to the longest start that
+/// fits `room` pixels at `size`; whole when it fits.
+fn shorten(measure: &mut dyn FnMut(&str, f32) -> f32, words: &str, size: f32, room: f32) -> String {
+    if measure(words, size) <= room {
+        return words.to_owned();
+    }
+    let chars: Vec<char> = words.chars().collect();
+    let (mut lo, mut hi) = (0, chars.len());
+    while lo < hi {
+        let mid = (lo + hi).div_ceil(2);
+        let cut: String = chars[..mid].iter().collect::<String>() + "…";
+        if measure(&cut, size) <= room {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    chars[..lo].iter().collect::<String>() + "…"
 }
 
 /// `words` wrapped at spaces to `room` pixels wide, as many lines as
@@ -861,6 +868,24 @@ mod tests {
         let out = layout(&d, &Approx, &Options::default(), None);
         let svg = svg_of(&d, &out, &Colors::light());
         assert!(svg.contains(">Alice<") && svg.contains(">Bob<"), "{svg}");
+    }
+
+    #[test]
+    fn a_long_group_title_is_cut_to_its_group() {
+        let mut d = parse::mermaid::parse("flowchart LR\n subgraph g [x]\n a\n end").unwrap();
+        d.groups[0].label = "a group title far longer than the group it names".into();
+        let out = layout(&d, &Approx, &Options::default(), None);
+        let room = out.groups["g"].w - 20.0;
+        let svg = svg_of(&d, &out, &Colors::light());
+        let title = svg
+            .split("font-size=\"11\" font-weight=\"500\">")
+            .nth(1)
+            .and_then(|t| t.split('<').next())
+            .unwrap();
+        assert!(
+            title.ends_with('…') && Approx.width(title, 11.0) <= room,
+            "{title}"
+        );
     }
 
     fn svg_of(d: &Diagram, out: &Layout, colors: &Colors) -> String {
