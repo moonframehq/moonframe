@@ -27,6 +27,14 @@ struct Announcement {
     to: Option<String>,
 }
 
+/// Whether a stack last drawn in frame `last` is still the one drawn in
+/// `frame`: drawn this frame or the one before. A frame count that went
+/// back (a window drawn anew under an id it had before, as headless renders
+/// do) is a stack drawn anew, whose mod is told its size again.
+pub(super) fn drawn_just_before(last: Option<u64>, frame: u64) -> bool {
+    last.is_some_and(|seen| seen <= frame && seen + 1 >= frame)
+}
+
 /// What a stack says, in whole pixels and one-based children.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct Reading {
@@ -134,7 +142,7 @@ pub(super) fn reader(
     let key = format!("{:?}/{}", painter.window, place.path);
     let frame = painter.frame;
     let last = SEEN.with_borrow_mut(|seen| seen.insert(key.clone(), frame));
-    if frame > 0 && !matches!(last, Some(seen) if seen + 1 >= frame) {
+    if !drawn_just_before(last, frame) {
         TOLD.with_borrow_mut(|told| told.remove(&key));
     }
     let sender = Sender {

@@ -1,0 +1,7 @@
+[app]
+# A diagram editor: boxes, text and sticky notes on a canvas, wired by
+# connectors that follow them. `just app diagram` opens it.
+keep     = ["feedback"]
+name     = "diagram"
+requires = []
+title    = "Diagram"

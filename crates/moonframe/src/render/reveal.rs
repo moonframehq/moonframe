@@ -48,6 +48,8 @@ enum Target {
     /// A direct child, from 0.
     Child(usize),
     Key(String),
+    /// Points scrolled across and down; an axis not given stays.
+    At(Option<f32>, Option<f32>),
 }
 
 impl Pending {
@@ -58,6 +60,11 @@ impl Pending {
 
     pub(crate) fn key(key: String) -> Self {
         Self::new(Target::Key(key))
+    }
+
+    /// Scrolled `x` across and `y` down, in points.
+    pub(crate) fn at(x: Option<f32>, y: Option<f32>) -> Self {
+        Self::new(Target::At(x, y))
     }
 
     fn new(target: Target) -> Self {
@@ -167,19 +174,31 @@ fn mark(key: &str, pending: &Rc<Pending>, frame: u64) -> Option<AnyElement> {
 }
 
 /// A box of no size, last in the scrolling stack, that scrolls it to where
-/// the child, or the mark, was laid out, each frame until it stays where it
-/// was in the content of a box that keeps its size.
+/// the child, or the mark, was laid out (or as far as asked), each frame
+/// until it stays where it was in the content (the content stays as long)
+/// of a box that keeps its size.
 fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
     let handle = handle.clone();
     canvas(
         move |_, window, _| {
-            let (view, offset) = (handle.bounds(), handle.offset());
-            // Its children as laid out, before scrolling.
-            let target = match pending.target {
-                Target::Child(index) => handle.bounds_for_item(index).map(|child| child + offset),
-                Target::Key(_) => pending.found.take(),
+            let (view, offset, max) = (handle.bounds(), handle.offset(), handle.max_offset());
+            // Where to scroll, and what must stay put for it to be done: a
+            // child's place in the content, or how far the content scrolls.
+            let shown = |target: Bounds<Pixels>| {
+                (
+                    revealed(view, target, offset, max),
+                    target.origin - view.origin - offset,
+                )
             };
-            let Some(target) = target.filter(|_| !view.size.is_zero()) else {
+            let placed = match pending.target {
+                // Its children as laid out, before scrolling.
+                Target::Child(index) => handle
+                    .bounds_for_item(index)
+                    .map(|child| shown(child + offset)),
+                Target::Key(_) => pending.found.take().map(shown),
+                Target::At(x, y) => Some((scrolled_to(x, y, offset, max), max)),
+            };
+            let Some((shown, at)) = placed.filter(|_| !view.size.is_zero()) else {
                 if waits(&pending, view.size.is_zero()) {
                     window.refresh();
                 }
@@ -192,12 +211,10 @@ fn reader(pending: Rc<Pending>, handle: &ScrollHandle) -> AnyElement {
                 pending.done.set(true);
                 return;
             }
-            let shown = revealed(view, target, offset, handle.max_offset());
             if shown != offset {
                 handle.set_offset(shown);
             }
             pending.set.set(Some(shown));
-            let at = target.origin - view.origin - offset;
             let settled = pending
                 .last
                 .replace(Some((at, view.size)))
@@ -227,6 +244,20 @@ fn waits(pending: &Pending, sizeless: bool) -> bool {
     }
     pending.tries.set(pending.tries.get() + 1);
     true
+}
+
+/// The offset (GPUI's, at or below zero) scrolled `x` across and `y` down,
+/// as far as the content goes (`max`); an axis not given stays at `offset`.
+pub(super) fn scrolled_to(
+    x: Option<f32>,
+    y: Option<f32>,
+    offset: Point<Pixels>,
+    max: Point<Pixels>,
+) -> Point<Pixels> {
+    let along = |to: Option<f32>, now: Pixels, max: Pixels| {
+        to.map_or(now, |to| -px(to).min(max).max(px(0.)))
+    };
+    point(along(x, offset.x, max.x), along(y, offset.y, max.y))
 }
 
 /// The offset (GPUI's, at or below zero) that shows `target`, laid out at

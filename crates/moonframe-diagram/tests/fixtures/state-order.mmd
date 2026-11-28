@@ -1,0 +1,17 @@
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> Review : submit
+    state "In review" as Review
+    Review --> Draft : changes
+    Review --> Shipping : approve
+    state Shipping {
+        [*] --> Packed
+        Packed --> Sent
+        Sent --> [*]
+    }
+    state check <<choice>>
+    Shipping --> check
+    check --> Done : delivered
+    check --> Lost : no scan
+    Done --> [*]
+    Lost : investigate with the carrier

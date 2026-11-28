@@ -27,8 +27,8 @@ browser = ["dep:dispatch2", "dep:objc2-web-kit", "dep:wry"]
 # Developer-only export of this app's own rendered frame, without desktop capture,
 # and `render_entry`: one miniapp entry drawn headless to PNG.
 capture = ["dep:gpui-apple-capture", "dep:gpui-capture", "dep:gpui-platform-capture", "dep:image"]
-# The `chat` native provider (`app.chat`): agent chats run by herdr-acp,
-# attached over herdr's chat protocol.
+# The `chat` native provider (`app.chat`): agent chats run by Sheprd's
+# sheprd-acp, attached over its chat protocol.
 chat = ["dep:moonframe-chat"]
 default = [
   # keep-sorted start
@@ -53,6 +53,9 @@ default = [
 # `app.crash`: a panic leaves a report in the state folder, and the next
 # launch offers it. Off by default; the starter turns it on.
 crash = []
+# `ui.diagram`: diagrams drawn, laid out and edited by moonframe-diagram.
+# Off by default; the starter turns it on.
+diagram = ["dep:moonframe-diagram", "moonframe-diagram/view"]
 # `app.displays`, and a mod's window placed with `display` and `fullscreen`.
 # Off by default; the starter turns it on.
 displays = []
@@ -206,6 +209,7 @@ markdown                      = { optional = true, workspace = true }
 moonframe-acp                 = { optional = true, workspace = true }
 moonframe-chat                = { optional = true, workspace = true }
 moonframe-core.workspace      = true
+moonframe-diagram             = { optional = true, workspace = true }
 moonframe-docs                = { optional = true, workspace = true }
 moonframe-documents           = { optional = true, workspace = true }
 moonframe-forge               = { optional = true, workspace = true }

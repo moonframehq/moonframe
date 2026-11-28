@@ -30,6 +30,7 @@ mod regressions;
 mod revision_timeline;
 mod scroll_end;
 mod scroll_sync;
+mod scroll_to_at;
 mod scroll_to_key;
 mod scrolled_children;
 mod secret_input;

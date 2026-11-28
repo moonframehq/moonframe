@@ -561,3 +561,32 @@ return mod {
     // A repeated id keys only its first row; one that can't be a key, none.
     assert_eq!(keys, [Some("acme-1"), Some("7"), None, None, None, None]);
 }
+
+#[test]
+fn a_long_tables_list_takes_its_scroll_to() {
+    let source = |scroll_to: &str| {
+        format!(
+            r#"
+local table_view = use "table"
+return mod {{
+  view = function()
+    local rows = {{}}
+    for i = 1, 300 do rows[i] = {{ id = tostring(i), a = "a" }} end
+    return table_view {{ id = "long", height = 300, columns = {{ {{ key = "a" }} }}, rows = rows,
+      scroll_to = {scroll_to} }}
+  end,
+}}"#
+        )
+    };
+    let asked = |scroll_to: &str| {
+        let (_dir, workspace) = fixture(&source(scroll_to), &["table"]);
+        list(&workspace).scroll_to.map(|asked| asked.to)
+    };
+    assert_eq!(
+        asked("{ y = 480, seq = 2 }"),
+        Some(crate::ListScroll::Y(480.0))
+    );
+    assert_eq!(asked("12"), Some(crate::ListScroll::Row(12)));
+    // A key names no row of a list: left out, not an error.
+    assert_eq!(asked(r#"{ key = "12", seq = 1 }"#), None);
+}

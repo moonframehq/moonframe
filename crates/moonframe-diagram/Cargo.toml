@@ -1,0 +1,30 @@
+[package]
+description            = "Diagrams drawn in an app's own style: a model of nodes, edges and groups, a layered layout with orthogonal routing, and a GPUI view to pan, zoom and edit them"
+edition.workspace      = true
+license.workspace      = true
+name                   = "moonframe-diagram"
+publish.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+version.workspace      = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["view"]
+# The GPUI view. Without it the crate is the model and the layout alone,
+# plain data with no GUI (a server that lays diagrams out, the tests).
+view = ["dep:gpui-kit"]
+
+[dependencies]
+gpui-kit = { optional = true, workspace = true }
+
+[[example]]
+name              = "layout-bench"
+path              = "examples/layout_bench.rs"
+required-features = []
+
+[[example]]
+name = "parse-corpus"
+path = "examples/parse_corpus.rs"

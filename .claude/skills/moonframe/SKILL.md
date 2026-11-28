@@ -135,6 +135,19 @@ providers"), which takes saves only from its `writers` (`editor` as
 shipped; add yours there as for git). In the starter, a markdown file
 picked in the explorer opens in a main tab of this kind.
 
+**A diagram.** To show one an agent or the data describes, give
+`ui.diagram` a `document` of nodes and edges with no places and it lays
+them out: `ui.diagram { id = "deps", document = { direction = "right",
+nodes = { { id = "api", label = "API" }, { id = "db", label = "Postgres",
+kind = "cylinder" } }, edges = { { from = "api", to = "db" } } } }` inside
+a container with `grow = true`. To let the user draw one, keep `shapes`
+and `links` in the mod's state and pass them with `selected` and `tool`;
+apply each message (`moved`, `resized`, `created`, `connected`,
+`deleted`, `edited`, `selected`) to the state and the view follows.
+`examples/diagram` is the whole editor (layers, inspector, undo), and
+falls back to the Luau `diagram` component where `app.capabilities.diagram`
+is false.
+
 **A web page.** With browser chrome (back, forward, reload, an address
 bar that navigates, the title): `local browser = use "browser"`, then
 `browser { id = "docs", url = state.url, page = state.page, navigate =
@@ -586,7 +599,7 @@ ui.document {
 	select = "select",                -- { msg = "select", text, x, y, width, height }
 	editable = state.editing,
 	change = "change",                -- { msg = "change", html }: keep it, give it back as html
-	done = "done",                    -- { msg = "done", html } as it loses the keyboard
+	done = "done",                    -- { msg = "done", html, edited } as it loses the keyboard
 }
 ```
 
@@ -613,7 +626,11 @@ ui.document {
   as `html` half a second after an edit: save it, and pass it back as
   `html`; the same HTML loads nothing, so the caret stays. New HTML from
   the mod loads in its place, and the HTML from before an edit loads again
-  (a reset). `done` is sent as it loses the keyboard. An edit that grows
+  (a reset). `done` is sent as it loses the keyboard, with `edited`: whether
+  it was typed into since the last `done` (or since it loaded), so a mod
+  that saves on `done` skips a blur that changed nothing (the HTML it
+  reports is the page's own writing of it, which differs from the HTML
+  given even untouched). An edit that grows
   the document past the 8 MB `html` takes comes with `error` instead of
   `html`.
 - **Lifetime, size, input and what lies over it** are a browser's (see
@@ -1502,6 +1519,7 @@ Text-like elements take their main value positionally:
 | `ui.revision_timeline { entries = { { id = "r1", day = "Today", label = "10:30" } }, select = "pick" }` | `entries`, `selected`, `select`, `to`, `id`, `width`, `height`, `grow`, `disabled`, `class`, `style`, `state` | native right-aligned revision ruler, with Dock-like pointer magnification; clicks and keyboard navigation choose revisions or days; `select` adds `revision`, `index`, `day`, `label` |
 | `ui.badge "..."` | `text`, `tone`, extras | pill |
 | `ui.terminal { id = "main", cwd = "~/code", engine = "alacritty" }` | `id`, `cwd`, `engine` (`alacritty` or `ghostty`), `backend` (`auto`, `herdr-core`, `tmux`, `pty`), `class`, `style` | a live shell (the user's login shell) that fills the space it gets; see "Terminals" |
+| `ui.diagram { id = "flow", document = { nodes = ..., edges = ... } }` | `id`, `shapes`/`links` or `document`, `mode`, `tool`, `selected`, `highlight`, `camera`, `scroll`, `class`, `style` | a diagram drawn and laid out in Rust (the `diagram` feature, in the starter): flows laid out in layers or placed, sequence diagrams, pan and zoom; `mode = "edit"` selects, drags, resizes, connects and creates, sending `selected`, `moved`, `resized`, `created`, `connected`, `deleted`, `edited` to this mod, which keeps the document. See "A diagram" |
 | `ui.view { name = "editor", id = "main", props = {...} }` | `name`, `id`, `props`, `class`, `style` | a view the app writes in Rust (apps on the library only; the starter registers none), kept by mod and `id`, told when `props` change; its messages reach this mod's `update`. See "Extending the host" |
 | `ui.browser { id = "docs", url = "https://example.com" }` | `id`, `url`, `zoom`, `navigate`, `loading`, `class`, `style` | a web page in a native view that fills the space it gets; see "Browsers" |
 | `ui.document { html = state.html }` | `id`, `html` or `src`, `link`, `scroll`, `scroll_to`, `select`, `editable`, `change`, `done`, `class`, `style` | HTML shown sealed (no script, no network, light or dark as the app), or edited in place; see "Documents" |
@@ -1547,7 +1565,12 @@ Text-like elements take their main value positionally:
   overlay's content as it opens): `12` the twelfth direct child, `"row-7"`
   the first row or column with `key = "row-7"` however deep (a row in a
   card in the list, once it is drawn), and `{ key = "row-7", seq = n }` the
-  same, asked again with each new `seq` (a link opened twice).
+  same, asked again with each new `seq` (a link opened twice), and `{ y =
+  state.y, seq = n }` (and `x`) scrolls back to how far `measure` told it
+  was (keep `msg.y` in state as it comes: with a `seq`, only a new `seq`
+  asks again, and the stack's first `measure` already tells the `y` it was
+  put back to): a reader reopened where it was left, once the host forgot
+  the scroll of a stack it no longer drew.
 - `shrink = false` keeps the content's size when the parent is short of
   space (strips, toolbars), instead of being squeezed. The rows, columns
   and panels inside a row or column that scrolls along its axis keep it
@@ -2656,8 +2679,8 @@ Protocol (crates/moonframe-acp), each in the app's repository (else
 `~/.config/moonframe`; `[settings] cwd` to change), one prompt per run,
 published as it goes (every 0.25 s while something changed). Only mods in
 `[settings] starters` (`feedback` as shipped) may start runs, and a run
-obeys only the mod that started it. Agents are found as herdr-acp finds
-them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
+obeys only the mod that started it. Agents are found as Sheprd's
+`sheprd-acp` finds them: `claude-agent-acp`, `codex-acp` (each else through `npx`),
 `gemini --acp`, `opencode acp`, `copilot --acp`; `[settings] commands`
 replaces one (`{ claude = ["my-acp"] }`). At most 4 run at once; finished
 runs are kept (30) across launches.
@@ -2681,24 +2704,36 @@ for a run on the app itself, above), `{ cancel = run }`, `{ forget = run }`
 | `runs` | newest first: `{ id, owner, agent, agent_title, text, thread?, cwd?, status, started, finished?, error?, stop_reason?, message?, tools, tool_count, plan, question? }`; `status` is `"starting" "running" "waiting" "done" "failed" "cancelled" "stopped"`; `tools` the latest 12 `{ id, title, kind, status }`; `parts` everything said in order, `{ kind = "text", text }` or `{ kind = "tools", tools = { { id, title, kind, status } } }`; `agent_info` `{ name, title?, version? }` as the agent names itself; `model` the model its session says it uses, by name; `plan` `{ content, status }`; `question` `{ title, options = { { id, name, kind } } }`; `changed`, `undone`, `warning?`, `checking`; `timing` milliseconds from its start `{ spawned, initialized, session, first_token, ended, check, baseline, warm }`, and each tool's `ms` |
 
 `app.chat` (chat, native, crates/moonframe-chat): conversations with
-coding agents, each run by herdr-gpui's `herdr-acp` program with no view
-of its own (found on PATH or in Herdr.app; `[settings] program`) and
-attached over herdr's chat protocol. A chat takes prompt after prompt and
-outlives the app: the next launch attaches again. Only `[settings]
-starters` drive chats, each obeying the mod that started it: `{ start =
-"<agent>", cwd?, load? }`, `{ prompt, chat, files? }`, `{ cancel = chat }`,
-`{ answer = chat, permission, option }`, `{ mode, chat }`, `{ setting,
-value, chat }`, `{ unqueue, chat }`, `{ auto_accept, chat }`, `{ resume =
-chat }`, `{ close = chat }`, each answered `{ reply, action, ok, error? }`;
-anyone may send `{ focus = chat }`, the chat whose whole recent transcript
-is shared (the others share their last few entries). It publishes `{
-available, reason?, program, agents, default, cwd, chats }`, a chat being
-`{ id, owner, agent, cwd, created, status ("starting" "live" "reconnecting"
-"ended" "failed"), error?, session?, transcript? }` and `transcript`
-herdr's own (`Transcript` in herdr-chat-protocol: `entries`, `status`,
-`permissions`, `plan`, `options`, `modes`, `usage`, `queued`, `commands`),
-trimmed (see crates/moonframe-chat/src/project.rs). `examples/switchyard`
-is the whole example.
+coding agents, each run by Sheprd's chat program (`sheprd-acp`, also
+bundled as `herdr-acp`) with no view of its own (found on PATH or in
+Sheprd.app; `[settings] program`) and attached over its chat protocol, so
+Sheprd's agents, memory, pull request tracking and handoffs come with it.
+A chat takes prompt after prompt and outlives the app: the next launch
+attaches again. Only `[settings] starters` drive chats, each obeying the
+mod that started it: `{ start = "<agent>", cwd?, load?, context? }`, `{
+prompt, chat, files?, context? }`, `{ cancel = chat }`, `{ answer = chat,
+permission, option }` (or `answers = { ... }`, option labels or the user's
+own words, for a permission carrying a `question`), `{ mode, chat }`, `{
+setting, value, chat }`, `{ unqueue, chat }`, `{ send_now = queued, chat }`
+(into the running turn when `can_steer`, else in place of it), `{
+stop_activity = call_id, chat }` (one sub-agent or shell), `{ agent =
+"<agent>", chat }` (hand the conversation to another of `view.agents`
+while idle; a new chat offers every installed agent, a continued one
+none), `{ auto_accept, chat }`, `{ resume = chat }`, `{ close = chat }`,
+each answered `{ reply, action, ok, error? }`; anyone may send `{ focus =
+chat }`, the chat whose whole recent transcript is shared (the others
+share their last few rows). It publishes `{ available, reason?, warning?,
+program, agents, default, cwd, chats }`, a chat being `{ id, owner, agent,
+cwd, created, status ("starting" "live" "reconnecting" "ended" "failed"),
+error?, session?, view? }`, `view` what a view draws (`ChatView` in
+crates/moonframe-chat-view: `rows` (`user`, `answer`, `thought`, `tools`,
+`image`, `notice`, `handoff`, `turn`), `permissions` (with `question` or
+`guest`), `queue` (`held`, `steered`), `plan`, `mode`, `model`, `effort`,
+`settings`, `usage`, `commands`, `activities` (`stoppable`), `agents`,
+`pull_requests`, `clients`, `continued`, `can_steer`, `title`, `last`).
+`[settings] raw = true` adds the protocol's own `transcript` beside it
+(see crates/moonframe-chat/src/project.rs). The `agent-chat` component
+draws a view whole; `examples/switchyard` is the whole example.
 
 `app.speech` (speech, native, the `speech` feature, crates/moonframe-speech):
 dictation. Only `[settings] recorders` may listen, and a take obeys only the

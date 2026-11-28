@@ -284,8 +284,10 @@ export type StackProps = {
 	scroll: (boolean | "x" | "y" | "both")?,
 	-- Reveal this direct child (one-based) when the index changes; or the
 	-- first row or column with this `key`, however deep, when the key (or
-	-- `seq`, to ask again) changes.
-	scroll_to: (number | string | { key: string, seq: any? })?,
+	-- `seq`, to ask again) changes; or scroll to the `y` (and `x`) its
+	-- `measure` told, as far as the content goes: with a `seq`, only a new
+	-- `seq` asks again, so `measure`'s `y` can be kept as it comes.
+	scroll_to: (number | string | { key: string?, x: number?, y: number?, seq: any? })?,
 	-- With `scroll`: sent with `width`, `height`, `content_width`,
 	-- `content_height`, `x`, `y`, `fit`, `first` and `last` as they change.
 	measure: Data,
@@ -687,6 +689,7 @@ export type IconName =
 	| "gitlab"
 	| "globe"
 	| "grip-vertical"
+	| "hand"
 	| "hard-drive"
 	| "hash"
 	| "heading"
@@ -732,6 +735,7 @@ export type IconName =
 	| "minus"
 	| "monitor"
 	| "moon"
+	| "mouse-pointer-2"
 	| "network"
 	| "octagon-alert"
 	| "palette"
@@ -791,6 +795,7 @@ export type IconName =
 	| "star"
 	| "star-fill"
 	| "star-off"
+	| "sticky-note"
 	| "strikethrough"
 	| "sun"
 	| "tag"
@@ -803,6 +808,7 @@ export type IconName =
 	| "trash"
 	| "trash-2"
 	| "triangle-alert"
+	| "type"
 	| "undo"
 	| "undo-2"
 	| "unlock"
@@ -1101,7 +1107,9 @@ export type DocumentProps = {
 	-- after an edit; give it back as `html` and nothing reloads. Grown past
 	-- the 8 MB `html` takes, it comes with `error` instead.
 	change: Data,
-	-- While editable: sent with `html` as the document loses the keyboard.
+	-- While editable: sent with `html` as the document loses the keyboard,
+	-- and `edited`, whether it was typed into since the last `done` (or
+	-- since it loaded): skip saving a blur that changed nothing.
 	done: Data,
 	[number]: string,
 }
@@ -1111,6 +1119,85 @@ export type DocumentProps = {
 -- `id`, so it lives across reloads and while hidden, and hands it `props`,
 -- telling it when they change. What the user does in it comes back to this
 -- mod's `update` as messages the view chooses.
+-- One node of a `ui.diagram` document. With `x`, `y`, `w` and `h` it stays
+-- where it is; without, the diagram is laid out.
+export type DiagramNode = {
+	id: string,
+	label: string?,
+	sublabel: string?,
+	-- box rounded pill diamond circle (ellipse) cylinder note (sticky) text
+	kind: string?,
+	tone: Tone?,
+	-- `#rrggbb`, over the card color.
+	fill: string?,
+	group: string?,
+	x: number?,
+	y: number?,
+	w: number?,
+	h: number?,
+}
+
+-- One edge of a `ui.diagram` document.
+export type DiagramEdge = {
+	id: string?,
+	from: string,
+	to: string,
+	label: string?,
+	kind: ("solid" | "dashed" | "dotted" | "thick" | "invisible")?,
+	dashed: boolean?,
+	-- none arrow open circle cross triangle diamond hollow-diamond
+	start: string?,
+	["end"]: string?,
+	tone: Tone?,
+}
+
+-- A diagram the view lays out: a flow of nodes, edges and groups, or a
+-- sequence of messages between participants (its `nodes`).
+export type DiagramDocument = {
+	kind: ("flow" | "sequence")?,
+	direction: ("down" | "up" | "right" | "left")?,
+	-- `DiagramNode`s and `DiagramEdge`s.
+	nodes: { any }?,
+	edges: { any }?,
+	groups: { { id: string, label: string?, parent: string?, tone: Tone? } }?,
+	messages: { { from: string, to: string, label: string?, kind: ("sync" | "async" | "reply")? } }?,
+	notes: { { over: { string }, text: string, before: number? } }?,
+}
+
+-- `ui.diagram` (the `diagram` feature): a diagram drawn, laid out and
+-- edited in Rust. The mod keeps the document and applies what it hears:
+-- `selected`, `moved`, `resized`, `created`, `connected`, `deleted`,
+-- `edited`, `opened`, `zoom`, `tool`.
+export type DiagramProps = {
+	id: string?,
+	class: Class?,
+	style: Style?,
+	-- The Luau `diagram` component's document: every shape placed. Each
+	-- is a `DiagramNode` and a `DiagramEdge` (typed `any`: a mod's own
+	-- record types would not pass, as Luau's lists are invariant).
+	shapes: { any }?,
+	links: { any }?,
+	-- Or a document to lay out.
+	document: DiagramDocument?,
+	-- Or Mermaid (flowchart, sequence, state, class, er) or Graphviz DOT
+	-- text, laid out the same way; what does not parse shows why.
+	mermaid: string?,
+	dot: string?,
+	-- "edit" changes it (the default with `shapes`), "view" only looks.
+	mode: ("view" | "edit")?,
+	-- select hand connector, or a node kind to draw.
+	tool: string?,
+	selected: { string }?,
+	-- Nodes and edges drawn in the accent.
+	highlight: { string }?,
+	-- Asked again with each new `seq`.
+	camera: { fit: boolean?, zoom: number?, zoom_by: number?, seq: number? }?,
+	-- "focus": scrolling pans only after a click inside (in a page that
+	-- scrolls, as a chat does).
+	scroll: "focus"?,
+	[string]: any,
+}
+
 export type ViewProps = {
 	class: Class?,
 	style: Style?,
@@ -1505,6 +1592,7 @@ declare ui: {
 	document: (props: string | DocumentProps) -> Element,
 	video: (props: string | VideoProps) -> Element,
 	view: (props: string | ViewProps) -> Element,
+	diagram: (props: DiagramProps) -> Element,
 	input: (props: InputProps) -> Element,
 	markdown: (props: string | MarkdownProps) -> Element,
 	divider: () -> Element,
@@ -2975,6 +3063,26 @@ type UseChatMessageProps = {
 	read text: string?,
 	read [number]: any,
 }
+type UseChatQuestionProps = {
+	read id: string?,
+	read permission: any,
+}
+type UseChatQuestionState = any
+type UseChatWaitingProps = {
+	read view: any,
+	read chat: string?,
+	read plan_open: boolean?,
+	read plan_toggle: any,
+}
+type UseChatWorkingProps = {
+	read working: boolean?,
+	read waiting: boolean?,
+	read step: string?,
+	read working_for: string?,
+	read activities: { any }?,
+	read open: boolean?,
+	read toggle: any,
+}
 type UseCheckboxProps = {
 	read checked: boolean?,
 	read indeterminate: boolean?,
@@ -3238,6 +3346,20 @@ type UseDayStripProps = {
 	read event: string?,
 	read to: string?,
 }
+type UseDiagramShape = any
+type UseDiagramLink = any
+type UseDiagramProps = {
+	read id: string,
+	read shapes: { UseDiagramShape },
+	read links: { UseDiagramLink }?,
+	read selected: { string }?,
+	read tool: string?,
+	read version: number?,
+}
+type UseDiagramView = any
+type UseDiagramDrag = any
+type UseDiagramState = any
+type UseDiagramBox = any
 type UseDialogButton = any
 type UseDialogProps = {
 	read open: boolean?,
@@ -5044,6 +5166,9 @@ type UseProps = {
 	["change-tree"]: UseChangeTreeProps,
 	["chat-markdown"]: UseChatMarkdownProps,
 	["chat-message"]: UseChatMessageProps,
+	["chat-question"]: UseChatQuestionProps,
+	["chat-waiting"]: UseChatWaitingProps,
+	["chat-working"]: UseChatWorkingProps,
 	["checkbox"]: UseCheckboxProps,
 	["checks"]: UseChecksProps,
 	["chips"]: UseChipsProps,
@@ -5066,6 +5191,7 @@ type UseProps = {
 	["date-picker"]: UseDatePickerProps,
 	["date-tile"]: UseDateTileProps,
 	["day-strip"]: UseDayStripProps,
+	["diagram"]: UseDiagramProps,
 	["dialog"]: UseDialogProps,
 	["dictation"]: UseDictationProps,
 	["diff-counts"]: UseDiffCountsProps,

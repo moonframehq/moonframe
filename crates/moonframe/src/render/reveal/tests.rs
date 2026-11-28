@@ -1,5 +1,5 @@
 use {
-    super::{MAX_TRIES, Pending, revealed, waits},
+    super::{MAX_TRIES, Pending, revealed, scrolled_to, waits},
     gpui_kit::{Bounds, Pixels, point, px, size},
 };
 
@@ -63,4 +63,24 @@ fn a_missing_target_draws_again_only_while_the_stack_has_no_size() {
     let child = Pending::child(3);
     child.done.set(true);
     assert!(!waits(&child, true));
+}
+
+#[test]
+fn a_place_asked_for_is_gone_to_as_far_as_the_content_goes() {
+    let max = point(px(0.), px(800.));
+    let now = point(px(0.), px(-100.));
+    assert_eq!(
+        scrolled_to(None, Some(480.), now, max),
+        point(px(0.), px(-480.))
+    );
+    // Past the end: the end, until the content grows.
+    assert_eq!(
+        scrolled_to(None, Some(5000.), now, max),
+        point(px(0.), px(-800.))
+    );
+    // An axis not given stays where it is.
+    assert_eq!(
+        scrolled_to(Some(30.), None, now, max),
+        point(px(0.), px(-100.))
+    );
 }

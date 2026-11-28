@@ -76,6 +76,8 @@ use {
 use crate::terminal::Terminals;
 #[cfg(all(test, unix, feature = "markdown"))]
 pub(crate) use divider::kept as dividers_kept;
+#[cfg(feature = "capture")]
+pub(crate) use viewer::forget_window;
 pub(crate) use {
     divider::{
         closed as dividers_closed, frame_drawn as dividers_drawn, keystroke as divider_keystroke,

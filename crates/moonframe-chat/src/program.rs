@@ -1,4 +1,4 @@
-//! The `herdr-acp` program: finding it, starting a chat in it with no view
+//! Sheprd's chat program (`sheprd-acp`, once `herdr-acp`): finding it, starting a chat in it with no view
 //! of its own, finding where that chat listens, and ending it.
 //!
 //! Herdr learns a chat's endpoint from the pane it runs in; a chat started
@@ -19,33 +19,36 @@ use {
     },
 };
 
-/// The program's file name.
-const PROGRAM: &str = "herdr-acp";
+/// The program's file names, newest first: Sheprd still bundles it under
+/// its old name too, and older installs have only that.
+const PROGRAMS: &[&str] = &["sheprd-acp", "herdr-acp"];
 /// How long a new chat may take to start listening.
 const LISTEN_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// The apps that bundle `herdr-acp`, in the order they are tried.
+/// The apps that bundle the program, in the order they are tried.
 const BUNDLES: &[&str] = &[
     "Applications/Sheprd.app/Contents/MacOS",
     "Applications/Herdr.app/Contents/MacOS",
 ];
 
-/// Where an installed app keeps `herdr-acp`: in `/Applications`, then in
-/// the user's own `~/Applications`.
+/// Where an installed app keeps the program: in `/Applications`, then in
+/// the user's own `~/Applications`, each app's newest name first.
 pub(crate) fn bundled(home: Option<&Path>) -> Vec<PathBuf> {
     let roots = [Some(Path::new("/")), home];
     roots
         .into_iter()
         .flatten()
         .flat_map(|root| {
-            BUNDLES
-                .iter()
-                .map(move |bundle| root.join(bundle).join(PROGRAM))
+            BUNDLES.iter().flat_map(move |bundle| {
+                PROGRAMS
+                    .iter()
+                    .map(move |program| root.join(bundle).join(program))
+            })
         })
         .collect()
 }
 
-/// Where `herdr-acp` was found, and a `program` setting that named no file
+/// Where the program was found, and a `program` setting that named no file
 /// and so was passed over for the search.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Found {
@@ -53,7 +56,7 @@ pub(crate) struct Found {
     pub(crate) missing: Option<PathBuf>,
 }
 
-/// Where `herdr-acp` is: the setting when it names a file, else the search
+/// Where the program is: the setting when it names a file, else the search
 /// path, then inside an installed app (`bundled`).
 pub(crate) fn find(setting: Option<&Path>, path: &OsStr, bundled: &[PathBuf]) -> Found {
     if let Some(setting) = setting.filter(|setting| setting.is_file()) {
@@ -62,7 +65,10 @@ pub(crate) fn find(setting: Option<&Path>, path: &OsStr, bundled: &[PathBuf]) ->
             missing: None,
         };
     }
-    let program = moonframe_providers::program::find(PROGRAM, path).or_else(|| {
+    let on_path = PROGRAMS
+        .iter()
+        .find_map(|program| moonframe_providers::program::find(program, path));
+    let program = on_path.or_else(|| {
         bundled
             .iter()
             .find(|candidate| candidate.is_file())
@@ -74,7 +80,7 @@ pub(crate) fn find(setting: Option<&Path>, path: &OsStr, bundled: &[PathBuf]) ->
     }
 }
 
-/// The agents installed here, as `herdr-acp agents` names them.
+/// The agents installed here, as the program's `agents` names them.
 pub(crate) fn agents(program: &Path, path: &OsStr) -> Vec<String> {
     let output = Command::new(program)
         .arg("agents")
@@ -98,7 +104,9 @@ pub(crate) struct Spawn<'a> {
     pub program: &'a Path,
     pub agent: &'a str,
     pub cwd: &'a Path,
-    /// The agent's session to continue.
+    /// The agent's session to continue; a new conversation instead lets
+    /// the user switch to another installed agent (`--choose`), which the
+    /// program refuses for a continued one.
     pub load: Option<&'a str>,
     pub path: &'a OsStr,
     /// Where the program's errors go.
@@ -113,9 +121,10 @@ pub(crate) fn spawn(spawn: &Spawn<'_>) -> Result<(u32, EndpointId), String> {
         .ok_or_else(|| "herdr's endpoint folder is unknown here".to_owned())?;
     let mut command = Command::new(spawn.program);
     command.arg("--headless").arg("--cwd").arg(spawn.cwd);
-    if let Some(session) = spawn.load {
-        command.arg("--load").arg(session);
-    }
+    match spawn.load {
+        Some(session) => command.arg("--load").arg(session),
+        None => command.arg("--choose"),
+    };
     command
         .arg(spawn.agent)
         .current_dir(spawn.cwd)
@@ -148,13 +157,15 @@ pub(crate) fn spawn(spawn: &Spawn<'_>) -> Result<(u32, EndpointId), String> {
             return Ok((pid, endpoint));
         }
         if let Ok(Some(status)) = child.try_wait() {
-            return Err(format!("herdr-acp ended before it listened ({status})"));
+            return Err(format!(
+                "the chat program ended before it listened ({status})"
+            ));
         }
         if started.elapsed() > LISTEN_TIMEOUT {
             end(pid);
             let _ = child.wait();
             return Err(
-                "could not find herdr-acp's listening socket (needs /proc on Linux or lsof)"
+                "could not find the chat program's listening socket (needs /proc on Linux or lsof)"
                     .to_owned(),
             );
         }

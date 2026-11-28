@@ -1,0 +1,15 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#eef2ff'}}}%%
+flowchart TD
+    %% How a change gets merged
+    A["Agent opens a PR"] --> B{"CI green?"}
+    B -->|yes| C["Request review"]
+    B -->|no| D["Fix failing checks"]
+    D --> B
+    C --> E{"Approved?"}
+    E -->|"changes requested"| F["Address comments<br/>and push"]
+    F --> C
+    E -->|approved| G(["Merge"])
+    classDef done fill:#d1fae5,stroke:#059669
+    classDef danger stroke:#dc2626
+    class G done
+    class D danger
