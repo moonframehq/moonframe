@@ -6,7 +6,7 @@
 use {
     crate::{document, store},
     moonframe_core::Data,
-    moonframe_providers::{Handle, Native},
+    moonframe_providers::{Handle, MAX_ENTRIES, Native},
     serde_json::{Value, json},
     std::{
         collections::HashMap,
@@ -17,10 +17,11 @@ use {
 
 /// The most files read from one folder.
 const MOST_FILES: usize = 200;
-/// How many values the documents of one publish may hold together (a
-/// publish holds at most 10,000): diagrams past it are listed without
-/// their document, newest first keep theirs.
-const BUDGET: usize = 8_000;
+/// How many values one publish may hold, every field counted (a publish
+/// holds at most [`MAX_ENTRIES`]): diagrams past it are listed without
+/// their document, newest first keep theirs, and any past it even so are
+/// left out.
+const BUDGET: usize = MAX_ENTRIES - 16;
 
 /// Where a file is from.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -44,8 +45,8 @@ pub struct Diagrams {
     /// The project, whose `.moonframe/diagrams` is checked again on each
     /// scan (it may come later, or be swapped for a link).
     project: Option<PathBuf>,
-    /// Each file read, by path: when it changed and how big it was, and
-    /// what it read as, so an unchanged file is not read again.
+    /// Each file of the last scan, by path: when it changed and how big it
+    /// was, and what it read as, so an unchanged file is not read again.
     read: HashMap<PathBuf, (SystemTime, u64, Value)>,
     last: Option<Value>,
 }
@@ -60,6 +61,7 @@ impl Native for Diagrams {
             Some(dir) if !dir.is_empty() => PathBuf::from(dir),
             _ => store::default_dir(),
         };
+        store::set_agents_dir(&self.agents);
         self.project = moonframe_providers::project();
         self.refresh(host);
         Ok(())
@@ -100,32 +102,23 @@ fn project_folder(project: Option<PathBuf>) -> Option<PathBuf> {
 
 impl Diagrams {
     fn refresh(&mut self, host: &Handle) {
-        let mut entries = self.scan(&self.agents.clone(), From::Agent);
+        // Files gone since (or of a project left) are forgotten.
+        let mut before = std::mem::take(&mut self.read);
+        let mut entries = self.scan(&self.agents.clone(), From::Agent, &mut before);
         let folder = project_folder(self.project.clone());
         if let Some(project) = folder.clone() {
-            entries.extend(self.scan(&project, From::Project));
+            entries.extend(self.scan(&project, From::Project, &mut before));
         }
         entries.sort_by_key(|e| {
             std::cmp::Reverse(e.get("updated").and_then(Value::as_u64).unwrap_or(0))
         });
-        let mut spent = 0;
-        for entry in &mut entries {
-            let weight = entry.get("document").map_or(0, document::weight);
-            if spent + weight > BUDGET {
-                if let Value::Object(map) = entry {
-                    map.remove("document");
-                    map.insert("truncated".into(), true.into());
-                }
-            } else {
-                spent += weight;
-            }
-        }
-        let published = json!({
+        let mut published = json!({
             "available": true,
             "agents": self.agents.to_string_lossy(),
             "project": folder.as_ref().map(|p| p.to_string_lossy().into_owned()),
-            "diagrams": entries,
+            "diagrams": [],
         });
+        published["diagrams"] = Value::Array(within_budget(entries, document::weight(&published)));
         if self.last.as_ref() != Some(&published) {
             host.publish_json(&published);
             self.last = Some(published);
@@ -133,7 +126,12 @@ impl Diagrams {
     }
 
     /// The diagrams in `dir`, each read again only when it changed.
-    fn scan(&mut self, dir: &Path, from: From) -> Vec<Value> {
+    fn scan(
+        &mut self,
+        dir: &Path,
+        from: From,
+        before: &mut HashMap<PathBuf, (SystemTime, u64, Value)>,
+    ) -> Vec<Value> {
         let Ok(listing) = std::fs::read_dir(dir) else {
             return Vec::new();
         };
@@ -151,11 +149,12 @@ impl Diagrams {
                 continue;
             }
             let modified = meta.modified().unwrap_or(UNIX_EPOCH);
-            if let Some((when, len, entry)) = self.read.get(&file)
-                && *when == modified
-                && *len == meta.len()
+            if let Some(known) = before.remove(&file)
+                && known.0 == modified
+                && known.1 == meta.len()
             {
-                out.push(entry.clone());
+                out.push(known.2.clone());
+                self.read.insert(file, known);
                 continue;
             }
             let entry = entry(&file, language, from, &meta, modified);
@@ -165,6 +164,31 @@ impl Diagrams {
         }
         out
     }
+}
+
+/// `entries`, newest first, held to [`BUDGET`] with what is published
+/// around them (`spent`): past it a diagram goes without its document,
+/// and one that does not fit even so is left out.
+fn within_budget(entries: Vec<Value>, mut spent: usize) -> Vec<Value> {
+    let mut kept = Vec::with_capacity(entries.len());
+    for mut entry in entries {
+        let full = document::weight(&entry);
+        if spent + full <= BUDGET {
+            spent += full;
+            kept.push(entry);
+            continue;
+        }
+        if let Value::Object(map) = &mut entry {
+            map.remove("document");
+            map.insert("truncated".into(), true.into());
+        }
+        let lean = document::weight(&entry);
+        if spent + lean <= BUDGET {
+            spent += lean;
+            kept.push(entry);
+        }
+    }
+    kept
 }
 
 /// The language a file's name says, `None` for a file that is not a
@@ -194,11 +218,16 @@ fn entry(
         .and_then(|s| s.to_str())
         .unwrap_or("diagram")
         .to_owned();
+    // The whole name: `a.mmd` and `a.dot` are two diagrams.
+    let name = file
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("diagram");
     let seconds = modified
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
     let mut out = json!({
-        "key": format!("{}/{stem}", from.name()),
+        "key": format!("{}/{name}", from.name()),
         "id": stem,
         "title": stem,
         "from": from.name(),
@@ -338,7 +367,7 @@ mod tests {
         std::os::unix::fs::symlink(secret.path().join("key"), dir.join("key.mmd")).unwrap();
         std::fs::write(dir.join("own.mmd"), "graph TD; a-->b").unwrap();
         let mut provider = Diagrams::default();
-        let found = provider.scan(&dir, From::Project);
+        let found = provider.scan(&dir, From::Project, &mut HashMap::new());
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0]["id"], "own");
         // A diagrams folder that is a link out of the project is not read.
@@ -395,5 +424,59 @@ mod tests {
             Data::map([("close", Data::String("flow".into()))]),
         );
         assert!(!store::path(dir.path(), "flow").exists());
+    }
+
+    #[test]
+    fn same_named_files_keep_their_own_keys_and_gone_files_are_forgotten() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("arch.mmd"), "graph TD; a-->b").unwrap();
+        std::fs::write(dir.path().join("arch.dot"), "digraph { a -> b }").unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let host = handle(&seen, dir.path());
+        let mut provider = Diagrams::default();
+        provider.start(&host).unwrap();
+        let last = seen.lock().unwrap().last().cloned().unwrap();
+        let mut keys: Vec<&str> = last["diagrams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| d["key"].as_str().unwrap())
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["agent/arch.dot", "agent/arch.mmd"]);
+        assert_eq!(provider.read.len(), 2);
+        std::fs::remove_file(dir.path().join("arch.dot")).unwrap();
+        provider.tick(&host);
+        assert_eq!(provider.read.len(), 1, "the gone file is not kept");
+    }
+
+    #[test]
+    fn many_diagrams_stay_within_what_one_publish_holds() {
+        let dir = tempfile::tempdir().unwrap();
+        let nodes: String = (0..400)
+            .map(|i| format!(" n{i} --> n{}\n", i + 1))
+            .collect();
+        for i in 0..40 {
+            std::fs::write(
+                dir.path().join(format!("d{i}.mmd")),
+                format!("flowchart TD\n{nodes}"),
+            )
+            .unwrap();
+        }
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let host = handle(&seen, dir.path());
+        let mut provider = Diagrams::default();
+        provider.start(&host).unwrap();
+        let last = seen.lock().unwrap().last().cloned().expect("it published");
+        assert!(document::weight(&last) <= MAX_ENTRIES);
+        let diagrams = last["diagrams"].as_array().unwrap();
+        assert_eq!(diagrams.len(), 40, "all listed");
+        assert!(diagrams.iter().any(|d| d.get("document").is_some()));
+        assert!(diagrams.iter().any(|d| d["truncated"] == true));
+        // Entries that do not fit even without their document are left out.
+        let lean = json!({ "id": "x", "document": { "nodes": [] } });
+        let kept = within_budget(vec![lean.clone(), lean], BUDGET - 3);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0]["truncated"], true);
     }
 }

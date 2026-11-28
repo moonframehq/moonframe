@@ -4,7 +4,7 @@
   "project": "/Users/me/code/shop/.moonframe/diagrams",
   "diagrams": [
     {
-      "key": "agent/plan",
+      "key": "agent/plan.json",
       "id": "plan",
       "title": "What I am changing",
       "from": "agent",
