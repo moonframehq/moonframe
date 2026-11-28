@@ -267,7 +267,32 @@ The plan as first written:
 - Fixtures: a folder of real agent-written diagrams (collect from
   transcripts) with snapshot tests of parse and layout.
 
-### 4. Fences in markdown
+### 4. Fences in markdown (done)
+
+As built: `crates/moonframe/src/render/markdown/diagram.rs`, a block
+parser and renderer as `math.rs` is, behind `diagram`, so every
+`ui.markdown` (`chat-markdown`, `agent-chat`, docs, notes) draws
+` ```mermaid `, ` ```dot `, ` ```graphviz ` fences.
+
+- Drawn with moonframe-diagram's new `view::picture`: stateless, fitted
+  to the width (never past 100 %), at most 480 px tall, labels measured
+  in the theme's font. No scroll is taken, so a chat scrolls past it.
+- Each fence's text is laid out once and cached (256 kept). Streaming:
+  a version that parses is laid out from the longest earlier one it grew
+  from (nodes keep their places); one that doesn't yet shows that earlier
+  one, so it never flickers back to source.
+- "Copy as Mermaid" (the writer's text, also for DOT) and "Copy source"
+  in the corner.
+- What doesn't parse, or has over 300 nodes (laid out as the document
+  draws, so a bigger one would hold the window up), shows as code with
+  why.
+- Not yet: pan and zoom after a click, and "Open" in a pane with "Edit a
+  copy". A picture has no state, and a block renderer can't keep a view
+  entity safely (gpui keyed state only works while laying out or
+  painting); this comes with the chat cards of phase 6, which own their
+  views.
+
+The plan as first written:
 
 - A markdown plugin, as `crates/moonframe/src/render/markdown/math.rs` is,
   behind the `diagram` feature: ` ```mermaid ` and ` ```dot ` (and
