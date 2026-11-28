@@ -33,7 +33,11 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
             }
             continue;
         }
-        if line.starts_with("direction ") || line.starts_with("title ") {
+        if let Some(direction) = super::direction(line) {
+            d.direction = direction;
+            continue;
+        }
+        if line.starts_with("title ") {
             continue;
         }
         if let Some(entity) = line.strip_suffix('{') {

@@ -42,8 +42,9 @@ struct Look {
 struct Builder {
     diagram: Diagram,
     index: HashMap<String, usize>,
-    /// The subgraphs the statement is inside, innermost last.
-    open: Vec<String>,
+    /// The subgraphs the statement is inside, innermost last, with the
+    /// line each opened on.
+    open: Vec<(String, usize)>,
     looks: HashMap<String, Look>,
     /// Classes given to nodes, applied once every `classDef` is known.
     classed: Vec<(usize, String)>,
@@ -67,6 +68,12 @@ pub(super) fn parse(lines: &[Line<'_>]) -> Result<Diagram, Unsupported> {
         for statement in split_statements(line) {
             b.statement(number, statement.trim())?;
         }
+    }
+    if let Some((group, number)) = b.open.last() {
+        return Err(Unsupported::at(
+            *number,
+            format!("`subgraph {group}` is never closed with `end`"),
+        ));
     }
     for (node, class) in std::mem::take(&mut b.classed) {
         if let Some(look) = b.looks.get(&class) {
@@ -104,7 +111,9 @@ impl Builder {
         match word {
             "subgraph" => self.subgraph(number, s["subgraph".len()..].trim())?,
             "end" if s == "end" => {
-                self.open.pop();
+                if self.open.pop().is_none() {
+                    return Err(Unsupported::at(number, "an `end` with no `subgraph` open"));
+                }
             },
             "direction" | "linkStyle" | "click" | "accTitle" | "accDescr" | "title" => {},
             "classDef" => {
@@ -162,10 +171,10 @@ impl Builder {
         self.diagram.groups.push(Group {
             id: id.clone(),
             label: title,
-            parent: self.open.last().cloned(),
+            parent: self.open.last().map(|(g, _)| g.clone()),
             tone: None,
         });
-        self.open.push(id);
+        self.open.push((id, number));
         Ok(())
     }
 
@@ -179,7 +188,7 @@ impl Builder {
             return Err(Unsupported::too_big(number));
         }
         let mut node = Node::new(id, id);
-        node.group = self.open.last().cloned();
+        node.group = self.open.last().map(|(g, _)| g.clone());
         self.diagram.nodes.push(node);
         let i = self.diagram.nodes.len() - 1;
         self.index.insert(id.to_owned(), i);
