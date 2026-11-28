@@ -8,6 +8,7 @@ use {
         parse::{self, MOST_EDGES, MOST_NODES},
     },
     serde_json::{Map, Value, json},
+    std::collections::HashSet,
 };
 
 fn tone(t: Option<Tone>) -> Value {
@@ -175,6 +176,7 @@ pub fn check(doc: &Value) -> Result<Value, String> {
             return Err(format!("edge {} needs `from` and `to`", i + 1));
         }
     }
+    let edges = named(edges)?;
     let mut out = Map::new();
     for key in [
         "kind",
@@ -186,10 +188,42 @@ pub fn check(doc: &Value) -> Result<Value, String> {
         "notes",
     ] {
         if let Some(value) = map.get(key).filter(|v| !v.is_null()) {
-            out.insert(key.to_owned(), value.clone());
+            let value = if key == "edges" {
+                Value::Array(edges.clone())
+            } else {
+                value.clone()
+            };
+            out.insert(key.to_owned(), value);
         }
     }
     Ok(Value::Object(out))
+}
+
+/// `edges`, each with an id of its own, so a patch can name any of them:
+/// one given none takes the name the view shows it by (`e<index>`), else
+/// the first `eN` free. Two may not share one, as routes are kept by id.
+fn named(mut edges: Vec<Value>) -> Result<Vec<Value>, String> {
+    let mut taken = HashSet::new();
+    for edge in &edges {
+        if let Some(id) = edge.get("id").and_then(Value::as_str)
+            && !taken.insert(id.to_owned())
+        {
+            return Err(format!("two edges are `{id}`"));
+        }
+    }
+    for (index, edge) in edges.iter_mut().enumerate() {
+        if edge.get("id").is_some_and(Value::is_string) {
+            continue;
+        }
+        let id = std::iter::once(index)
+            .chain(0..)
+            .map(|n| format!("e{n}"))
+            .find(|id| !taken.contains(id))
+            .unwrap_or_default();
+        taken.insert(id.clone());
+        edge["id"] = Value::String(id);
+    }
+    Ok(edges)
 }
 
 /// Applies `ops` to `doc`: `add_nodes`, `add_edges`, `add_groups` (a node
@@ -305,7 +339,15 @@ pub fn patch(doc: &mut Value, ops: &Value) -> Result<String, String> {
             },
             _ => false,
         };
-        if let Some(edges) = doc["edges"].as_array_mut() {
+        let edges = doc["edges"].as_array_mut();
+        let known: &[Value] = edges.as_deref().map_or(&[], |e| e);
+        if let Some(missing) = gone_edges
+            .iter()
+            .find(|g| !known.iter().any(|e| matches(e, g)))
+        {
+            return Err(format!("no edge {missing} to remove"));
+        }
+        if let Some(edges) = edges {
             edges.retain(|e| !gone_edges.iter().any(|g| matches(e, g)));
         }
         changed.push(format!("{} edges removed", gone_edges.len()));
@@ -402,6 +444,30 @@ mod tests {
         assert_eq!(notes[0]["over"], json!(["A"]));
         let text = doc.to_string();
         assert!(!text.contains("\"B\""), "{text}");
+    }
+
+    #[test]
+    fn a_graphs_edges_are_saved_with_the_names_the_view_shows() {
+        let given = json!({
+            "nodes": [{ "id": "a" }, { "id": "b" }, { "id": "c" }],
+            "edges": [{ "from": "a", "to": "b" }, { "id": "e0", "from": "b", "to": "c" }, { "from": "c", "to": "a" }],
+        });
+        let mut doc = check(&given).unwrap();
+        let ids: Vec<&str> = doc["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids, ["e1", "e0", "e2"]);
+        patch(&mut doc, &json!({ "remove_edges": ["e2"] })).unwrap();
+        assert_eq!(doc["edges"].as_array().unwrap().len(), 2, "e2 went");
+        assert!(
+            patch(&mut doc, &json!({ "remove_edges": ["e2"] })).is_err(),
+            "gone already"
+        );
+        let twice = json!({ "edges": [{ "id": "x", "from": "a", "to": "b" }, { "id": "x", "from": "b", "to": "a" }] });
+        assert!(check(&twice).is_err());
     }
 
     #[test]
