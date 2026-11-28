@@ -362,8 +362,8 @@ impl Motion {
             .clone()
     }
 
-    /// Reveal a direct child only when the view's request changes; a key
-    /// is kept, and returned, until what it names has shown.
+    /// What to reveal, asked for when the view's request changes and kept,
+    /// and returned, until it has shown.
     pub(crate) fn scroll_to(
         &mut self,
         path: &str,
@@ -375,11 +375,8 @@ impl Motion {
             .get_or(path, Instant::now(), || (None, None));
         if previous.as_ref() != target {
             *pending = match target {
-                Some(ScrollTo::Child(index)) => {
-                    handle.scroll_to_item(index - 1);
-                    None
-                },
-                Some(ScrollTo::Key { key, .. }) => Some(Rc::new(Pending::new(key.clone()))),
+                Some(ScrollTo::Child(index)) => Some(Rc::new(Pending::child(index - 1))),
+                Some(ScrollTo::Key { key, .. }) => Some(Rc::new(Pending::key(key.clone()))),
                 None => None,
             };
             *previous = target.cloned();
